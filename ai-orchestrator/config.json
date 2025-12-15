@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.8.10",
+    "version": "0.8.11",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -12,6 +12,10 @@
     "startup": "application",
     "boot": "auto",
     "init": false,
+    "ingress": true,
+    "ingress_port": 8999,
+    "ingress_entry": "/",
+    "panel_icon": "mdi:robot",
     "ports": {
         "8999/tcp": 8999,
         "3654/tcp": 3654
