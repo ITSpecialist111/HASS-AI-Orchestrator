@@ -37,8 +37,10 @@ Configure the add-on in the "Configuration" tab:
 ollama_host: "http://localhost:11434" # Or external IP
 dry_run_mode: true                    # Keep TRUE for first run!
 log_level: "info"
-heating_model: "mistral:7b-instruct"
-```
+   ollama_host: "http://192.168.1.x:11434"
+   heating_model: "mistral:7b-instruct"
+   ha_access_token: "YOUR_LONG_LIVED_TOKEN_HERE" # Required for Direct Core Access
+   ```
 
 #### 4. Start
 Click **Start**. Monitor the **Log** tab.
@@ -54,7 +56,7 @@ Click **Start**. Monitor the **Log** tab.
 
 ## 🎮 Getting Started (Dashboard)
 
-Navigate to: `http://homeassistant.local:8099`
+Navigate to: `http://homeassistant.local:8999`
 
 ### 1. The Dashboard
 - **Live Ops**: See your agents (Heating, Security, etc.) pulsing when they "think".

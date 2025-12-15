@@ -19,6 +19,7 @@ AI Orchestrator is a local, privacy-focused autonomous system that intelligently
 3. **Configuration**:
    ```yaml
    ollama_host: "http://localhost:11434" # or external IP
+   ha_access_token: "eyJ0eX..."          # Create under User Profile > Long-Lived Access Tokens
    dry_run_mode: true                    # Recommended for first run
    log_level: "info"
    ```
@@ -27,7 +28,7 @@ AI Orchestrator is a local, privacy-focused autonomous system that intelligently
 ## 🎮 Dashboard
 
 Once running, access the dashboard at:
-`http://homeassistant.local:8099`
+`http://homeassistant.local:8999`
 
 ## 🧠 Brain Training
 
