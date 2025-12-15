@@ -115,12 +115,13 @@ class HAWebSocketClient:
             self.connected = False
             print(f"❌ Error receiving messages: {e}")
     
-    async def get_states(self, entity_id: Optional[str] = None) -> Dict | list:
+    async def get_states(self, entity_id: Optional[str] = None, timeout: float = 60.0) -> Dict | list:
         """
         Get current state of entities.
         
         Args:
             entity_id: Specific entity ID, or None for all entities
+            timeout: Timeout in seconds (default: 60.0)
         
         Returns:
             Entity state dict or list of states
@@ -131,7 +132,7 @@ class HAWebSocketClient:
         future = asyncio.Future()
         self.pending_responses[msg_id] = future
         try:
-            result = await asyncio.wait_for(future, timeout=30.0)
+            result = await asyncio.wait_for(future, timeout=timeout)
         except asyncio.TimeoutError:
             del self.pending_responses[msg_id]
             raise TimeoutError("Timeout waiting for HA states")

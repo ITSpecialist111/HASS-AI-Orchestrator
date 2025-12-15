@@ -32,7 +32,8 @@ class KnowledgeBase:
         try:
             # Get all states (acting as registry for now)
             # In a real scenario, we'd use the entity registry API if available
-            states = await self.ha.get_states()
+            # Use a very long timeout (5 minutes) for large installations
+            states = await self.ha.get_states(timeout=300.0)
             
             # Check if states is a list (dump of all states) or single dict
             # HA WS `get_states` usually returns a list
