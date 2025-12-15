@@ -439,3 +439,24 @@ async def broadcast_approval_request(data: Dict):
 
 # Make broadcast function available to agents/orchestrator via app state if needed
 app.state.broadcast_to_dashboard = broadcast_to_dashboard
+
+
+# -----------------------------------------------------------------------------
+# Static Files (Dashboard)
+# -----------------------------------------------------------------------------
+# Path to the built frontend (assuming standard add-on structure)
+dashboard_path = Path(__file__).parent.parent / "dashboard" / "dist"
+
+if dashboard_path.exists():
+    print(f"✓ Mounting dashboard from {dashboard_path}")
+    app.mount("/", StaticFiles(directory=str(dashboard_path), html=True), name="static")
+else:
+    print(f"⚠️ Dashboard bundle not found at {dashboard_path}")
+    
+    @app.get("/")
+    async def root():
+        return {
+            "message": "AI Orchestrator Backend is Running",
+            "status": "No dashboard found. Please ensure the frontend was built.",
+            "mode": "API Only"
+        }
