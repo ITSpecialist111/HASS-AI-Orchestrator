@@ -22,8 +22,8 @@ ports_description:
   3000/tcp: "Development dashboard server (optional)"
 
 # Persistent data
+# Persistent data
 map:
-  - config:rw
   - addon_config:rw
 
 # Home Assistant API access
@@ -49,6 +49,3 @@ schema:
   heating_entities: [str]
   decision_interval: int(30,600)
   enable_gpu: bool
-
-# Image configuration
-image: "ghcr.io/itspecialist111/hass-ai-orchestrator-{arch}"

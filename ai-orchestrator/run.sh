@@ -85,6 +85,22 @@ mkdir -p /data/logs
 mkdir -p /data/chroma
 mkdir -p /data/manuals
 
+# Phase 6: Ensure agents.yaml exists in persistent config
+if [ ! -f /config/agents.yaml ]; then
+    echo "Creating default agents.yaml in /config..."
+    if [ -f /app/agents.yaml ]; then
+        cp /app/agents.yaml /config/agents.yaml
+    else
+        echo "agents: []" > /config/agents.yaml
+    fi
+fi
+
+# Link /config/agents.yaml to where the app expects it (or update app to look in /config)
+# For now, we update the app to use /config/agents.yaml via environment variable or symlink
+rm -f /app/backend/agents.yaml
+ln -sf /config/agents.yaml /app/backend/agents.yaml
+echo "Linked agents.yaml to persistent storage"
+
 echo "=========================================="
 echo "Starting FastAPI Backend"
 echo "=========================================="
