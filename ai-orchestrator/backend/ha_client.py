@@ -40,7 +40,13 @@ class HAWebSocketClient:
     async def connect(self):
         """Connect to Home Assistant WebSocket API and authenticate"""
         try:
-            self.ws = await websockets.connect(self.ws_url)
+            # Add headers for authentication (required for Supervisor proxy)
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            self.ws = await websockets.connect(self.ws_url, extra_headers=headers)
             
             # Receive auth_required message
             auth_required = await self.ws.recv()
