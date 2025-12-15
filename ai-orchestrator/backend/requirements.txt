@@ -10,6 +10,7 @@ langgraph==0.2.28
 
 # RAG & Vector Store (Phase 3)
 chromadb==0.5.0
+numpy<2.0.0
 pypdf==4.2.0
 tiktoken==0.7.0
 
