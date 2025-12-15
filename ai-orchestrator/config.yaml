@@ -1,5 +1,5 @@
 name: "AI Orchestrator"
-version: "0.6.0"
+version: "0.6.1"
 slug: "ai-orchestrator"
 description: "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant"
 url: "https://github.com/ITSpecialist111/HASS-AI-Orchestrator"
@@ -21,7 +21,6 @@ ports_description:
   8099/tcp: "Backend API and Dashboard"
   3000/tcp: "Development dashboard server (optional)"
 
-# Persistent data
 # Persistent data
 map:
   - addon_config:rw
