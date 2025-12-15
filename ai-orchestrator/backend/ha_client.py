@@ -35,7 +35,7 @@ class HAWebSocketClient:
         # Convert HTTP URL to WebSocket URL
         parsed = urlparse(self.ha_url)
         ws_scheme = "wss" if parsed.scheme == "https" else "ws"
-        self.ws_url = f"{ws_scheme}://{parsed.netloc}/api/websocket"
+        self.ws_url = f"{ws_scheme}://{parsed.netloc}{parsed.path}/api/websocket"
     
     async def connect(self):
         """Connect to Home Assistant WebSocket API and authenticate"""
