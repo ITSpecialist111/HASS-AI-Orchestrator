@@ -99,10 +99,21 @@ async def lifespan(app: FastAPI):
     try:
         await ha_client.connect()
         print(f"✓ Connected to Home Assistant at {ha_url}")
+    except ValueError as e:
+        if "auth_invalid" in str(e):
+            print("\n" + "="*50)
+            print("❌ AUTHENTICATION ERROR")
+            print("="*50)
+            print("The Supervisor Token was rejected by Home Assistant.")
+            print("Please configure a Long-Lived Access Token (LLAT):")
+            print("1. Go to your HA Profile (bottom left user icon).")
+            print("2. Scroll to 'Long-Lived Access Tokens'.")
+            print("3. Create a token (e.g., named 'AI Orchestrator').")
+            print("4. Paste it into the 'ha_access_token' field in this Add-on's Configuration.")
+            print("="*50 + "\n")
+        raise e
     except Exception as e:
         print(f"❌ Failed to connect to Home Assistant: {e}")
-        # Build robustness: don't crash lifespan, just log error. 
-        # But for now, crashing is better so we see the error in logs.
         raise e
     
     # 2. Initialize RAG & Knowledge Base (Phase 3)
