@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.8.7",
+    "version": "0.8.8",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -13,12 +13,12 @@
     "boot": "auto",
     "init": false,
     "ports": {
-        "8099/tcp": 8099,
-        "3000/tcp": 3000
+        "8999/tcp": 8999,
+        "3654/tcp": 3654
     },
     "ports_description": {
-        "8099/tcp": "Backend API and Dashboard",
-        "3000/tcp": "Development dashboard server (optional)"
+        "8999/tcp": "Backend API and Dashboard",
+        "3654/tcp": "Development dashboard server (optional)"
     },
     "map": [
         "addon_config:rw"

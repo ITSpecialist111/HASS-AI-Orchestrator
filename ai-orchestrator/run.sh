@@ -119,6 +119,6 @@ echo "=========================================="
 cd /app/backend
 exec python3 -m uvicorn main:app \
     --host 0.0.0.0 \
-    --port 8099 \
+    --port 8999 \
     --log-level "${LOG_LEVEL,,}" \
     --no-access-log

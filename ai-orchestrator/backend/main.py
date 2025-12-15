@@ -206,12 +206,15 @@ async def lifespan(app: FastAPI):
     print(f"✓ Initialized {len(agents)} agents: {', '.join(agents.keys())}")
     
     # 6. Initialize Orchestrator
+    # Use the configured model (default: mistral:7b-instruct) for the orchestrator too,
+    # since the user might only have one model available on the remote Ollama.
     orchestrator = Orchestrator(
         ha_client=ha_client,
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
-        model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b")
+        model_name=default_agent_model,  # Reusing the main config model
+        planning_interval=default_decision_interval
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
