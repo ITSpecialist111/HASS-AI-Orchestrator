@@ -4,7 +4,7 @@ FROM node:20-alpine AS frontend-builder
 # Build React dashboard
 WORKDIR /app/dashboard
 COPY dashboard/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY dashboard/ ./
 RUN npm run build
 
