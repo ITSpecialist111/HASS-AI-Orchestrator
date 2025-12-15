@@ -37,6 +37,9 @@ echo "  Decision Interval: ${DECISION_INTERVAL}s"
 echo "  GPU Enabled: $ENABLE_GPU"
 if [ -n "$HA_ACCESS_TOKEN" ]; then
     echo "  HA Access Token: PROVIDED (Length: ${#HA_ACCESS_TOKEN})"
+    # Switch to Direct Core Access to bypass Supervisor Proxy issues
+    export HA_URL="http://homeassistant:8123"
+    echo "  > Switching to Direct Core Access: $HA_URL"
 else
     echo "  HA Access Token: NOT PROVIDED (Using Supervisor Token fallback)"
 fi

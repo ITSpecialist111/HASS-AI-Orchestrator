@@ -91,11 +91,21 @@ async def lifespan(app: FastAPI):
     
     # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
     ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip()
-    if not ha_token:
-        ha_token = supervisor_token
     
-    # Pass both: 'ha_token' for the auth payload, 'supervisor_token' for the proxy header
-    ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=supervisor_token)
+    # Determine which token to use for headers
+    # If using LLAT (Direct Mode implies homeassistant:8123), we don't need Supervisor Proxy headers
+    if ha_token:
+        # Direct Core Access Mode
+        header_token = None
+        print(f"DEBUG: Using Direct Core Access with LLAT (No Supervisor Headers)")
+    else:
+        # Supervisor Proxy Mode
+        ha_token = supervisor_token
+        header_token = supervisor_token
+        print(f"DEBUG: Using Supervisor Proxy Mode")
+    
+    # Pass both: 'ha_token' for the auth payload, 'header_token' for the proxy header
+    ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=header_token)
     try:
         await ha_client.connect()
         print(f"✓ Connected to Home Assistant at {ha_url}")
