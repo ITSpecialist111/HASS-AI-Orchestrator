@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from .base_agent import BaseAgent
-from ..mcp_server import MCPServer
-from ..ha_client import HAWebSocketClient
+from mcp_server import MCPServer
+from ha_client import HAWebSocketClient
 
 class UniversalAgent(BaseAgent):
     """
