@@ -16,6 +16,8 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apk add --no-cache \
+    python3 \
+    py3-pip \
     gcc \
     musl-dev \
     curl \
