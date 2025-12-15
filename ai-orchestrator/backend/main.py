@@ -213,8 +213,8 @@ async def lifespan(app: FastAPI):
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
-        model_name=default_agent_model,  # Reusing the main config model
-        planning_interval=default_decision_interval
+        model_name=os.getenv("HEATING_MODEL", "mistral:7b-instruct"),  # Reusing the main config model
+        planning_interval=int(os.getenv("DECISION_INTERVAL", "120"))
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
