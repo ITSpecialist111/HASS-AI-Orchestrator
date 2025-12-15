@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
     
     # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
-    ha_token = os.getenv("HA_ACCESS_TOKEN", "")
+    ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip()
     if not ha_token:
         ha_token = supervisor_token
     

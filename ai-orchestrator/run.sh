@@ -35,6 +35,11 @@ echo "  Log Level: $LOG_LEVEL"
 echo "  Heating Model: $HEATING_MODEL"
 echo "  Decision Interval: ${DECISION_INTERVAL}s"
 echo "  GPU Enabled: $ENABLE_GPU"
+if [ -n "$HA_ACCESS_TOKEN" ]; then
+    echo "  HA Access Token: PROVIDED (Length: ${#HA_ACCESS_TOKEN})"
+else
+    echo "  HA Access Token: NOT PROVIDED (Using Supervisor Token fallback)"
+fi
 
 # Start Ollama server if using localhost
 if [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"* ]]; then
