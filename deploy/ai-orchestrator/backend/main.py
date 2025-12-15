@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.1.0",
+    version="0.7.0",
     lifespan=lifespan
 )
 

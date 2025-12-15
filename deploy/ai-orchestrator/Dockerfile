@@ -50,7 +50,8 @@ ENV PYTHONPATH=/app
 EXPOSE 8099
 
 # Labels for Home Assistant
-LABEL io.hass.version="0.1.0" \
+ARG BUILD_VERSION
+LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \
       io.hass.name="AI Orchestrator" \
       io.hass.description="Multi-agent AI orchestration for Home Assistant" \
