@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend requirements and install dependencies
+COPY backend/requirements.txt backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+# Install test dependencies
+RUN pip install --no-cache-dir pytest pytest-asyncio
+
+# Copy backend code
+COPY backend/ backend/
+
+# Copy skills
+COPY skills/ skills/
+
+# Set working directory to backend for pytest
+WORKDIR /app/backend
+
+# Run smoke tests
+CMD ["pytest", "-m", "smoke", "-v", "--tb=short"]

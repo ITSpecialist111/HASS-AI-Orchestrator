@@ -1,0 +1,46 @@
+agents:
+  - id: "heating"
+    name: "Heating Manager"
+    model: "mistral:7b-instruct"
+    decision_interval: 120
+    entities: []  # populated from env vars for backward compatibility if needed, or specific list here
+    instruction: |
+      Maintain comfortable temperature (21C day, 18C night).
+      Turn off if windows are open.
+      
+  - id: "cooling"
+    name: "Cooling Manager"
+    model: "mistral:7b-instruct"
+    decision_interval: 120
+    instruction: |
+      Keep temperature below 25C. 
+      Use fans first, then AC.
+      
+  - id: "lighting"
+    name: "Lighting Manager"
+    model: "phi3.5:3.8b"
+    decision_interval: 60
+    instruction: |
+      Manage lights based on occupancy and time of day.
+      Use warmer colors (2700K) in the evening.
+      
+  - id: "security"
+    name: "Security Manager"
+    model: "mistral:7b-instruct"
+    decision_interval: 180
+    instruction: |
+      Monitor locks and sensors.
+      Lock doors if no motion for 30 mins.
+      Report any anomalies.
+
+  # Example of a new custom agent
+  # - id: "pool_manager"
+  #   name: "Pool Guy"
+  #   model: "mistral:7b-instruct"
+  #   decision_interval: 3600
+  #   entities: 
+  #     - switch.pool_pump
+  #     - sensor.pool_temp
+  #   instruction: |
+  #     Run the pool pump for 8 hours/day.
+  #     Ensure temp is above 20C before heating.

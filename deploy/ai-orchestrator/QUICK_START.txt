@@ -1,0 +1,50 @@
+﻿AI ORCHESTRATOR - INSTALLATION GUIDE
+=====================================
+
+DEPLOYMENT PACKAGE READY!
+Location: C:\Users\graham\Documents\GitHub\HASS-AI-Orchestrator\deploy\ai-orchestrator
+
+QUICK INSTALL STEPS:
+-------------------
+
+1. COPY TO HOME ASSISTANT:
+   Method A (Samba): Copy this folder to \\homeassistant.local\addons\
+   Method B (SSH): scp -r "C:\Users\graham\Documents\GitHub\HASS-AI-Orchestrator\deploy\ai-orchestrator" root@homeassistant.local:/addons/ai-orchestrator
+
+2. INSTALL ADD-ON:
+   - Open Home Assistant web UI
+   - Settings -> Add-ons
+   - Click ... (three dots) -> Check for updates  
+   - Find "AI Orchestrator" under Local add-ons
+   - Click and press INSTALL
+   - Wait 5-10 minutes for Docker build
+
+3. CONFIGURE (CRITICAL!):
+   Before starting, edit configuration:
+   
+   ollama_host: http://localhost:11434
+   dry_run_mode: true
+   log_level: info
+   heating_model: mistral:7b-instruct
+   heating_entities:
+     - climate.YOUR_ENTITY_ID_HERE
+   decision_interval: 120
+   enable_gpu: false
+
+   IMPORTANT: Get your climate entity IDs from:
+   Developer Tools -> States -> Filter "climate"
+
+4. START ADD-ON:
+   - Click START button
+   - Watch Log tab for successful startup
+
+5. ACCESS DASHBOARD:
+   http://
+
+NEXT STEPS:
+- Monitor first decisions (120s interval)
+- Verify DRY RUN badge appears
+- Confirm no actual temperature changes
+- After 24h validation, disable dry_run_mode
+
+See DEPLOYMENT.md for full documentation.
