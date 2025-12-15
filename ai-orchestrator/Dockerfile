@@ -1,4 +1,5 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.11
+ARG BUILD_ARCH=amd64
 FROM node:20-alpine AS frontend-builder
 
 # Build React dashboard
@@ -10,7 +11,6 @@ RUN npm run build
 
 # Runtime stage
 # We ignore the BUILD_FROM arg (which defaults to Alpine) and force Debian for ChromaDB/ONNX support
-ARG BUILD_ARCH
 FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:bookworm
 
 # Set working directory
