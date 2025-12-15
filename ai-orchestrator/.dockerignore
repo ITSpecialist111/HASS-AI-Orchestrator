@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.git
+**/.vscode
+**/__pycache__
+**/.env
+**/.DS_Store
+**/venv
+**/bin
+**/obj
+backend/logs
+addon_configs
