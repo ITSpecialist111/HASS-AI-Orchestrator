@@ -23,8 +23,9 @@ export DECISION_INTERVAL=$(jq -r '.decision_interval // 120' $CONFIG_PATH)
 export ENABLE_GPU=$(jq -r '.enable_gpu // false' $CONFIG_PATH)
 
 # Home Assistant API configuration
+# Home Assistant API configuration
 export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"
-export HA_TOKEN="${SUPERVISOR_TOKEN}"
+export HA_ACCESS_TOKEN=$(jq -r '.ha_access_token // ""' $CONFIG_PATH)
 export HA_URL="http://supervisor/core"
 
 echo "Configuration loaded:"

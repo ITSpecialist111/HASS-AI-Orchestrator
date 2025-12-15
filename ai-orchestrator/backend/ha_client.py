@@ -16,16 +16,18 @@ class HAWebSocketClient:
     Handles authentication, state subscriptions, and service calls.
     """
     
-    def __init__(self, ha_url: str, access_token: str):
+    def __init__(self, ha_url: str, token: str, supervisor_token: Optional[str] = None):
         """
         Initialize HA WebSocket client.
         
         Args:
-            ha_url: Home Assistant URL (http://supervisor/core or http://homeassistant.local:8123)
-            access_token: Long-lived access token or supervisor token
+            ha_url: Home Assistant URL
+            token: Token for WebSocket 'auth' packet (LLAT or Supervisor Token)
+            supervisor_token: Token for Supervisor Proxy Headers (if different)
         """
         self.ha_url = ha_url.rstrip("/")
-        self.access_token = access_token
+        self.token = token
+        self.supervisor_token = supervisor_token or token
         self.connected = False
         self.ws = None
         self.message_id = 0
@@ -41,8 +43,9 @@ class HAWebSocketClient:
         """Connect to Home Assistant WebSocket API and authenticate"""
         try:
             # Add headers for authentication (required for Supervisor proxy)
+            # Use supervisor_token for the proxy header
             headers = {
-                "Authorization": f"Bearer {self.access_token}",
+                "Authorization": f"Bearer {self.supervisor_token}",
                 "Content-Type": "application/json"
             }
             
@@ -54,10 +57,10 @@ class HAWebSocketClient:
             if auth_data["type"] != "auth_required":
                 raise ValueError(f"Unexpected message: {auth_data}")
             
-            # Send auth message
+            # Send auth message using the payload token (might be LLAT)
             await self.ws.send(json.dumps({
                 "type": "auth",
-                "access_token": self.access_token
+                "access_token": self.token
             }))
             
             # Receive auth result

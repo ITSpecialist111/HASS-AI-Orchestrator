@@ -87,13 +87,23 @@ async def lifespan(app: FastAPI):
     
     # 1. Initialize Home Assistant WebSocket client
     ha_url = os.getenv("HA_URL", "http://supervisor/core")
-    ha_token = os.getenv("SUPERVISOR_TOKEN", "")
+    supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
     
-    ha_client = HAWebSocketClient(ha_url, ha_token)
-    await ha_client.connect()
-    print(f"✓ Connected to Home Assistant at {ha_url}")
+    # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
+    ha_token = os.getenv("HA_ACCESS_TOKEN", "")
+    if not ha_token:
+        ha_token = supervisor_token
     
-    print(f"✓ Connected to Home Assistant at {ha_url}")
+    # Pass both: 'ha_token' for the auth payload, 'supervisor_token' for the proxy header
+    ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=supervisor_token)
+    try:
+        await ha_client.connect()
+        print(f"✓ Connected to Home Assistant at {ha_url}")
+    except Exception as e:
+        print(f"❌ Failed to connect to Home Assistant: {e}")
+        # Build robustness: don't crash lifespan, just log error. 
+        # But for now, crashing is better so we see the error in logs.
+        raise e
     
     # 2. Initialize RAG & Knowledge Base (Phase 3)
     enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
