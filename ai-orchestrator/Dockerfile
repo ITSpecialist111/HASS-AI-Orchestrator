@@ -9,20 +9,22 @@ COPY dashboard/ ./
 RUN npm run build
 
 # Runtime stage
-FROM ${BUILD_FROM}
+# We ignore the BUILD_FROM arg (which defaults to Alpine) and force Debian for ChromaDB/ONNX support
+ARG BUILD_ARCH
+FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:bookworm
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
-    gcc \
-    musl-dev \
+    python3-pip \
+    python3-venv \
+    build-essential \
     curl \
-    bash \
-    jq
+    jq \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY backend/requirements.txt /app/backend/requirements.txt
