@@ -6,6 +6,7 @@ import logging
 import json
 import asyncio
 from pathlib import Path
+from datetime import datetime
 from typing import List, Dict
 from rag_manager import RagManager
 from ha_client import HAWebSocketClient
@@ -28,64 +29,70 @@ class KnowledgeBase:
         """
         logger.info("Starting HA Entity Registry ingestion...")
         
-        # Get all states (acting as registry for now)
-        # In a real scenario, we'd use the entity registry API if available
-        states = await self.ha.get_states()
-        
-        # Check if states is a list (dump of all states) or single dict
-        # HA WS `get_states` usually returns a list
-        if isinstance(states, dict) and "result" in states:
-             # Handle raw WS response if wrapped
-             states = states["result"]
-             
-        if not isinstance(states, list):
-             # Fallback if we can't get list
-             logger.warning("Could not retrieve full entity list")
-             return
-
-        count = 0
-        for entity in states:
-            entity_id = entity.get("entity_id")
-            attributes = entity.get("attributes", {})
-            state = entity.get("state")
+        try:
+            # Get all states (acting as registry for now)
+            # In a real scenario, we'd use the entity registry API if available
+            states = await self.ha.get_states()
             
-            # Skip uninteresting entities
-            domain = entity_id.split(".")[0]
-            if domain not in ["climate", "light", "switch", "lock", "alarm_control_panel", "binary_sensor", "sensor"]:
-                continue
+            # Check if states is a list (dump of all states) or single dict
+            # HA WS `get_states` usually returns a list
+            if isinstance(states, dict) and "result" in states:
+                 # Handle raw WS response if wrapped
+                 states = states["result"]
+                 
+            if not isinstance(states, list):
+                 # Fallback if we can't get list
+                 logger.warning("Could not retrieve full entity list")
+                 return
+    
+            count = 0
+            for entity in states:
+                entity_id = entity.get("entity_id")
+                attributes = entity.get("attributes", {})
+                state = entity.get("state")
                 
-            # Create semantic description
-            friendly_name = attributes.get("friendly_name", entity_id)
-            desc = f"Entity '{friendly_name}' ({entity_id}) is a {domain} device. "
-            
-            if domain == "climate":
-                modes = attributes.get("hvac_modes", [])
-                min_temp = attributes.get("min_temp")
-                max_temp = attributes.get("max_temp")
-                desc += f"It supports HVAC modes: {', '.join(modes)}. Temperature range: {min_temp}°C to {max_temp}°C."
+                # Skip uninteresting entities
+                domain = entity_id.split(".")[0]
+                if domain not in ["climate", "light", "switch", "lock", "alarm_control_panel", "binary_sensor", "sensor"]:
+                    continue
+                    
+                # Create semantic description
+                friendly_name = attributes.get("friendly_name", entity_id)
+                desc = f"Entity '{friendly_name}' ({entity_id}) is a {domain} device. "
                 
-            elif domain == "light":
-                modes = attributes.get("supported_color_modes", [])
-                desc += f"Supported color modes: {', '.join(modes)}."
-                if "brightness" in attributes:
-                    desc += " It supports brightness control."
-                if "color_temp" in attributes:
-                    desc += " It supports color temperature control."
+                if domain == "climate":
+                    modes = attributes.get("hvac_modes", [])
+                    min_temp = attributes.get("min_temp")
+                    max_temp = attributes.get("max_temp")
+                    desc += f"It supports HVAC modes: {', '.join(modes)}. Temperature range: {min_temp}°C to {max_temp}°C."
+                    
+                elif domain == "light":
+                    modes = attributes.get("supported_color_modes", [])
+                    desc += f"Supported color modes: {', '.join(modes)}."
+                    if "brightness" in attributes:
+                        desc += " It supports brightness control."
+                    if "color_temp" in attributes:
+                        desc += " It supports color temperature control."
+                
+                # Add to vector store
+                self.rag.add_document(
+                    text=desc,
+                    collection_name="entity_registry",
+                    metadata={
+                        "entity_id": entity_id,
+                        "domain": domain,
+                        "last_updated": datetime.now().isoformat()
+                    },
+                    doc_id=f"entity_{entity_id}"
+                )
+                count += 1
+                
+            logger.info(f"Ingested {count} entities into Knowledge Base")
             
-            # Add to vector store
-            self.rag.add_document(
-                text=desc,
-                collection_name="entity_registry",
-                metadata={
-                    "entity_id": entity_id,
-                    "domain": domain,
-                    "last_updated": datetime.now().isoformat()
-                },
-                doc_id=f"entity_{entity_id}"
-            )
-            count += 1
-            
-        logger.info(f"Ingested {count} entities into Knowledge Base")
+        except TimeoutError:
+            logger.warning("Timed out fetching Entity Registry. Knowledge Base will be partial.")
+        except Exception as e:
+            logger.error(f"Error during Knowledge Base ingestion: {e}")
 
     async def ingest_manuals(self, manuals_dir: str = "/data/manuals"):
         """
