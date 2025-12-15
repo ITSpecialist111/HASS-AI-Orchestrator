@@ -176,23 +176,24 @@ Decision Criteria:
         if "relevant_knowledge" in self.skills:
              prompt += f"\nRELEVANT KNOWLEDGE (from memory/docs):\n{self.skills['relevant_knowledge']}\n"
              
-        return prompt
-
+        # Append output format instructions
+        prompt += """
 Respond with a JSON object containing your decision in this format:
-{{
+{
   "reasoning": "Brief explanation of why you made this decision",
   "actions": [
-    {{
+    {
       "tool": "tool_name",
-      "parameters": {{
+      "parameters": {
         "param1": "value1"
-      }}
-    }}
+      }
+    }
   ]
-}}
+}
 
 If no action is needed, return an empty actions array.
 """
+        return prompt
     
     @abstractmethod
     async def decide(self, context: Dict) -> Dict:
