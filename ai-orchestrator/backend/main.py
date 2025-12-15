@@ -216,7 +216,7 @@ async def lifespan(app: FastAPI):
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
     # 7. Start Orchestrator Loop
-    asyncio.create_task(orchestrator.run_orchestration_loop())
+    asyncio.create_task(orchestrator.run_planning_loop())
     print("✓ Orchestration loop started")
     
     # 8. Initialize Architect (Phase 6)
