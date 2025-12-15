@@ -130,7 +130,11 @@ class HAWebSocketClient:
         # Wait for response
         future = asyncio.Future()
         self.pending_responses[msg_id] = future
-        result = await asyncio.wait_for(future, timeout=10.0)
+        try:
+            result = await asyncio.wait_for(future, timeout=30.0)
+        except asyncio.TimeoutError:
+            del self.pending_responses[msg_id]
+            raise TimeoutError("Timeout waiting for HA states")
         
         if not result.get("success"):
             raise ValueError(f"Failed to get states: {result}")
