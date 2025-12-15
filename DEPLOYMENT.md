@@ -12,20 +12,22 @@ This deployment package includes the full **Phase 6** feature set:
 
 ## 📦 Installation Options
 
-### Option 1: Home Assistant Add-on (Production)
+### Option 1: Repository Install (Recommended)
 
-#### Prerequisites
-- Home Assistant OS / Supervised
-- SSH Access (to copy files)
-- **4GB+ RAM** (Local LLM requirement)
+This is the easiest way to install and get automatic updates.
 
-#### 1. Copy Files
-Copy this entire repository to your Home Assistant `/addons/ai-orchestrator` folder.
+#### 1. Add Repository
+1. Open Home Assistant.
+2. Go to **Settings > Add-ons > Add-on Store**.
+3. Click **⋮** (three dots) > **Repositories**.
+4. Add URL: `https://github.com/ITSpecialist111/HASS-AI-Orchestrator`
+5. Click **Add**.
 
-#### 2. Install
-1. Go to **Settings > Add-ons > Local Add-ons**.
-2. Install **AI Orchestrator**.
-3. **DO NOT START YET**.
+#### 2. Install Add-on
+1. Reload the page (important!).
+2. Find **AI Orchestrator** in the list.
+3. Click **Install**.
+4. Build time: **5-15 minutes** (it builds locally on your device).
 
 #### 3. Configuration
 Configure the add-on in the "Configuration" tab:
@@ -34,21 +36,18 @@ Configure the add-on in the "Configuration" tab:
 ollama_host: "http://localhost:11434" # Or external IP
 dry_run_mode: true                    # Keep TRUE for first run!
 log_level: "info"
-default_model: "mistral:7b-instruct"  # The brain
+heating_model: "mistral:7b-instruct"
 ```
 
 #### 4. Start
-Click **Start**. The first run will take 5-10 minutes to:
-1. Pull the LLM model (4GB).
-2. Build the vector database.
+Click **Start**. Monitor the **Log** tab.
 
-Monitor the **Log** tab:
-```
-✓ Connect to Home Assistant
-✓ Architect Agent initialized
-✓ Orchestration loop started
-✅ AI Orchestrator (Phase 6) ready!
-```
+---
+
+### Option 2: Manual Install (Legacy)
+1. Copy the `ai-orchestrator` folder to `/addons/` on your HA host.
+2. Restart Supervisor.
+3. Install via Local Add-ons list.
 
 ---
 
