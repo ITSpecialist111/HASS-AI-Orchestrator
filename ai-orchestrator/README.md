@@ -1,28 +1,25 @@
-# 🤖 AI Orchestrator (Phase 6)
+# � AI Orchestrator
 
-**The "Jarvis" for your Home Assistant.**
+**The Autonomous AI Automation Engine for Home Assistant.**
 
-AI Orchestrator is a local, privacy-focused autonomous system that intelligently manages your smart home using multiple specialized AI agents. It moves beyond simple "if-this-then-that" automation to intent-based AI decision making.
+AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.8.35
+**Version**: v0.8.52
 
 ## 🌟 Key Features
 
-### 1. Universal Agents (v2) 🧠
-Creating an agent is as simple as writing a job description. You don't need to code python scripts or complex YAML automations.
+### 1. Dynamic Agent Reasoning 🧠
+Move beyond rigid YAML automations. Create agents with simple natural language job descriptions.
+-   **Natural Language Instructions**: "Keep the living room cozy. If it's movie time (dim lights, TV on), ensure the temperature is comfortable."
+-   **Smart Context Awareness**: Agents automatically discover relevant devices and services. They know *what* is available in your home.
 
--   **Natural Language Instructions**: "Monitor the baby's room. If it gets too cold, turn on the heater."
--   **Dynamic Entity Discovery**: You don't even need to tell the agent *which* heater. It will scan your Home Assistant, find relevant devices (prioritizing Climate, Lights, Switches, and Locks), and choose the correct one automatically.
--   **Anti-Hallucination**: The system strictly prevents agents from inventing non-existent devices.
+-   **RAG Knowledge Base**: Feed your agents manuals, documentation, or specific facts so they make informed decisions (e.g., "Don't turn off the heater if the pump is running").
 
-### 2. Model Context Protocol (MCP) Server 🛠️
-Agents interact with your home safely through a standardized tool layer.
-Available tools include:
--   `set_temperature` / `set_hvac_mode`: Advanced climate control (with safeguards).
--   `turn_on_light` / `set_brightness`: Smart lighting management.
--   `lock_door`: Secure access control.
--   `log`: Agents keep a "diary" of their observations and decisions.
--   `call_ha_service`: Generic fallback for any other Home Assistant service.
+### 2. Internal MCP Tool Engine 🛠️
+The system features a purpose-built **Model Context Protocol (MCP) Server** responsible for safely executing agent decisions. This is the bridge between the AI's "brain" and Home Assistant's "hands".
+-   It strictly maps AI intent to valid Home Assistant Service calls (`climate.set_temperature`, `light.turn_on`, etc.).
+-   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
+-   It logs every action for transparency.
 
 ### 3. "Minority Report" Dashboard 🖥️
 -   **Live Decision Stream**: Watch your agents think in real-time. See *why* they made a decision.
@@ -71,11 +68,11 @@ agents:
 ## 🔧 Troubleshooting
 
 ### "Agent is hallucinating entity IDs?"
-*   **Cause**: The agent is trying to guess entity names.
+*   **Cause**: The agent is searching for devices that don't match its internal registry.
 *   **Fix**:
-    1.  Ensure you are on **v0.8.35+** (includes strict Anti-Hallucination rules).
+    1.  Ensure you are on **v0.8.52+** (includes Dynamic Service Discovery and Anti-Hallucination).
     2.  Check the "Decision Stream" log. Does it verify the entity exists?
-    3.  Manually assign the entity in `agents.yaml` to force it to be visible.
+    3.  Manually assign the entity in `agents.yaml` if auto-discovery is missing it.
 
 ### "I see 'Dry Run' in the logs?"
 *   **Cause**: `dry_run_mode` is enabled in configuration.
