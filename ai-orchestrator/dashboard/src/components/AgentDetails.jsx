@@ -49,9 +49,15 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
         }
     };
 
-    const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${agent.name}?`)) return;
+    // Delete Confirmation State
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+    const handleDeleteClick = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        setLoading(true);
         try {
             const res = await fetch(`/api/factory/agents/${agent.agent_id}`, {
                 method: 'DELETE'
@@ -59,9 +65,16 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
             if (res.ok) {
                 onDelete(agent.agent_id);
                 onClose();
+                // Optional: Force reload if parent doesn't handle list update
+                window.location.reload();
+            } else {
+                alert("Failed to delete agent. Server returned error.");
             }
         } catch (e) {
-            alert("Failed to delete agent");
+            alert("Failed to delete agent. Check connection.");
+        } finally {
+            setLoading(false);
+            setShowDeleteConfirm(false);
         }
     };
 
@@ -85,7 +98,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     </div>
                     <div className="flex gap-2">
                         <button
-                            onClick={handleDelete}
+                            onClick={handleDeleteClick}
                             className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                             title="Delete Agent"
                         >
@@ -100,6 +113,37 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     </div>
                 </div>
 
+                {/* Delete Confirmation Overlay */}
+                {showDeleteConfirm && (
+                    <div className="absolute inset-0 z-10 bg-slate-900/90 flex items-center justify-center p-6 backdrop-blur-sm">
+                        <div className="bg-slate-800 border border-red-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-4">
+                                    <Trash2 size={24} />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">Delete Agent?</h3>
+                                <p className="text-slate-400 mb-6">
+                                    Are you sure you want to permanently delete <strong>{agent.name}</strong>? This action cannot be undone.
+                                </p>
+                                <div className="flex gap-3 w-full">
+                                    <button
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        className="flex-1 py-2 px-4 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600 transition-colors font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        disabled={loading}
+                                        className="flex-1 py-2 px-4 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? 'Deleting...' : 'Delete Forever'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Tabs */}
                 <div className="flex border-b border-slate-700 px-6">
                     <button
