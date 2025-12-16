@@ -65,15 +65,17 @@ You can control ANY entity in your target list.
             return "No specific entities assigned. Monitor global state if needed."
             
         for entity_id in self.entities:
-            state = await self.ha_client.get_state(entity_id)
-            if state:
-                attrs = state.get("attributes", {})
-                friendly_name = attrs.get("friendly_name", entity_id)
-                val = state.get("state", "unknown")
-                # Format specific attributes for context if needed
-                states.append(f"- {friendly_name} ({entity_id}): {val}")
-            else:
-                states.append(f"- {entity_id}: unknown")
+            try:
+                state = await self.ha_client.get_states(entity_id)
+                if state:
+                    attrs = state.get("attributes", {})
+                    friendly_name = attrs.get("friendly_name", entity_id)
+                    val = state.get("state", "unknown")
+                    states.append(f"- {friendly_name} ({entity_id}): {val}")
+                else:
+                    states.append(f"- {entity_id}: unknown")
+            except Exception:
+                states.append(f"- {entity_id}: unavailable")
                 
         return "\n".join(states)
 
@@ -108,6 +110,7 @@ ENTITY STATES:
 
 Based on your PRIMARY INSTRUCTION and the CURRENT SITUATION, determine if any action is needed.
 Respond with a JSON object containing 'reasoning' and 'actions'.
+Each action MUST have a 'tool' field (e.g. "call_ha_service") and 'parameters'.
 """
         # Call LLM
         response = await self._call_llm(prompt)
@@ -122,8 +125,24 @@ Respond with a JSON object containing 'reasoning' and 'actions'.
                     clean_response = clean_response.rsplit("\n", 1)[0]
             if clean_response.startswith("json"):
                 clean_response = clean_response[4:]
-                
-            return json.loads(clean_response)
+            
+            data = json.loads(clean_response)
+            
+            # Validate actions structure
+            valid_actions = []
+            if "actions" in data and isinstance(data["actions"], list):
+                for action in data["actions"]:
+                    if "tool" in action:
+                        valid_actions.append(action)
+                    elif "service" in action: # Handle common hallucination
+                        valid_actions.append({
+                            "tool": "call_ha_service",
+                            "parameters": action
+                        })
+            
+            data["actions"] = valid_actions
+            return data
+            
         except Exception as e:
             return {
                 "reasoning": f"Failed to parse LLM response: {e}",
