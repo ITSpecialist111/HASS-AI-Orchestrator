@@ -249,7 +249,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.20",
+    version="0.8.21",
     lifespan=lifespan
 )
 
@@ -276,23 +276,26 @@ async def ingress_path_fixer(request: Request, call_next):
         # Ensure it starts with /
         if not new_path.startswith("/"):
             new_path = "/" + new_path
+        
+        # FIX: Normalize double slashes (e.g. //api/agents -> /api/agents)
+        while "//" in new_path:
+            new_path = new_path.replace("//", "/")
             
         request.scope["path"] = new_path
         print(f"DEBUG REWRITE: {path} -> {new_path}")
         
     elif "/api/" in path and not path.startswith("/api/"):
         # Fallback for when header might be missing but path is clearly prefixed (legacy fix)
-        # e.g. /hassio/ingress/slug/api/agents -> /api/agents
-        # Be careful not to match /api/ itself if it's correct
-        pass # Disabling guessing to rely on headers or direct /ws access
+        pass 
         
-        # If we didn't find the header, check if we need to fix /ws manually
-        # This is risky without the header. Let's try a safer 'known root' check
-        
-    # Manual fix for /ws if header missing (rare)
-    if path.endswith("/ws") and path != "/ws":
-         request.scope["path"] = "/ws"
-         print(f"DEBUG REWRITE (Manual WS): {path} -> /ws")
+    # Manual fix for /ws if header missing or double slash weirdness remains
+    path = request.scope["path"] # Reload potentially modified path
+    if path.endswith("/ws") and "/ws" in path and path != "/ws":
+         # Try to force it if it looks like a WS request
+         # e.g. //ws -> /ws
+         if path.strip("/") == "ws":
+             request.scope["path"] = "/ws"
+             print(f"DEBUG REWRITE (Manual WS): {path} -> /ws")
 
     response = await call_next(request)
     return response
