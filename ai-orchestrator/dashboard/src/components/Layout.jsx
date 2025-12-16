@@ -8,15 +8,28 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
 
-    // Load config for settings modal
+    const [appVersion, setAppVersion] = useState(version);
+
+    // Load config for settings modal and version
     useEffect(() => {
-        if (showSettings) {
-            fetch('api/config')
-                .then(res => res.json())
-                .then(data => setConfig(data))
-                .catch(err => console.error("Failed to load config", err));
-        }
-    }, [showSettings]);
+        fetch('api/config')
+            .then(res => res.json())
+            .then(data => {
+                setConfig(data);
+                if (data.version) setAppVersion("v" + data.version);
+            })
+            .catch(err => console.error("Failed to load config", err));
+    }, [showSettings]); // Also fetch on settings open, but ideally on mount too
+
+    // Initial fetch
+    useEffect(() => {
+        fetch('api/config')
+            .then(res => res.json())
+            .then(data => {
+                if (data.version) setAppVersion("v" + data.version);
+            })
+            .catch(e => console.error("Ver check failed", e));
+    }, []);
 
     const menuItems = [
         { id: 'live', label: 'Command Centre', icon: LayoutDashboard },
@@ -29,7 +42,6 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
         <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden selection:bg-purple-500/30">
             {/* Sidebar */}
             <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 transition-all duration-300">
-
                 {/* Brand */}
                 <div className="p-6 flex items-center gap-3 border-b border-slate-800/50">
                     <div className="bg-gradient-to-br from-purple-600 to-blue-600 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-purple-900/20 shrink-0">
@@ -46,7 +58,6 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                     {menuItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.id;
-
                         return (
                             <button
                                 key={item.id}
@@ -64,10 +75,9 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                     })}
                 </nav>
 
-                {/* Footer Status */}
                 <div className="p-4 bg-slate-950/30 border-t border-slate-800 text-xs">
                     <div className="flex items-center justify-between mb-3">
-                        <span className="text-slate-500 font-mono">{version}</span>
+                        <span className="text-slate-500 font-mono">{appVersion}</span>
                         <button
                             onClick={() => setShowSettings(true)}
                             className="text-slate-600 hover:text-slate-400 transition-colors p-1 hover:bg-slate-800 rounded"
