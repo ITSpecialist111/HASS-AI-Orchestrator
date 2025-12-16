@@ -295,16 +295,30 @@ If no action is needed, return an empty actions array.
         decision_files = sorted(self.decision_dir.glob("*.json"), reverse=True)
         return decision_files[0] if decision_files else None
     
+    async def _broadcast_status(self, status: str):
+        """Broadcast status update to dashboard"""
+        if self.broadcast_func:
+            await self.broadcast_func({
+                "type": "agent_update",
+                "data": {
+                    "agent_id": self.agent_id,
+                    "name": self.name,
+                    "status": status,
+                    "last_active": datetime.now().isoformat()
+                }
+            })
+
     async def run_decision_loop(self):
         """Main decision loop that runs continuously"""
         self.status = "idle"
+        # Delay start slightly to allow system to settle
+        await asyncio.sleep(5)
         print(f"✓ {self.name} decision loop started (interval: {self.decision_interval}s)")
         
         while True:
             try:
-                await asyncio.sleep(self.decision_interval)
-                
                 self.status = "deciding"
+                await self._broadcast_status("deciding")
                 
                 # Make decision
                 context = await self.gather_context()
@@ -316,7 +330,7 @@ If no action is needed, return an empty actions array.
                 # Log decision
                 self.log_decision(context, decision, results)
                 
-                # Broadcast to dashboard
+                # Broadcast decision result
                 if self.broadcast_func:
                     await self.broadcast_func({
                         "type": "decision",
@@ -330,11 +344,16 @@ If no action is needed, return an empty actions array.
                     })
                 
                 self.status = "idle"
-                print(f"✓ {self.name} decision completed")
+                await self._broadcast_status("idle")
+                print(f"✓ {self.name} decision completed (waiting {self.decision_interval}s)")
+                
+                # Sleep at END of loop
+                await asyncio.sleep(self.decision_interval)
             
             except Exception as e:
                 self.status = "error"
                 print(f"❌ {self.name} decision loop error: {e}")
+                await self._broadcast_status("error")
                 await asyncio.sleep(10)  # Back off on error
     
     @abstractmethod
