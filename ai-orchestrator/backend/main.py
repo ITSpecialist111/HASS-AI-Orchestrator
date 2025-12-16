@@ -223,6 +223,12 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(orchestrator.run_planning_loop())
     print("✓ Orchestration loop started")
     
+    # 7.5 Start Specialist Agent Loops (Autonomous Mode)
+    for agent_id, agent in agents.items():
+        if hasattr(agent, "run_decision_loop") and getattr(agent, "decision_interval", 0) > 0:
+            asyncio.create_task(agent.run_decision_loop())
+            print(f"✓ Started decision loop for {agent_id}")
+    
     # 8. Initialize Architect (Phase 6)
     architect = ArchitectAgent(ha_client, rag_manager=rag_manager)
     app.state.architect = architect
@@ -250,7 +256,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.29",
+    version="0.8.30",
     lifespan=lifespan
 )
 
