@@ -6,12 +6,14 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
     const [decisions, setDecisions] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
     const [instruction, setInstruction] = useState(agent?.instruction || "");
+    const [name, setName] = useState(agent?.name || "");
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (agent?.agent_id) {
             fetchDecisions();
             setInstruction(agent.instruction || ""); // Reset on agent change
+            setName(agent.name || "");
         }
     }, [agent]);
 
@@ -31,13 +33,18 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
             const res = await fetch(`/api/factory/agents/${agent.agent_id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ instruction: instruction })
+                body: JSON.stringify({
+                    instruction: instruction,
+                    name: name
+                })
             });
 
             if (res.ok) {
                 setIsEditing(false);
-                // Trigger generic refresh? Or optimistic update?
-                // For now, let's just close edit mode and show success
+                // Optional: Trigger full refresh if name changed because it affects grid
+                if (name !== agent.name) {
+                    window.location.reload();
+                }
             } else {
                 alert("Failed to update agent");
             }
@@ -91,7 +98,17 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${agent.status === 'deciding' ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
-                            <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xl font-bold text-white focus:outline-none focus:border-blue-500 w-full"
+                                />
+                            ) : (
+                                <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
+                            )}
+
                             <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">{agent.model}</span>
                         </div>
                         <p className="text-slate-400 text-sm">ID: {agent.agent_id}</p>

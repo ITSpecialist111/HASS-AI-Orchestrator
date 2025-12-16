@@ -103,7 +103,7 @@ const AgentCard = ({ agent, onClick }) => {
 
 import AgentDetails from './AgentDetails';
 
-export const AgentGrid = ({ agents }) => {
+export const AgentGrid = ({ agents, onAgentCreate }) => {
     const [selectedAgent, setSelectedAgent] = React.useState(null);
 
     const handleAgentClick = (agent) => {
@@ -136,7 +136,10 @@ export const AgentGrid = ({ agents }) => {
                 ))}
 
                 {/* Add New Agent Card Place holder/Button */}
-                <div className="group border border-dashed border-slate-800 bg-slate-900/30 rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-slate-800/50 hover:border-purple-500/30 transition-all min-h-[160px]">
+                <div
+                    onClick={onAgentCreate}
+                    className="group border border-dashed border-slate-800 bg-slate-900/30 rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-slate-800/50 hover:border-purple-500/30 transition-all min-h-[160px]"
+                >
                     <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
                         <span className="text-xl">+</span>
                     </div>

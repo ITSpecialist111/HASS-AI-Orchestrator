@@ -82,9 +82,9 @@ async def delete_agent(agent_id: str, request: Request):
     
     try:
         # 1. Provide info to Orchestrator to stop the loop? 
-        # For now, just remove from global dict
-        if agent_id in request.app.state.agents:
-            del request.app.state.agents[agent_id]
+        # For now, just remove from global dict safely
+        if hasattr(request.app.state, "agents"):
+             request.app.state.agents.pop(agent_id, None)
             
         # 2. Remove from yaml
         if os.path.exists(config_path):
@@ -92,15 +92,22 @@ async def delete_agent(agent_id: str, request: Request):
                 data = yaml.safe_load(f) or {}
             
             if 'agents' in data:
+                initial_count = len(data['agents'])
                 data['agents'] = [a for a in data['agents'] if a['id'] != agent_id]
                 
+                if len(data['agents']) == initial_count and agent_id not in request.app.state.agents:
+                    # Not found in file AND not in memory (already popped)
+                    # Use a warning but don't error if it's already effectively gone
+                    pass
+
                 with open(config_path, 'w') as f:
                     yaml.dump(data, f, sort_keys=False)
                     
         return {"status": "success", "message": f"Agent {agent_id} deleted"}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error deleting agent {agent_id}: {e}") # Log to console
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
 
 class UpdateAgentRequest(BaseModel):
     instruction: Optional[str] = None
@@ -143,31 +150,17 @@ async def update_agent(agent_id: str, req: UpdateAgentRequest, request: Request)
             raise HTTPException(status_code=404, detail="Config file not found")
 
         # 2. Hot Reload in Memory
-        # We need access to the agent instance
-        # This is tricky because we need to re-instantiate it using main.py's dependencies (mcp, ha_client)
-        # For now, we simply require a restart or we can try to update the live instance attributes if possible.
-        
-        # Simple attribute update for immediate effect (Instruction and Interval)
-        # Re-init is safer but requires importing UniversalAgent and having access to all deps.
-        # Let's try simple attribute update if it exists in memory.
-        
-        # Access global agents dict via app state (hacky until refactored)
-        # We need to expose agents in app.state in main.py first!
-        # Assuming we will do that.
-        
-        # For now, just return success and tell user to restart or wait for hot reload implementation
-        # Actually, let's try to update the running instance if we can find it.
-        # We'll need to define `request.app.state.agents` in `main.py`
-        
         if hasattr(request.app.state, "agents") and agent_id in request.app.state.agents:
              agent_instance = request.app.state.agents[agent_id]
              if req.instruction is not None:
                  agent_instance.instruction = req.instruction
-                 # If using UniversalAgent, this is enough because it reads self.instruction every loop
+             if req.name is not None:
+                 agent_instance.name = req.name # UniversalAgent has .name attribute? Yes, base class.
              if req.decision_interval is not None and hasattr(agent_instance, "decision_interval"):
                  agent_instance.decision_interval = req.decision_interval
         
-        return {"status": "success", "message": "Agent updated. Properties updated in memory."}
+        return {"status": "success", "message": "Agent updated."}
 
     except Exception as e:
+        print(f"Error updating agent {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
