@@ -62,8 +62,28 @@ You can control ANY entity in your target list.
         """
         states = []
         if not self.entities:
-            return "No specific entities assigned. Monitor global state if needed."
-            
+            # Dynamic mode: fetch all relevant entities to let LLM decide
+            try:
+                all_states = await self.ha_client.get_states()
+                relevant_domains = ["climate", "light", "switch", "sensor", "binary_sensor", "lock", "cover"]
+                
+                # Filter and take first 50 to avoid token limit
+                filtered = [
+                    s for s in all_states 
+                    if s['entity_id'].split('.')[0] in relevant_domains
+                ][:50]
+                
+                states.append("Dynamic Entity Discovery (Top 50 relevant):")
+                for s in filtered:
+                    eid = s['entity_id']
+                    friendly = s.get('attributes', {}).get('friendly_name', eid)
+                    val = s['state']
+                    states.append(f"- {friendly} ({eid}): {val}")
+                    
+                return "\n".join(states)
+            except Exception as e:
+                return f"Error discovering entities: {e}"
+
         for entity_id in self.entities:
             try:
                 state = await self.ha_client.get_states(entity_id)

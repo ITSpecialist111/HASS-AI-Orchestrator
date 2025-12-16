@@ -44,3 +44,11 @@ agents:
   #   instruction: |
   #     Run the pool pump for 8 hours/day.
   #     Ensure temp is above 20C before heating.
+
+  - id: "custom_agent"
+    name: "Custom Agent"
+    model: "mistral:7b-instruct"
+    decision_interval: 120
+    entities:
+      - climate.ethan
+    instruction: "I want you to monitor ethans room temp this shouold be 10 degrees all the time"
