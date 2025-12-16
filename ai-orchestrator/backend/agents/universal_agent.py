@@ -194,9 +194,10 @@ CRITICAL RULES:
 4. Respond with VALID JSON only. Do not add markdown blocks.
 
 TOOL USAGE EXAMPLES:
-- Correct: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "temperature": 21.0}}}}
-- Incorrect: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "new_temperature": 21.0}}}} (Wrong param name)
-- Incorrect: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.hallucinated"}}}} (Entity not found)
+- Correct (Specific): {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "temperature": 21.0}}}}
+- Correct (Generic): {{"tool": "call_ha_service", "parameters": {{"domain": "light", "service": "turn_on", "entity_id": "light.living_room", "service_data": {{"brightness_pct": 50}}}}}}
+- Incorrect (Wrong Tool): {{"tool": "call_ha_service", "parameters": {{"entity_id": "climate.ethan", "service": "set_target_temp", "new_temperature": 10}}}} -> There is NO 'set_target_temp' service. Use 'set_temperature' tool.
+- Incorrect (Missing Domain): {{"tool": "call_ha_service", "parameters": {{"service": "turn_on", "entity_id": "light.foo"}}}} -> missing "domain": "light"
 
 Based on your PRIMARY INSTRUCTION and the CURRENT SITUATION, determine if any action is needed.
 Respond with a JSON object containing 'reasoning' and 'actions'.
