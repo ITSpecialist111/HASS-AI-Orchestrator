@@ -62,6 +62,10 @@ You can control ANY entity in your target list.
         """
         states = []
         if not self.entities:
+            # Dynamic mode: fetch all relevant entities to let LLM decide
+            try:
+                all_states = await self.ha_client.get_states()
+                
                 # Prioritize controllable domains
                 control_domains = ["climate", "light", "switch", "lock", "cover"]
                 sensor_domains = ["sensor", "binary_sensor"]
