@@ -18,7 +18,7 @@ export const AgentFactory = ({ onAgentCreated }) => {
 
     const loadSuggestions = async () => {
         try {
-            const res = await fetch('/api/factory/suggestions');
+            const res = await fetch('api/factory/suggestions');
             if (res.ok) {
                 setSuggestions(await res.json());
             }
@@ -32,7 +32,7 @@ export const AgentFactory = ({ onAgentCreated }) => {
         setMode('loading');
         setError(null);
         try {
-            const res = await fetch('/api/factory/generate', {
+            const res = await fetch('api/factory/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt })
@@ -49,7 +49,7 @@ export const AgentFactory = ({ onAgentCreated }) => {
     const handleSave = async () => {
         setMode('loading');
         try {
-            const res = await fetch('/api/factory/save', {
+            const res = await fetch('api/factory/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ config: generatedConfig })

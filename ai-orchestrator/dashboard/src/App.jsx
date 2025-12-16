@@ -25,7 +25,8 @@ function App() {
     // WebSocket connection
     useEffect(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const wsUrl = `${protocol}//${window.location.host}/ws`
+        // Use relative path derivation for Ingress support
+        const wsUrl = `${protocol}//${window.location.host}${window.location.pathname.replace(/\/$/, '')}/ws`
         const websocket = new WebSocket(wsUrl)
 
         websocket.onopen = () => setConnected(true)
@@ -64,7 +65,7 @@ function App() {
 
     const fetchAgents = async () => {
         try {
-            const res = await fetch('/api/agents')
+            const res = await fetch('api/agents')
             const data = await res.json()
             setAgents(data)
         } catch (e) { console.error(e) }
@@ -72,7 +73,7 @@ function App() {
 
     const fetchDecisions = async () => {
         try {
-            const res = await fetch('/api/decisions?limit=20')
+            const res = await fetch('api/decisions?limit=20')
             const data = await res.json()
             setDecisions(data)
         } catch (e) { console.error(e) }
@@ -81,8 +82,8 @@ function App() {
     const fetchAnalytics = async () => {
         try {
             const [dailyRes, perfRes] = await Promise.all([
-                fetch('/api/stats/daily'),
-                fetch('/api/stats/performance')
+                fetch('api/stats/daily'),
+                fetch('api/stats/performance')
             ])
             setDailyStats(await dailyRes.json())
             setPerformance(await perfRes.json())
