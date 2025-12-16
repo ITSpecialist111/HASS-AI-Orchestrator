@@ -28,7 +28,7 @@ This is the easiest way to install and get automatic updates.
 2. Find **AI Orchestrator** in the list.
 3. Click **Install**.
 4. Build time: **5-15 minutes** (it builds locally on your device).
-5. **Verify Version**: Ensure it is **v0.8.19** before installing.
+5. **Verify Version**: Ensure it is **v0.8.20** before installing.
 
 #### 3. Configuration
 Configure the add-on in the "Configuration" tab:
@@ -116,3 +116,9 @@ The system automatically ingests them on startup. Agents will search these files
 ---
 **Technical Support**:
 Check `/data/logs/orchestrator.log` for detailed debugging.
+
+### Ingress / Blank Dashboard Issues
+If you see a blank dashboard:
+1.  **Check Logs**: Look for `DEBUG REQUEST`. If you see `/hassio/ingress/...`, the path fix is working.
+2.  **Hard Refresh**: `Ctrl+F5` to clear browser cache of old JS files.
+3.  **MIME Types**: Ensure your HA host isn't blocking `.js` files (rare, but possible).

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import yaml
@@ -17,20 +17,20 @@ class SaveRequest(BaseModel):
     config: Dict[str, Any]
 
 # Helper to get architect from app state (we will set this up in main.py)
-def get_architect(request):
+def get_architect(request: Request):
     # This assumes we attach it to app.state
     # For now, we might need to instantiate or rely on a global
     return request.app.state.architect
 
 @router.get("/suggestions")
-async def get_suggestions(request: Any): # using Any for request typing shortcut
+async def get_suggestions(request: Request): 
     architect = request.app.state.architect
     if not architect:
         raise HTTPException(status_code=503, detail="Architect not initialized")
     return await architect.suggest_agents()
 
 @router.post("/generate")
-async def generate_config(req: GenerateRequest, request: Any):
+async def generate_config(req: GenerateRequest, request: Request):
     architect = request.app.state.architect
     if not architect:
         raise HTTPException(status_code=503, detail="Architect not initialized")

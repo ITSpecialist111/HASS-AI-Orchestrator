@@ -249,7 +249,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.19",
+    version="0.8.20",
     lifespan=lifespan
 )
 
@@ -260,22 +260,40 @@ app.include_router(factory_router)
 @app.middleware("http")
 async def ingress_path_fixer(request: Request, call_next):
     """
-    Middleware to handle Ingress path stripping issues.
-    If the request URL contains '/api/' but strictly speaking mistakenly includes
-    the ingress path prefix (e.g. /api/hassio_ingress/.../api/agents), we rewrite it
-    to just /api/agents so FastAPI routers match it.
+    Middleware to handle Ingress path stripping issues using X-Ingress-Path header.
+    Home Assistant Ingress sends 'X-Ingress-Path' (e.g. /api/hassio_ingress/slug).
+    We must strip this prefix so FastAPI sees the 'real' path (e.g. /ws or /api/agents).
     """
     path = request.url.path
-    # Log original request for debugging
-    print(f"DEBUG REQUEST [ORIG]: {request.method} {path}")
+    ingress_path = request.headers.get("X-Ingress-Path")
     
-    if "/api/" in path and not path.startswith("/api/"):
-        # Extract the part starting from /api/
-        # e.g. /hassio/ingress/slug/api/agents -> /api/agents
-        new_path = "/api/" + path.split("/api/", 1)[1]
+    # Debug logging
+    print(f"DEBUG REQUEST: {request.method} {path} | Ingress-Header: {ingress_path}")
+    
+    if ingress_path and path.startswith(ingress_path):
+        # Strip the ingress prefix
+        new_path = path[len(ingress_path):]
+        # Ensure it starts with /
+        if not new_path.startswith("/"):
+            new_path = "/" + new_path
+            
         request.scope["path"] = new_path
-        print(f"DEBUG REQUEST [RW]: Rewrote path to {new_path}")
-    
+        print(f"DEBUG REWRITE: {path} -> {new_path}")
+        
+    elif "/api/" in path and not path.startswith("/api/"):
+        # Fallback for when header might be missing but path is clearly prefixed (legacy fix)
+        # e.g. /hassio/ingress/slug/api/agents -> /api/agents
+        # Be careful not to match /api/ itself if it's correct
+        pass # Disabling guessing to rely on headers or direct /ws access
+        
+        # If we didn't find the header, check if we need to fix /ws manually
+        # This is risky without the header. Let's try a safer 'known root' check
+        
+    # Manual fix for /ws if header missing (rare)
+    if path.endswith("/ws") and path != "/ws":
+         request.scope["path"] = "/ws"
+         print(f"DEBUG REWRITE (Manual WS): {path} -> /ws")
+
     response = await call_next(request)
     return response
 
