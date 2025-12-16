@@ -19,7 +19,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
 
     const fetchDecisions = async () => {
         try {
-            const res = await fetch(`/api/decisions?agent_id=${agent.agent_id}&limit=20`);
+            const res = await fetch(`api/decisions?agent_id=${agent.agent_id}&limit=20`);
             const data = await res.json();
             setDecisions(data);
         } catch (e) {
@@ -30,7 +30,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
     const handleUpdate = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/factory/agents/${agent.agent_id}`, {
+            const res = await fetch(`api/factory/agents/${agent.agent_id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -66,7 +66,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
     const confirmDelete = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/factory/agents/${agent.agent_id}`, {
+            const res = await fetch(`api/factory/agents/${agent.agent_id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
