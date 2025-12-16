@@ -250,7 +250,19 @@ export const AgentFactory = ({ onAgentCreated }) => {
                                         <textarea
                                             value={generatedConfig.instruction}
                                             onChange={(e) => setGeneratedConfig({ ...generatedConfig, instruction: e.target.value })}
+                                            className="w-full h-24 bg-slate-950 border border-slate-800 rounded p-3 text-slate-300 font-mono text-xs whitespace-pre-wrap outline-none focus:border-purple-500 resize-none mb-3"
+                                            placeholder="Primary goal and behavioral rules..."
+                                        />
+
+                                        <div className="text-slate-500 mb-1 flex items-center gap-2">
+                                            Knowledge / Documentation
+                                            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 rounded border border-slate-700">Optional</span>
+                                        </div>
+                                        <textarea
+                                            value={generatedConfig.knowledge || ''}
+                                            onChange={(e) => setGeneratedConfig({ ...generatedConfig, knowledge: e.target.value })}
                                             className="w-full h-24 bg-slate-950 border border-slate-800 rounded p-3 text-slate-300 font-mono text-xs whitespace-pre-wrap outline-none focus:border-purple-500 resize-none"
+                                            placeholder="Paste device manuals, API docs, or specific facts provided by the manufacturer here..."
                                         />
                                     </div>
                                 </div>

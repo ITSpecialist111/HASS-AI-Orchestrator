@@ -22,7 +22,8 @@ class UniversalAgent(BaseAgent):
         rag_manager: Optional[Any] = None,
         model_name: str = "mistral:7b-instruct",
         decision_interval: int = 120,
-        broadcast_func: Optional[Any] = None
+        broadcast_func: Optional[Any] = None,
+        knowledge: str = ""
     ):
         # Universal agents don't use a fixed skills_path
         # We pass a dummy path or None, and override _load_skills
@@ -39,6 +40,7 @@ class UniversalAgent(BaseAgent):
         )
         self.instruction = instruction
         self.entities = entities
+        self.knowledge = knowledge
 
     def _load_skills(self) -> str:
         """
@@ -51,6 +53,9 @@ class UniversalAgent(BaseAgent):
 
 # PRIMARY INSTRUCTION
 {self.instruction}
+
+# KNOWLEDGE / CONTEXT
+{self.knowledge if self.knowledge else "No additional context provided."}
 
 # CAPABILITIES
 You have access to Home Assistant services via the 'call_ha_service' tool.
