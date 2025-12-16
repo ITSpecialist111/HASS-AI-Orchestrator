@@ -30,6 +30,7 @@ from agents.universal_agent import UniversalAgent
 from agents.architect_agent import ArchitectAgent
 from analytics import router as analytics_router
 from factory_router import router as factory_router
+from ingress_middleware import IngressMiddleware
 import yaml
 
 
@@ -249,7 +250,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.21",
+    version="0.8.22",
     lifespan=lifespan
 )
 
@@ -257,48 +258,9 @@ app.include_router(analytics_router)
 app.include_router(factory_router)
 
 
-@app.middleware("http")
-async def ingress_path_fixer(request: Request, call_next):
-    """
-    Middleware to handle Ingress path stripping issues using X-Ingress-Path header.
-    Home Assistant Ingress sends 'X-Ingress-Path' (e.g. /api/hassio_ingress/slug).
-    We must strip this prefix so FastAPI sees the 'real' path (e.g. /ws or /api/agents).
-    """
-    path = request.url.path
-    ingress_path = request.headers.get("X-Ingress-Path")
-    
-    # Debug logging
-    print(f"DEBUG REQUEST: {request.method} {path} | Ingress-Header: {ingress_path}")
-    
-    if ingress_path and path.startswith(ingress_path):
-        # Strip the ingress prefix
-        new_path = path[len(ingress_path):]
-        # Ensure it starts with /
-        if not new_path.startswith("/"):
-            new_path = "/" + new_path
-        
-        # FIX: Normalize double slashes (e.g. //api/agents -> /api/agents)
-        while "//" in new_path:
-            new_path = new_path.replace("//", "/")
-            
-        request.scope["path"] = new_path
-        print(f"DEBUG REWRITE: {path} -> {new_path}")
-        
-    elif "/api/" in path and not path.startswith("/api/"):
-        # Fallback for when header might be missing but path is clearly prefixed (legacy fix)
-        pass 
-        
-    # Manual fix for /ws if header missing or double slash weirdness remains
-    path = request.scope["path"] # Reload potentially modified path
-    if path.endswith("/ws") and "/ws" in path and path != "/ws":
-         # Try to force it if it looks like a WS request
-         # e.g. //ws -> /ws
-         if path.strip("/") == "ws":
-             request.scope["path"] = "/ws"
-             print(f"DEBUG REWRITE (Manual WS): {path} -> /ws")
-
-    response = await call_next(request)
-    return response
+# Removed broken @app.middleware("http") which caused WS to crash
+# The fix is now in ingress_middleware.py loaded below
+app.add_middleware(IngressMiddleware)
 
 
 @app.get("/api/health")
