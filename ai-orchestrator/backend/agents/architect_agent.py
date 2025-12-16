@@ -147,9 +147,22 @@ class ArchitectAgent:
                 "instruction": "Lock the door if it has been closed for 5 minutes. Notify if opened after midnight."
             })
         else:
-             generated.update({
-                "id": "custom_agent",
-                "name": "Custom Agent",
+            # Fallback for custom agents
+            # Try to extract a name if requested
+            name = "Custom Agent"
+            import re
+            name_match = re.search(r"(?:name|call) (?:this|the)?\s*agent\s+(?:is\s+)?([A-Za-z0-9 ]+)", prompt_lower, re.IGNORECASE)
+            if name_match:
+                # Clean up the name
+                raw_name = name_match.group(1).strip()
+                # Remove common trailing words if user said "Heating Agent please"
+                name = raw_name.replace("please", "").strip().title()
+
+            agent_id = name.lower().replace(" ", "_")
+
+            generated.update({
+                "id": agent_id,
+                "name": name,
                 "entities": [],
                 "instruction": user_prompt
             })

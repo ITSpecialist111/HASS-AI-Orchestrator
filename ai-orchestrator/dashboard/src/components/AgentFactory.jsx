@@ -191,14 +191,28 @@ export const AgentFactory = ({ onAgentCreated }) => {
                             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                                 <h3 className="font-medium text-slate-300 mb-2">Blueprint Review</h3>
                                 <div className="space-y-3 text-sm">
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-3 gap-2 items-center">
                                         <div className="text-slate-500">Name</div>
-                                        <div className="col-span-2 text-slate-200 font-mono">{generatedConfig.name}</div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="text"
+                                                value={generatedConfig.name}
+                                                onChange={(e) => setGeneratedConfig({ ...generatedConfig, name: e.target.value })}
+                                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-sm focus:border-purple-500 outline-none"
+                                            />
+                                        </div>
 
                                         <div className="text-slate-500">ID</div>
-                                        <div className="col-span-2 text-slate-200 font-mono">{generatedConfig.id}</div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="text"
+                                                value={generatedConfig.id}
+                                                onChange={(e) => setGeneratedConfig({ ...generatedConfig, id: e.target.value })}
+                                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-sm font-mono focus:border-purple-500 outline-none"
+                                            />
+                                        </div>
 
-                                        <div className="text-slate-500">Entities</div>
+                                        <div className="text-slate-500 self-start pt-1">Entities</div>
                                         <div className="col-span-2 flex flex-wrap gap-1">
                                             {generatedConfig.entities.map(e => (
                                                 <span key={e} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
@@ -210,9 +224,11 @@ export const AgentFactory = ({ onAgentCreated }) => {
 
                                     <div className="pt-3 border-t border-slate-700">
                                         <div className="text-slate-500 mb-1">Instructions</div>
-                                        <p className="text-slate-300 bg-slate-900 p-3 rounded font-mono text-xs whitespace-pre-wrap">
-                                            {generatedConfig.instruction}
-                                        </p>
+                                        <textarea
+                                            value={generatedConfig.instruction}
+                                            onChange={(e) => setGeneratedConfig({ ...generatedConfig, instruction: e.target.value })}
+                                            className="w-full h-24 bg-slate-950 border border-slate-800 rounded p-3 text-slate-300 font-mono text-xs whitespace-pre-wrap outline-none focus:border-purple-500 resize-none"
+                                        />
                                     </div>
                                 </div>
                             </div>
