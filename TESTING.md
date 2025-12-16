@@ -4,13 +4,15 @@ Comprehensive smoke tests created for validating core Phase 1 functionality.
 
 ## 📊 Test Coverage
 
-### Files Created (9 total)
+### Files Created (11 total)
 - ✅ `pytest.ini` - Test configuration
 - ✅ `conftest.py` - Shared fixtures and mocks
 - ✅ `test_api_smoke.py` - API endpoint tests (8 tests)
 - ✅ `test_mcp_smoke.py` - MCP server tests (10 tests)
 - ✅ `test_agent_smoke.py` - Agent framework tests (6 tests)
 - ✅ `test_config_smoke.py` - Configuration tests (7 tests)
+- ✅ `tests/test_hass_client_integration.py` - HASS Client Protocol tests
+- ✅ `tests/test_universal_agent_hass_integration.py` - Universal Agent Integration tests
 - ✅ `tests/__init__.py` - Package init
 - ✅ `tests/README.md` - Test documentation
 
@@ -52,6 +54,13 @@ Comprehensive smoke tests created for validating core Phase 1 functionality.
 - ✅ Ollama host has valid URL format
 - ✅ HA URL has valid format
 - ✅ Log level is valid value
+
+#### Integration Smoke Tests
+- ✅ HASS Client connects and authenticates
+- ✅ HASS Client handles state updates
+- ✅ HASS Client sends service calls correctly
+- ✅ UniversalAgent gathers context via Client
+- ✅ UniversalAgent executes decisions via Client
 
 ## 🚀 Running Tests
 
@@ -172,6 +181,6 @@ Full test documentation available in:
 ---
 
 **Status**: ✅ Test suite complete and ready to execute
-**Total Tests**: 31 smoke tests
+**Total Tests**: 38 smoke tests
 **Coverage**: API, MCP, Agents, Configuration
 **Runtime**: ~5-10 seconds
