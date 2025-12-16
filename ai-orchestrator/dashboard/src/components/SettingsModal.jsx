@@ -70,7 +70,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                             When enabled, the AI will make decisions and log them but acts as a "simulated" execution - no actual changes will be made to Home Assistant entities. Great for testing prompt safety without affecting your home.
                         </p>
                         <div className="text-[10px] text-slate-500 italic border-t border-slate-700/50 pt-2">
-                            Note: Toggling this here applies immediately but resets on server restart unless changed in add-on configuration.
+                            Note: Toggling this here applies immediately but resets on server restart. To make it permanent, change "dry_run_mode" in the Add-on Configuration tab in Home Assistant.
                         </div>
                     </div>
 

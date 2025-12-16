@@ -64,8 +64,50 @@ You can control ANY entity in your target list.
         """
         states = []
         if not self.entities:
-            # Dynamic mode: fetch all relevant entities to let LLM decide
+            # Dynamic mode: find relevant entities
             try:
+                # 1. Try Semantic Search if RAG is available
+                if self.rag_manager:
+                    print(f"🔍 Performing semantic entity search for instruction: '{self.instruction}'")
+                    rag_results = self.rag_manager.query(
+                        query_text=self.instruction,
+                        collection_names=["entity_registry"],
+                        n_results=10  # Get top 10 most relevant entities
+                    )
+                    
+                    if rag_results:
+                        found_entities = []
+                        for res in rag_results:
+                            # Parse entity_id from content or metadata
+                            # Content format usually: "Entity: light.foo (Friendly Name) - Domain: light..."
+                            content = res.get("content", "")
+                            # Simple extraction heuristic: look for domain.name pattern in content
+                            # or use the fact that RAG ingestion usually stores ID in metadata if available
+                            # For now, let's look for standard entity ID pattern in content "Entity: domain.id"
+                            import re
+                            match = re.search(r"Entity: ([a-z0-9_]+\.[a-z0-9_]+)", content)
+                            if match:
+                                found_entities.append(match.group(1))
+                        
+                        if found_entities:
+                            self.entities = found_entities # Cache them for this run? Or keep dynamic?
+                            # Keeping it dynamic is better for changing conditions, but let's use them now
+                            states.append(f"Semantic Entity Discovery (Instruction-based):")
+                            for eid in found_entities:
+                                try:
+                                    s = await self.ha_client.get_states(eid)
+                                    if s:
+                                        friendly = s.get('attributes', {}).get('friendly_name', eid)
+                                        states.append(f"- {friendly} ({eid}): {s['state']}")
+                                except:
+                                    pass
+                            
+                            # If we found good semantic matches, return early + some globals
+                            # Add time/sun context
+                            states.append(f"- Time: {datetime.now().strftime('%H:%M')}")
+                            return "\n".join(states)
+
+                # 2. Fallback to Heuristic Discovery (if RAG failed or found nothing)
                 all_states = await self.ha_client.get_states()
                 
                 # Prioritize controllable domains
@@ -86,7 +128,7 @@ You can control ANY entity in your target list.
                     if s['entity_id'].split('.')[0] in (control_domains + sensor_domains)
                 ][:50]
                 
-                states.append("Dynamic Entity Discovery (Prioritized):")
+                states.append("Dynamic Entity Discovery (Fallback Heuristic):")
                 for s in filtered:
                     eid = s['entity_id']
                     friendly = s.get('attributes', {}).get('friendly_name', eid)
