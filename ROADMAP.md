@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.6.0 (Phases 1-6 Complete)
+**Current Version**: v0.6.1 (Stability & Testing Update)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 

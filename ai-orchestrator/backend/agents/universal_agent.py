@@ -1,4 +1,6 @@
 from typing import List, Dict, Any, Optional
+import json
+from datetime import datetime
 from .base_agent import BaseAgent
 from mcp_server import MCPServer
 from ha_client import HAWebSocketClient
@@ -28,7 +30,7 @@ class UniversalAgent(BaseAgent):
             name=name,
             mcp_server=mcp_server,
             ha_client=ha_client,
-            skills_path=None, 
+            skills_path="UNIVERSAL_AGENT", 
             rag_manager=rag_manager,
             model_name=model_name,
             decision_interval=decision_interval
@@ -74,3 +76,57 @@ You can control ANY entity in your target list.
                 states.append(f"- {entity_id}: unknown")
                 
         return "\n".join(states)
+
+    async def gather_context(self) -> Dict:
+        """
+        Gather current context for universal agent.
+        Uses _get_state_description helper.
+        """
+        state_desc = await self._get_state_description()
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "state_description": state_desc,
+            "instruction": self.instruction
+        }
+
+    async def decide(self, context: Dict) -> Dict:
+        """
+        Make decision based on instruction and current state.
+        """
+        # Build prompt
+        state_desc = context.get("state_description", "No state data")
+        
+        prompt = f"""
+{self._load_skills()}
+
+CURRENT SITUATION:
+Time: {context['timestamp']}
+
+ENTITY STATES:
+{state_desc}
+
+Based on your PRIMARY INSTRUCTION and the CURRENT SITUATION, determine if any action is needed.
+Respond with a JSON object containing 'reasoning' and 'actions'.
+"""
+        # Call LLM
+        response = await self._call_llm(prompt)
+        
+        # Parse response (reuse basic parsing logic if available, or simple json load)
+        try:
+            # Simple cleanup for markdown
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                clean_response = clean_response.split("\n", 1)[1]
+                if clean_response.endswith("```"):
+                    clean_response = clean_response.rsplit("\n", 1)[0]
+            if clean_response.startswith("json"):
+                clean_response = clean_response[4:]
+                
+            return json.loads(clean_response)
+        except Exception as e:
+            return {
+                "reasoning": f"Failed to parse LLM response: {e}",
+                "actions": []
+            }
+
