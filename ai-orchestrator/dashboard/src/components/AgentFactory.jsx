@@ -19,11 +19,17 @@ export const AgentFactory = ({ onAgentCreated }) => {
     const loadSuggestions = async () => {
         try {
             const res = await fetch('api/factory/suggestions');
-            if (res.ok) {
-                setSuggestions(await res.json());
+            if (!res.ok) throw new Error(`API Error ${res.status}`);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setSuggestions(data);
+            } else {
+                console.warn("Suggestions API returned non-array:", data);
+                setSuggestions([]);
             }
         } catch (e) {
-            console.error(e);
+            console.error("Failed to load suggestions:", e);
+            setSuggestions([]);
         }
     };
 
@@ -37,11 +43,18 @@ export const AgentFactory = ({ onAgentCreated }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt })
             });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`Server Error ${res.status}: ${text}`);
+            }
+
             const data = await res.json();
             setGeneratedConfig(data);
             setMode('review');
         } catch (err) {
-            setError('Failed to generate agent. Try again.');
+            console.error(err);
+            setError(`Failed to generate agent: ${err.message}`);
             setMode('prompt');
         }
     };

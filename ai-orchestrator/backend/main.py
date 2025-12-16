@@ -249,7 +249,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.18",
+    version="0.8.19",
     lifespan=lifespan
 )
 
@@ -258,9 +258,24 @@ app.include_router(factory_router)
 
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log every request to help debug Ingress path issues"""
-    print(f"DEBUG REQUEST: {request.method} {request.url.path}")
+async def ingress_path_fixer(request: Request, call_next):
+    """
+    Middleware to handle Ingress path stripping issues.
+    If the request URL contains '/api/' but strictly speaking mistakenly includes
+    the ingress path prefix (e.g. /api/hassio_ingress/.../api/agents), we rewrite it
+    to just /api/agents so FastAPI routers match it.
+    """
+    path = request.url.path
+    # Log original request for debugging
+    print(f"DEBUG REQUEST [ORIG]: {request.method} {path}")
+    
+    if "/api/" in path and not path.startswith("/api/"):
+        # Extract the part starting from /api/
+        # e.g. /hassio/ingress/slug/api/agents -> /api/agents
+        new_path = "/api/" + path.split("/api/", 1)[1]
+        request.scope["path"] = new_path
+        print(f"DEBUG REQUEST [RW]: Rewrote path to {new_path}")
+    
     response = await call_next(request)
     return response
 
