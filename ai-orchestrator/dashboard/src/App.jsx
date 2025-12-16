@@ -100,7 +100,7 @@ function App() {
                 return (
                     <div className="space-y-6">
                         {/* High level status or summary could go here */}
-                        <AgentGrid agents={agents} />
+                        <AgentGrid agents={agents} onAgentCreate={() => setActiveTab('factory')} />
                     </div>
                 )
             case 'stream':
