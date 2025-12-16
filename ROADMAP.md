@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.8.47 (Semantic Context & Dry Run Fixes)
+**Current Version**: v0.8.48 (Agent Factory UX & Roadmap Updates)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 
@@ -8,12 +8,17 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 
 ## 🚀 Short Term (v1.0 - The "Polish" Update)
 
-### 1. Voice Integration (HA Assist)
+### 1. Zero-Downtime Agent Reloading
+- **Goal**: Add/Update agents without restarting the entire backend (Hot Reload).
+- **Feature**: Implement a mechanism for dynamic agent loading and unloading.
+- **Use Case**: Rapid iteration on agent logic without service interruption.
+
+### 2. Voice Integration (HA Assist)
 - **Goal**: Talk to your agents via Home Assistant Assist / ESPHome satellites.
 - **Feature**: Expose the "Architect" and "Orchestrator" as conversation agents.
 - **Use Case**: *"Hey Jarvis, tell the Lighting Agent to set a romantic mood."*
 
-### 2. Mobile Companion App
+### 3. Mobile Companion App
 - **Goal**: A native-feeling mobile view for the Dashboard.
 - **Feature**: Responsive design updates for the React dashboard.
 - **Use Case**: Checking agent "thoughts" and approving decisions from your phone while away.

@@ -157,8 +157,9 @@ export const AgentFactory = ({ onAgentCreated }) => {
                             {/* Suggestions */}
                             {suggestions.length > 0 && (
                                 <div className="space-y-3">
-                                    <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                                        <Lightbulb size={16} /> Suggested for you
+                                    <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2 pb-2 border-b border-slate-700/50">
+                                        <Lightbulb size={16} className="text-amber-400" />
+                                        Recommended Agents
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {suggestions.map((s, i) => (
@@ -213,18 +214,24 @@ export const AgentFactory = ({ onAgentCreated }) => {
                                             <input
                                                 type="text"
                                                 value={generatedConfig.name}
-                                                onChange={(e) => setGeneratedConfig({ ...generatedConfig, name: e.target.value })}
+                                                onChange={(e) => {
+                                                    const newName = e.target.value;
+                                                    // Simple auto-slug
+                                                    const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                                                    setGeneratedConfig({ ...generatedConfig, name: newName, id: slug });
+                                                }}
                                                 className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-sm focus:border-purple-500 outline-none"
                                             />
                                         </div>
 
-                                        <div className="text-slate-500">ID</div>
+                                        <div className="text-slate-500">ID <span className="text-[10px] opacity-50">(Auto)</span></div>
                                         <div className="col-span-2">
                                             <input
                                                 type="text"
                                                 value={generatedConfig.id}
-                                                onChange={(e) => setGeneratedConfig({ ...generatedConfig, id: e.target.value })}
-                                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-sm font-mono focus:border-purple-500 outline-none"
+                                                readOnly
+                                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-400 text-sm font-mono cursor-not-allowed select-all"
+                                                title="ID is auto-generated from name"
                                             />
                                         </div>
 
