@@ -220,6 +220,18 @@ class MCPServer:
                     "required": ["domain", "service", "entity_id"]
                 },
                 "handler": self._call_ha_service
+            },
+            "log": {
+                "name": "log",
+                "description": "Log a message or observation (useful for debugging or tracking logic)",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {"type": "string", "description": "Message to log"}
+                    },
+                    "required": ["message"]
+                },
+                "handler": self._log_message
             }
         }
     
@@ -595,3 +607,9 @@ class MCPServer:
             }
         except Exception as e:
             return {"error": str(e), "executed": False}
+
+    async def _log_message(self, params: Dict) -> Dict:
+        """Log message handler"""
+        message = params["message"]
+        # The logging happens automatically in execute_tool via log_entry
+        return {"action": "log", "message": message, "logged": True}

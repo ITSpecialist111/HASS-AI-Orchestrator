@@ -146,6 +146,13 @@ class ArchitectAgent:
                 "entities": ["binary_sensor.front_door", "lock.front_door"],
                 "instruction": "Lock the door if it has been closed for 5 minutes. Notify if opened after midnight."
             })
+        elif "temp" in prompt_lower or "heat" in prompt_lower or "cool" in prompt_lower or "thermostat" in prompt_lower:
+             generated.update({
+                "id": "climate_monitor",
+                "name": "Climate Monitor",
+                "entities": ["climate.thermostat"], # Placeholder - user likely needs to edit this
+                "instruction": "Monitor temperature and adjust thermostat to maintain target range."
+            })
         else:
             # Fallback for custom agents
             # Try to extract a name if requested

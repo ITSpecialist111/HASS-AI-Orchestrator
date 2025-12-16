@@ -74,8 +74,8 @@ You can control ANY entity in your target list.
                     states.append(f"- {friendly_name} ({entity_id}): {val}")
                 else:
                     states.append(f"- {entity_id}: unknown")
-            except Exception:
-                states.append(f"- {entity_id}: unavailable")
+            except Exception as e:
+                states.append(f"- {entity_id}: unavailable ({str(e)})")
                 
         return "\n".join(states)
 
