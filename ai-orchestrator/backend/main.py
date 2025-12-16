@@ -250,7 +250,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.26",
+    version="0.8.27",
     lifespan=lifespan
 )
 
