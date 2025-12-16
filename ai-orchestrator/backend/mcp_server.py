@@ -240,7 +240,7 @@ class MCPServer:
         return [
             {
                 "name": tool["name"],
-                "description": tool["description"],
+                "description": tool["description"] + " (Check parameters carefully)",
                 "parameters": tool["parameters"]
             }
             for tool in self.tools.values()

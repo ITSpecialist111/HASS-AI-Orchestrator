@@ -62,18 +62,25 @@ You can control ANY entity in your target list.
         """
         states = []
         if not self.entities:
-            # Dynamic mode: fetch all relevant entities to let LLM decide
-            try:
-                all_states = await self.ha_client.get_states()
-                relevant_domains = ["climate", "light", "switch", "sensor", "binary_sensor", "lock", "cover"]
+                # Prioritize controllable domains
+                control_domains = ["climate", "light", "switch", "lock", "cover"]
+                sensor_domains = ["sensor", "binary_sensor"]
                 
-                # Filter and take first 50 to avoid token limit
+                sorted_states = sorted(
+                    all_states,
+                    key=lambda x: (
+                        0 if x['entity_id'].split('.')[0] in control_domains else 1,
+                        x['entity_id']
+                    )
+                )
+
+                # Filter and take first 50
                 filtered = [
-                    s for s in all_states 
-                    if s['entity_id'].split('.')[0] in relevant_domains
+                    s for s in sorted_states
+                    if s['entity_id'].split('.')[0] in (control_domains + sensor_domains)
                 ][:50]
                 
-                states.append("Dynamic Entity Discovery (Top 50 relevant):")
+                states.append("Dynamic Entity Discovery (Prioritized):")
                 for s in filtered:
                     eid = s['entity_id']
                     friendly = s.get('attributes', {}).get('friendly_name', eid)
@@ -128,9 +135,19 @@ Time: {context['timestamp']}
 ENTITY STATES:
 {state_desc}
 
+CRITICAL RULES:
+1. You MUST ONLY use entity IDs listed in 'ENTITY STATES'. Do NOT guess or hallucinate IDs.
+2. If the entity you need is not listed, use the 'log' tool to report "Entity X not found".
+3. Use 'call_ha_service' only for generic services. For climate/lights, prefer specialized tools like 'set_temperature' if available.
+
+TOOL USAGE EXAMPLES:
+- Correct: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "temperature": 21.0}}}}
+- Incorrect: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "new_temperature": 21.0}}}} (Wrong param name)
+- Incorrect: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.hallucinated"}}}} (Entity not found)
+
 Based on your PRIMARY INSTRUCTION and the CURRENT SITUATION, determine if any action is needed.
 Respond with a JSON object containing 'reasoning' and 'actions'.
-Each action MUST have a 'tool' field (e.g. "call_ha_service") and 'parameters'.
+Each action MUST have a 'tool' field (e.g. "set_temperature") and 'parameters'.
 """
         # Call LLM
         response = await self._call_llm(prompt)
