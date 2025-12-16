@@ -66,17 +66,27 @@ function App() {
     const fetchAgents = async () => {
         try {
             const res = await fetch('api/agents')
+            if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`)
             const data = await res.json()
-            setAgents(data)
-        } catch (e) { console.error(e) }
+            if (Array.isArray(data)) {
+                setAgents(data)
+            } else {
+                console.error("Agents data not an array:", data)
+            }
+        } catch (e) {
+            console.error("Fetch Agents Failed:", e)
+        }
     }
 
     const fetchDecisions = async () => {
         try {
             const res = await fetch('api/decisions?limit=20')
+            if (!res.ok) throw new Error(`API Error ${res.status}`)
             const data = await res.json()
-            setDecisions(data)
-        } catch (e) { console.error(e) }
+            if (Array.isArray(data)) {
+                setDecisions(data)
+            }
+        } catch (e) { console.error("Fetch Decisions Failed:", e) }
     }
 
     const fetchAnalytics = async () => {
@@ -85,9 +95,13 @@ function App() {
                 fetch('api/stats/daily'),
                 fetch('api/stats/performance')
             ])
-            setDailyStats(await dailyRes.json())
-            setPerformance(await perfRes.json())
-        } catch (e) { console.error(e) }
+
+            if (dailyRes.ok) {
+                const d = await dailyRes.json()
+                if (Array.isArray(d)) setDailyStats(d)
+            }
+            if (perfRes.ok) setPerformance(await perfRes.json())
+        } catch (e) { console.error("Fetch Analytics Failed:", e) }
     }
 
     return (

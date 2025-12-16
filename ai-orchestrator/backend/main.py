@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -249,12 +249,20 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.17",
+    version="0.8.18",
     lifespan=lifespan
 )
 
 app.include_router(analytics_router)
 app.include_router(factory_router)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every request to help debug Ingress path issues"""
+    print(f"DEBUG REQUEST: {request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
 
 
 @app.get("/api/health")

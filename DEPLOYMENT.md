@@ -28,7 +28,7 @@ This is the easiest way to install and get automatic updates.
 2. Find **AI Orchestrator** in the list.
 3. Click **Install**.
 4. Build time: **5-15 minutes** (it builds locally on your device).
-5. **Verify Version**: Ensure it is **v0.8.17** before installing.
+5. **Verify Version**: Ensure it is **v0.8.18** before installing.
 
 #### 3. Configuration
 Configure the add-on in the "Configuration" tab:
