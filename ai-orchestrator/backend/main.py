@@ -192,7 +192,8 @@ async def lifespan(app: FastAPI):
                     entities=entities,
                     rag_manager=rag_manager,
                     model_name=agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "mistral:7b-instruct")),
-                    decision_interval=agent_cfg.get('decision_interval', 120)
+                    decision_interval=agent_cfg.get('decision_interval', 120),
+                    broadcast_func=broadcast_to_dashboard
                 )
                 print(f"  ✓ Loaded agent: {agent_cfg['name']} ({agent_id})")
                 
@@ -258,7 +259,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.43",
+    version="0.8.44",
     lifespan=lifespan
 )
 

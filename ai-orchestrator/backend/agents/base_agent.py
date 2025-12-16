@@ -29,7 +29,8 @@ class BaseAgent(ABC):
         skills_path: str,
         rag_manager: Optional[Any] = None,
         model_name: str = "mistral:7b-instruct",
-        decision_interval: int = 120
+        decision_interval: int = 120,
+        broadcast_func: Optional[Any] = None
     ):
         """
         Initialize base agent.
@@ -42,7 +43,9 @@ class BaseAgent(ABC):
             skills_path: Path to SKILLS.md file
             rag_manager: Optional RAG Manager for context retrieval
             model_name: Ollama model name
+            model_name: Ollama model name
             decision_interval: Seconds between decisions
+            broadcast_func: Optional async callback for dashboard updates
         """
         self.agent_id = agent_id
         self.name = name
@@ -52,6 +55,7 @@ class BaseAgent(ABC):
         self.rag_manager = rag_manager
         self.model_name = model_name
         self.decision_interval = decision_interval
+        self.broadcast_func = broadcast_func
         self.status = "initializing"
         
         # Load skills from SKILLS.md
@@ -313,7 +317,17 @@ If no action is needed, return an empty actions array.
                 self.log_decision(context, decision, results)
                 
                 # Broadcast to dashboard
-                # (main.py will hook this in)
+                if self.broadcast_func:
+                    await self.broadcast_func({
+                        "type": "decision",
+                        "data": {
+                            "timestamp": datetime.now().isoformat(),
+                            "agent_id": self.agent_id,
+                            "reasoning": decision.get("reasoning", ""),
+                            "action": str(decision.get("actions", [])),
+                            "dry_run": self.mcp_server.dry_run
+                        }
+                    })
                 
                 self.status = "idle"
                 print(f"✓ {self.name} decision completed")
