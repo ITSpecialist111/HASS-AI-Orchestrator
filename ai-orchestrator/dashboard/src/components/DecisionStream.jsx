@@ -79,11 +79,11 @@ export function DecisionStream({ decisions }) {
 
                                         <div className="col-span-2">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border
-                         ${d.agent_id.includes('security') ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                    d.agent_id.includes('heating') ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                         ${(d.agent_id || '').includes('security') ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                    (d.agent_id || '').includes('heating') ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                                         'bg-blue-500/10 text-blue-400 border-blue-500/20'
                                                 }`}>
-                                                {d.agent_id}
+                                                {d.agent_id || 'Unknown'}
                                             </span>
                                         </div>
 
