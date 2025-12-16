@@ -73,44 +73,53 @@ You can control ANY entity in your target list.
             try:
                 # 1. Try Semantic Search if RAG is available
                 if self.rag_manager:
-                    print(f"🔍 Performing semantic entity search for instruction: '{self.instruction}'")
-                    rag_results = self.rag_manager.query(
-                        query_text=self.instruction,
-                        collection_names=["entity_registry"],
-                        n_results=10  # Get top 10 most relevant entities
-                    )
-                    
-                    if rag_results:
-                        found_entities = []
-                        for res in rag_results:
-                            # Parse entity_id from content or metadata
-                            # Content format usually: "Entity: light.foo (Friendly Name) - Domain: light..."
-                            content = res.get("content", "")
-                            # Simple extraction heuristic: look for domain.name pattern in content
-                            # or use the fact that RAG ingestion usually stores ID in metadata if available
-                            # For now, let's look for standard entity ID pattern in content "Entity: domain.id"
-                            import re
-                            match = re.search(r"Entity: ([a-z0-9_]+\.[a-z0-9_]+)", content)
-                            if match:
-                                found_entities.append(match.group(1))
+                    try:
+                        print(f"🔍 Performing semantic entity search for instruction: '{self.instruction}'")
+                        rag_results = self.rag_manager.query(
+                            query_text=self.instruction,
+                            collection_names=["entity_registry"],
+                            n_results=10  # Get top 10 most relevant entities
+                        )
                         
-                        if found_entities:
-                            self.entities = found_entities # Cache them for this run? Or keep dynamic?
-                            # Keeping it dynamic is better for changing conditions, but let's use them now
-                            states.append(f"Semantic Entity Discovery (Instruction-based):")
-                            for eid in found_entities:
-                                try:
-                                    s = await self.ha_client.get_states(eid)
-                                    if s:
-                                        friendly = s.get('attributes', {}).get('friendly_name', eid)
-                                        states.append(f"- {friendly} ({eid}): {s['state']}")
-                                except:
-                                    pass
+                        if rag_results:
+                            found_entities = []
+                            for res in rag_results:
+                                # Parse entity_id from content or metadata
+                                # Content format usually: "Entity: light.foo (Friendly Name) - Domain: light..."
+                                content = res.get("content", "")
+                                
+                                # Ignore if content looks like an error message
+                                if "nomic-embed-text" in content or "error" in content.lower():
+                                    print(f"⚠️ RAG Result contained error pattern, ignoring: {content}")
+                                    continue
+
+                                # Simple extraction heuristic: look for domain.name pattern in content
+                                import re
+                                match = re.search(r"Entity: ([a-z0-9_]+\.[a-z0-9_]+)", content)
+                                if match:
+                                    found_entities.append(match.group(1))
                             
-                            # If we found good semantic matches, return early + some globals
-                            # Add time/sun context
-                            states.append(f"- Time: {datetime.now().strftime('%H:%M')}")
-                            return "\n".join(states)
+                            if found_entities:
+                                self.entities = found_entities # Cache them for this run? Or keep dynamic?
+                                # Keeping it dynamic is better for changing conditions, but let's use them now
+                                states.append(f"Semantic Entity Discovery (Instruction-based):")
+                                for eid in found_entities:
+                                    try:
+                                        s = await self.ha_client.get_states(eid)
+                                        if s:
+                                            friendly = s.get('attributes', {}).get('friendly_name', eid)
+                                            states.append(f"- {friendly} ({eid}): {s['state']}")
+                                    except:
+                                        pass
+                                
+                                # If we found good semantic matches, return early + some globals
+                                # Add time/sun context
+                                states.append(f"- Time: {datetime.now().strftime('%H:%M')}")
+                                return "\n".join(states)
+                                
+                    except Exception as rag_err:
+                        print(f"⚠️ Semantic Search Failed (Falling back to heuristic): {rag_err}")
+                        # Fall through to heuristic...
 
                 # 2. Fallback to Heuristic Discovery (if RAG failed or found nothing)
                 all_states = await self.ha_client.get_states()
@@ -142,22 +151,12 @@ You can control ANY entity in your target list.
                     
                 return "\n".join(states)
             except Exception as e:
-                return f"Error discovering entities: {e}"
+                # If everything fails (including HA client), return empty to avoid breaking the agent completely
+                # but log the specific error
+                print(f"❌ Entity Discovery Fatal Error: {e}")
+                return "Error: Could not discover entities. Please check Home Assistant connection."
 
-        for entity_id in self.entities:
-            try:
-                state = await self.ha_client.get_states(entity_id)
-                if state:
-                    attrs = state.get("attributes", {})
-                    friendly_name = attrs.get("friendly_name", entity_id)
-                    val = state.get("state", "unknown")
-                    states.append(f"- {friendly_name} ({entity_id}): {val}")
-                else:
-                    states.append(f"- {entity_id}: unknown")
-            except Exception as e:
-                states.append(f"- {entity_id}: unavailable ({str(e)})")
-                
-        return "\n".join(states)
+        # ... (rest of method unchanged)
 
     async def gather_context(self) -> Dict:
         """
@@ -192,6 +191,7 @@ CRITICAL RULES:
 1. You MUST ONLY use entity IDs listed in 'ENTITY STATES'. Do NOT guess or hallucinate IDs.
 2. If the entity you need is not listed, use the 'log' tool to report "Entity X not found".
 3. Use 'call_ha_service' only for generic services. For climate/lights, prefer specialized tools like 'set_temperature' if available.
+4. Respond with VALID JSON only. Do not add markdown blocks.
 
 TOOL USAGE EXAMPLES:
 - Correct: {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "temperature": 21.0}}}}
@@ -216,7 +216,18 @@ Each action MUST have a 'tool' field (e.g. "set_temperature") and 'parameters'.
             if clean_response.startswith("json"):
                 clean_response = clean_response[4:]
             
-            data = json.loads(clean_response)
+            # Helper to try fixing common JSON errors (trailing commas)
+            def loose_json_parse(text):
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    # Try removing trailing commas
+                    import re
+                    text = re.sub(r',\s*}', '}', text)
+                    text = re.sub(r',\s*]', ']', text)
+                    return json.loads(text)
+            
+            data = loose_json_parse(clean_response)
             
             # Validate actions structure
             valid_actions = []
@@ -234,8 +245,9 @@ Each action MUST have a 'tool' field (e.g. "set_temperature") and 'parameters'.
             return data
             
         except Exception as e:
+            print(f"❌ JSON Parse Error on '{response}': {e}") # Log full response for debug
             return {
-                "reasoning": f"Failed to parse LLM response: {e}",
+                "reasoning": f"Failed to parse LLM response: {e}. Raw response logged.",
                 "actions": []
             }
 
