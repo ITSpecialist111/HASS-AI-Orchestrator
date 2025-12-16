@@ -160,17 +160,33 @@ export const AgentFactory = ({ onAgentCreated }) => {
                                     <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2">
                                         <Lightbulb size={16} /> Suggested for you
                                     </h3>
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {suggestions.map((s, i) => (
                                             <button
                                                 key={i}
-                                                onClick={() => setPrompt(s.prompt)}
-                                                className="text-left p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors group"
+                                                onClick={() => {
+                                                    if (s.blueprint) {
+                                                        // Direct Blueprint Load
+                                                        setGeneratedConfig(s.blueprint);
+                                                        setMode('review');
+                                                    } else {
+                                                        // Legacy prompt fallback
+                                                        setPrompt(s.prompt);
+                                                    }
+                                                }}
+                                                className="text-left p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-purple-500/50 rounded-lg transition-all group flex flex-col h-full"
                                             >
-                                                <div className="font-medium text-slate-300 group-hover:text-purple-400 transition-colors">
-                                                    {s.title}
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="font-medium text-slate-300 group-hover:text-purple-400 transition-colors">
+                                                        {s.title}
+                                                    </span>
+                                                    {s.blueprint && (
+                                                        <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
+                                                            READY
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="text-sm text-slate-500 mt-1">{s.reason}</div>
+                                                <div className="text-xs text-slate-500 line-clamp-2">{s.reason}</div>
                                             </button>
                                         ))}
                                     </div>
