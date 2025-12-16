@@ -49,7 +49,14 @@ class HAWebSocketClient:
                 "Content-Type": "application/json"
             }
             
-            self.ws = await websockets.connect(self.ws_url, extra_headers=headers)
+            # Increase max_size to 10MB to handle large state registries
+            self.ws = await websockets.connect(
+                self.ws_url, 
+                extra_headers=headers,
+                max_size=10 * 1024 * 1024, # 10MB
+                ping_interval=20,
+                ping_timeout=20
+            )
             
             # Receive auth_required message
             auth_required = await self.ws.recv()
