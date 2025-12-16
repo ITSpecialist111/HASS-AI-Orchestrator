@@ -175,6 +175,31 @@ You can control ANY entity in your target list.
         """
         Make decision based on instruction and current state.
         """
+        # 1. Discover relevant services based on entities
+        relevant_services_text = ""
+        try:
+            if self.entities:
+                # Extract unique domains
+                domains = set([e.split('.')[0] for e in self.entities])
+                
+                # Fetch all services
+                all_services = await self.ha_client.get_services()
+                
+                # Filter for our domains
+                found_services = []
+                for domain in domains:
+                    if domain in all_services:
+                        services = all_services[domain]
+                        # Just list service names, maybe descriptions if brief
+                        # To save token space, just list names: "climate.set_temperature, climate.turn_on"
+                        s_names = list(services.keys())
+                        found_services.append(f"- {domain}: {', '.join(s_names)}")
+                
+                if found_services:
+                    relevant_services_text = "\nAVAILABLE HA SERVICES (Use these EXACT names):\n" + "\n".join(found_services)
+        except Exception as e:
+            print(f"⚠️ Failed to fetch services: {e}")
+
         # Build prompt
         state_desc = context.get("state_description", "No state data")
         
@@ -186,6 +211,8 @@ Time: {context['timestamp']}
 
 ENTITY STATES:
 {state_desc}
+
+{relevant_services_text}
 
 CRITICAL RULES:
 1. You MUST ONLY use entity IDs listed in 'ENTITY STATES'. Do NOT guess or hallucinate IDs.

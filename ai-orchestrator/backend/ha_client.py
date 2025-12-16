@@ -158,6 +158,29 @@ class HAWebSocketClient:
         
         return states
     
+    async def get_services(self) -> Dict:
+        """
+        Get all available services from Home Assistant.
+        
+        Returns:
+            Dictionary of domains and their services.
+        """
+        msg_id = await self._send_message({"type": "get_services"})
+        
+        # Wait for response
+        future = asyncio.Future()
+        self.pending_responses[msg_id] = future
+        try:
+            result = await asyncio.wait_for(future, timeout=10.0)
+        except asyncio.TimeoutError:
+            del self.pending_responses[msg_id]
+            raise TimeoutError("Timeout waiting for HA services")
+        
+        if not result.get("success"):
+            raise ValueError(f"Failed to get services: {result}")
+        
+        return result["result"]
+    
     async def call_service(
         self,
         domain: str,
