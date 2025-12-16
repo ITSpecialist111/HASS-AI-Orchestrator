@@ -258,7 +258,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.42",
+    version="0.8.43",
     lifespan=lifespan
 )
 
@@ -403,12 +403,31 @@ async def get_config():
     """Get current configuration"""
     return {
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-        "dry_run_mode": os.getenv("DRY_RUN_MODE", "true").lower() == "true",
+        "dry_run_mode": mcp_server.dry_run if mcp_server else True,
         "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
         }
     }
+
+
+class UpdateConfigRequest(BaseModel):
+    dry_run_mode: Optional[bool] = None
+
+
+@app.patch("/api/config")
+async def update_config(req: UpdateConfigRequest):
+    """Update runtime configuration (in-memory only)"""
+    global mcp_server
+    
+    if req.dry_run_mode is not None:
+        if mcp_server:
+            mcp_server.dry_run = req.dry_run_mode
+            print(f"🔄 Runtime Config Update: Dry Run set to {req.dry_run_mode}")
+        else:
+            raise HTTPException(status_code=503, detail="MCP Server not initialized")
+            
+    return {"status": "success", "dry_run_mode": mcp_server.dry_run}
 
 
 @app.websocket("/ws")

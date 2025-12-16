@@ -1,8 +1,23 @@
 
 import React from 'react';
 import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { SettingsModal } from './SettingsModal';
 
 export function Layout({ children, activeTab, onTabChange, connected, version = "v0.8.23" }) {
+    const [showSettings, setShowSettings] = useState(false);
+    const [config, setConfig] = useState(null);
+
+    // Load config for settings modal
+    useEffect(() => {
+        if (showSettings) {
+            fetch('api/config')
+                .then(res => res.json())
+                .then(data => setConfig(data))
+                .catch(err => console.error("Failed to load config", err));
+        }
+    }, [showSettings]);
+
     const menuItems = [
         { id: 'live', label: 'Command Centre', icon: LayoutDashboard },
         { id: 'stream', label: 'Decision Stream', icon: Activity },
@@ -53,7 +68,11 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                 <div className="p-4 bg-slate-950/30 border-t border-slate-800 text-xs">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-slate-500 font-mono">{version}</span>
-                        <button className="text-slate-600 hover:text-slate-400">
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="text-slate-600 hover:text-slate-400 transition-colors p-1 hover:bg-slate-800 rounded"
+                            title="Settings"
+                        >
                             <Settings size={14} />
                         </button>
                     </div>
@@ -81,6 +100,14 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                     {children}
                 </div>
             </main>
+
+            {/* Settings Modal */}
+            {showSettings && (
+                <SettingsModal
+                    onClose={() => setShowSettings(false)}
+                    currentConfig={config}
+                />
+            )}
         </div>
     );
 }

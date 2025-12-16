@@ -1,0 +1,19 @@
+configuration:
+  dry_run_mode:
+    name: Dry Run Mode
+    description: "If enabled, the AI will make decisions and log them but acts as a 'simulated' execution - no actual changes will be made to Home Assistant entities. Great for testing prompt safety."
+  ollama_host:
+    name: Ollama Host
+    description: "URL of your Ollama instance (e.g., http://localhost:11434)."
+  log_level:
+    name: Log Level
+    description: "Verbosity of backend logs."
+  ha_access_token:
+    name: HA Access Token
+    description: "Long-Lived Access Token for direct Home Assistant API access (bypasses Supervisor proxy)."
+  decision_interval:
+    name: Decision Interval
+    description: "Time in seconds between AI decision loops."
+  enable_gpu:
+    name: Enable GPU
+    description: "Enable GPU support for local Ollama instance (requires hardware support)."
