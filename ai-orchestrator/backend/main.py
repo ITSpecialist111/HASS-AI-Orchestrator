@@ -53,6 +53,8 @@ class AgentStatus(BaseModel):
     model: str
     last_decision: Optional[str]
     decision_interval: int
+    instruction: Optional[str] = None
+    entities: List[str] = []
 
 
 class Decision(BaseModel):
@@ -256,9 +258,13 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.35",
+    version="0.8.36",
     lifespan=lifespan
 )
+
+# Expose globals to state for routers
+app.state.agents = agents
+
 
 app.include_router(analytics_router)
 app.include_router(factory_router)
@@ -302,7 +308,9 @@ async def get_agents():
             status=getattr(agent, "status", "unknown"),
             model=getattr(agent, "model_name", "unknown"),
             last_decision=last_decision,
-            decision_interval=getattr(agent, "decision_interval", 0)
+            decision_interval=getattr(agent, "decision_interval", 0),
+            instruction=getattr(agent, "instruction", ""),
+            entities=getattr(agent, "entities", [])
         ))
     
     return status_list

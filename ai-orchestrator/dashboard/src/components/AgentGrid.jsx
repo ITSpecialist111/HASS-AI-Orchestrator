@@ -2,7 +2,7 @@
 import React from 'react';
 import { Cpu, Thermometer, Lightbulb, Shield, Zap, RefreshCw, Activity, Clock } from 'lucide-react';
 
-const AgentCard = ({ agent }) => {
+const AgentCard = ({ agent, onClick }) => {
     const getIcon = (id) => {
         switch (id) {
             case 'heating': return <Thermometer size={20} className="text-orange-400" />;
@@ -40,7 +40,10 @@ const AgentCard = ({ agent }) => {
     const isThinking = agent.status === 'deciding';
 
     return (
-        <div className={`relative bg-slate-900 rounded-xl p-5 border transition-all duration-300 group overflow-hidden ${styles.border}`}>
+        <div
+            onClick={() => onClick(agent)}
+            className={`relative bg-slate-900 rounded-xl p-5 border transition-all duration-300 group overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-purple-500/10 ${styles.border}`}
+        >
             {/* Background Tech Elements */}
             <div className="absolute top-0 right-0 p-2 opacity-5">
                 <Activity size={100} />
@@ -53,7 +56,7 @@ const AgentCard = ({ agent }) => {
                         {getIcon(agent.agent_id)}
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-100 tracking-tight text-sm">{agent.name}</h3>
+                        <h3 className="font-bold text-slate-100 tracking-tight text-sm group-hover:text-blue-400 transition-colors">{agent.name}</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${styles.indicator}`}></span>
                             <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider font-mono">{agent.status}</span>
@@ -98,7 +101,24 @@ const AgentCard = ({ agent }) => {
     );
 };
 
+import AgentDetails from './AgentDetails';
+
 export const AgentGrid = ({ agents }) => {
+    const [selectedAgent, setSelectedAgent] = React.useState(null);
+
+    const handleAgentClick = (agent) => {
+        setSelectedAgent(agent);
+    };
+
+    const handleClose = () => setSelectedAgent(null);
+
+    // Provide a way to refresh if deleted - currently simpler to just reload or wait for websocket update
+    // But optimistic removal is handled below for UI feel
+    const handleDelete = (id) => {
+        // Here we could callback to parent to filter agents, but WebSocket should update state
+        setSelectedAgent(null);
+    };
+
     if (!agents || agents.length === 0) {
         return (
             <div className="text-center py-12 text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-900/30">
@@ -109,18 +129,28 @@ export const AgentGrid = ({ agents }) => {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-            {agents.map(agent => (
-                <AgentCard key={agent.agent_id} agent={agent} />
-            ))}
+        <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                {agents.map(agent => (
+                    <AgentCard key={agent.agent_id} agent={agent} onClick={handleAgentClick} />
+                ))}
 
-            {/* Add New Agent Card Place holder/Button */}
-            <div className="group border border-dashed border-slate-800 bg-slate-900/30 rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-slate-800/50 hover:border-purple-500/30 transition-all min-h-[160px]">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
-                    <span className="text-xl">+</span>
+                {/* Add New Agent Card Place holder/Button */}
+                <div className="group border border-dashed border-slate-800 bg-slate-900/30 rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-slate-800/50 hover:border-purple-500/30 transition-all min-h-[160px]">
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
+                        <span className="text-xl">+</span>
+                    </div>
+                    <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200">New Agent</span>
                 </div>
-                <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200">New Agent</span>
             </div>
-        </div>
+
+            {selectedAgent && (
+                <AgentDetails
+                    agent={selectedAgent}
+                    onClose={handleClose}
+                    onDelete={handleDelete}
+                />
+            )}
+        </>
     );
 };

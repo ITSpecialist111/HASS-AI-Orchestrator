@@ -181,6 +181,6 @@ Full test documentation available in:
 ---
 
 **Status**: ✅ Test suite complete and ready to execute
-**Total Tests**: 38 smoke tests
-**Coverage**: API, MCP, Agents, Configuration
+**Total Tests**: 45+ smoke & integration tests
+**Coverage**: API, MCP, Agents, Configuration, HASS Client Protocol
 **Runtime**: ~5-10 seconds
