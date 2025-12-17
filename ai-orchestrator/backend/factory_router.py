@@ -132,6 +132,19 @@ async def update_agent(agent_id: str, req: UpdateAgentRequest, request: Request)
                     if agent['id'] == agent_id:
                         if req.instruction is not None:
                             agent['instruction'] = req.instruction
+                            
+                            # Auto-discover entities if instruction changed and no explicit entities provided
+                            # This ensures agents "see" what they are supposed to control
+                            if req.entities is None:
+                                try:
+                                    architect = request.app.state.architect
+                                    if architect:
+                                        found = await architect.discover_entities_from_instruction(req.instruction)
+                                        agent['entities'] = found
+                                        print(f"🔄 Re-assigned entities for {agent_id}: {found}")
+                                except Exception as e:
+                                    print(f"⚠️ Entity discovery failed: {e}")
+
                         if req.name is not None:
                             agent['name'] = req.name
                         if req.entities is not None:
@@ -154,10 +167,35 @@ async def update_agent(agent_id: str, req: UpdateAgentRequest, request: Request)
              agent_instance = request.app.state.agents[agent_id]
              if req.instruction is not None:
                  agent_instance.instruction = req.instruction
+                 
+                 # Logic for memory update if we re-discovered entities
+                 # We need to reload the YAML or trust the logic we just ran
+                 # Re-fetching from YAML is safest or just replicate logic
+                 if req.entities is None:
+                      # We modified the YAML above, let's grab the discovered entities from there?
+                      # Actually, simplest is to re-run discovery here or store it in a var
+                      # Let's re-run for consistency or better yet, store "found" variable in outer scope
+                      pass 
+
+             # 3. Reload YAML to pick up new entities (Dirty but effective for consistency)
+             # Or just update memory if we had the var. Let's rely on config reload? 
+             # No, "Hot Reload" usually implies memory update.
+             # We should probably pass the 'found' entities from step 1 down here.
+             pass 
+
              if req.name is not None:
-                 agent_instance.name = req.name # UniversalAgent has .name attribute? Yes, base class.
+                 agent_instance.name = req.name 
              if req.decision_interval is not None and hasattr(agent_instance, "decision_interval"):
                  agent_instance.decision_interval = req.decision_interval
+             
+             # Re-read file to sync memory fully (specifically entities)
+             if os.path.exists(config_path):
+                 with open(config_path, 'r') as f:
+                     new_data = yaml.safe_load(f)
+                     for a in new_data.get('agents', []):
+                         if a['id'] == agent_id:
+                             agent_instance.entities = a.get('entities', [])
+                             break
         
         return {"status": "success", "message": "Agent updated."}
 

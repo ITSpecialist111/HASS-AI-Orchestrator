@@ -242,10 +242,20 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                              Backend update needed to return entities in AgentStatus if we want to show them here accurately.
                              For now, rely on what might be passed or show specific fallback.
                           */}
-                                <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50 text-slate-400 text-sm italic text-center">
-                                    Entity list is managed dynamically or via backend config.
-                                    (Visual entity list coming in v0.9)
-                                </div>
+                                {agent.entities && agent.entities.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {agent.entities.map((entityId) => (
+                                            <div key={entityId} className="flex items-center gap-1.5 bg-slate-700/50 px-3 py-1.5 rounded-full border border-slate-600 text-xs text-slate-200 font-mono hover:bg-slate-700 transition-colors">
+                                                <div className={`w-2 h-2 rounded-full ${entityId.split('.')[0] === 'binary_sensor' || entityId.split('.')[0] === 'sensor' ? 'bg-blue-400' : 'bg-green-400'}`} />
+                                                {entityId}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50 text-slate-400 text-sm italic text-center">
+                                        No specific entities assigned. (Agent will use Auto-Discovery)
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

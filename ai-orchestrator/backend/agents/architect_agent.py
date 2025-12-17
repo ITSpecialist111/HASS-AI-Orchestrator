@@ -167,51 +167,90 @@ class ArchitectAgent:
         # Cap at 20
         return candidates[:20]
 
+    async def discover_entities_from_instruction(self, instruction: str) -> List[str]:
+        """
+        Analyzes the natural language instruction and finds relevant entities 
+        from the Home Assistant registry (Anti-Hallucination).
+        """
+        try:
+            states = await self.ha_client.get_states()
+            all_ids = [s['entity_id'] for s in states]
+            
+            # 1. Extract Keywords from Instruction
+            stopwords = {'the', 'and', 'or', 'if', 'when', 'then', 'is', 'to', 'in', 'on', 'off', 'for', 'a', 'an', 'at', 'my', 'me', 'please', 'turn', 'switch', 'set', 'check', 'monitor', 'control', 'manage', 'automate'}
+            
+            # Simple tokenization
+            import re
+            tokens = set(re.findall(r'\b[a-z]{3,}\b', instruction.lower()))
+            keywords = tokens - stopwords
+            
+            if not keywords:
+                return []
+                
+            matched_entities = set()
+            
+            # 2. Score Entities
+            # We look for entity_ids that contain the keywords
+            # e.g. "kitchen" -> light.kitchen_main, binary_sensor.kitchen_motion
+            
+            for eid in all_ids:
+                eid_lower = eid.lower()
+                # Check for exact token matches in the entity_id string
+                # count matches
+                matches = sum(1 for k in keywords if k in eid_lower)
+                
+                if matches > 0:
+                    matched_entities.add(eid)
+                    
+            # 3. Refine / Filter
+            # If we matched too many (e.g. "light" matches all lights), we might need to be stricter?
+            # But the user might WANT "turn off all lights".
+            # So basic keyword matching is actually safer than over-filtering.
+            # However, limit to reasonable count to avoid context overflow? 
+            # 20 seems safe for now.
+            
+            result = list(matched_entities)
+            # Prioritize actuators (domains we can control) vs sensors
+            actuators = [e for e in result if e.split('.')[0] in ['light', 'switch', 'climate', 'cover', 'lock', 'fan', 'media_player', 'vacuum']]
+            sensors = [e for e in result if e not in actuators]
+            
+            # Return actuators first
+            return (actuators + sensors)[:50] 
+            
+        except Exception as e:
+            self.logger.error(f"Discovery error: {e}")
+            return []
+
     async def generate_config(self, user_prompt: str, available_entities: List[str] = None) -> Dict[str, Any]:
         """
-        Generates a YAML configuration block based on user prompt (Legacy/Manual flow).
+        Generates a YAML configuration block based on user prompt.
+        Uses real entity discovery.
         """
-        # ... logic for manual prompt generation ...
-        # Simplified for brevity since main Logic is above now, but keeping existing heuristic for manual entry
+        # Discover real entities based on the prompt
+        found_entities = await self.discover_entities_from_instruction(user_prompt)
+        
+        # Infer name/ID
+        name = "Custom Agent"
+        import re
+        match = re.search(r"(?:name|call)\s+(?:is\s+)?([A-Za-z0-9 ]+)", user_prompt, re.IGNORECASE)
+        if match:
+             name = match.group(1).title()
+        else:
+             # Try to derive from first strong keyword?
+             ignore = {'turn', 'switch', 'change', 'set', 'if', 'when', 'manager', 'supervisor', 'agent', 'bot'}
+             words = [w for w in user_prompt.split() if w.lower() not in ignore and len(w) > 3]
+             if words:
+                 name = f"{words[0].title()} Agent"
+                 
+        agent_id = name.lower().replace(" ", "_").replace(".", "")
         
         generated = {
+            "id": agent_id,
+            "name": name,
             "model": "mistral:7b-instruct",
-            "decision_interval": 120
+            "decision_interval": 120,
+            "entities": found_entities,
+            "instruction": user_prompt
         }
-        
-        prompt_lower = user_prompt.lower()
-        
-        # [Existing heuristic logic simplified/preserved]
-        # We can actually fallback to the smart logic if the prompt matches a token!
-        # But for now, stick to the robust mock.
-        
-        if "pool" in prompt_lower:
-            generated.update({
-                "id": "pool_manager",
-                "name": "Pool Manager",
-                "entities": ["switch.pool_pump", "sensor.pool_temp"],
-                "instruction": "Maintain pool temperature above 25C. Run pump from 8AM to 4PM."
-            })
-        elif "light" in prompt_lower:
-             generated.update({
-                "id": "lighting_manager",
-                "name": "Lighting Manager",
-                "entities": ["light.living_room"], # Mock
-                "instruction": "Turn on lights if occupancy is detected."
-            })
-        else:
-            # Generic fallback
-            name="Custom Agent"
-            import re
-            match = re.search(r"(?:name|call)\s+(?:is\s+)?([A-Za-z0-9 ]+)", prompt_lower)
-            if match:
-                 name = match.group(1).title()
-            
-            generated.update({
-                "id": name.lower().replace(" ", "_"),
-                "name": name,
-                "entities": [],
-                "instruction": user_prompt
-            })
             
         return generated
