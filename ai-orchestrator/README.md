@@ -91,6 +91,11 @@ When you change an agent's instruction in the Dashboard (e.g., changing "Manage 
 
 This prevents the "Hallucinated Entity ID" errors common in other LLM integrations.
 
+### 🛡️ Dynamic Service Restriction (Approved Methods)
+Each agent is strictly limited to the Home Assistant services that match its assigned entities. 
+*   **Example**: If an agent controls `light.living_room`, it is injected with approved methods like `light.turn_on` and `light.turn_off`.
+*   **Effect**: It CANNOT haphazardly call `switch.turn_on` or hallucinate fake services like `light.explode`. The generic "call_ha_service" tool is contextually bound to these approved methods "behind the scenes" in the system prompt.
+
 ---
 
 ## 🔧 Troubleshooting
