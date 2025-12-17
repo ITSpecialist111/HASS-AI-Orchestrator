@@ -260,7 +260,7 @@ ha_client: Optional[HAWebSocketClient] = None
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.53",
+    version="0.8.54",
     lifespan=lifespan
 )
 
@@ -407,6 +407,8 @@ async def get_config():
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         "dry_run_mode": mcp_server.dry_run if mcp_server else True,
         "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
+        "smart_model": os.getenv("SMART_MODEL", "deepseek-r1:8b"),
+        "fast_model": os.getenv("FAST_MODEL", "mistral:7b-instruct"),
         "version": app.version,
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
