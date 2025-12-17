@@ -292,10 +292,10 @@ app.add_middleware(IngressMiddleware)
 async def health_check():
     """Health check endpoint"""
     return {
-        "status": "healthy",
-        "ha_connected": ha_client.connected if ha_client else False,
-        "agents_active": len(agents),
-        "orchestrator_active": orchestrator is not None
+        "status": "online",
+        "version": "0.9.0",
+        "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
+        "agent_count": len(orchestrator.agents) if orchestrator else 0
     }
 
 
