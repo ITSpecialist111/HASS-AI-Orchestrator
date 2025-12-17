@@ -26,10 +26,24 @@ export const AnalyticsCharts = ({ dailyData, performanceData }) => {
                                 itemStyle={{ color: '#f1f5f9' }}
                             />
                             <Legend />
-                            <Bar dataKey="heating" fill="#f97316" name="Heating" stackId="a" />
-                            <Bar dataKey="cooling" fill="#3b82f6" name="Cooling" stackId="a" />
-                            <Bar dataKey="lighting" fill="#eab308" name="Lighting" stackId="a" />
-                            <Bar dataKey="security" fill="#ef4444" name="Security" stackId="a" />
+                            {/* Dynamically generate bars for each agent found in data */}
+                            {dailyData.length > 0 && Object.keys(dailyData[0])
+                                .filter(key => key !== 'date')
+                                .map((agentId, index) => {
+                                    // Deterministic color generation
+                                    const hue = (index * 137.508) % 360; // Golden angle approx
+                                    const color = `hsl(${hue}, 70%, 50%)`;
+                                    return (
+                                        <Bar
+                                            key={agentId}
+                                            dataKey={agentId}
+                                            fill={color}
+                                            name={agentId.charAt(0).toUpperCase() + agentId.slice(1)}
+                                            stackId="a"
+                                        />
+                                    );
+                                })
+                            }
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
