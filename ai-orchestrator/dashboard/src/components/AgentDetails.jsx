@@ -264,11 +264,11 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                             </span>
                                         </div>
                                         <div className="text-slate-300 mb-2 font-medium">
-                                            {decision.reasoning || "No reasoning provided."}
+                                            {decision.decision?.reasoning || decision.reasoning || "No reasoning provided."}
                                         </div>
-                                        {decision.action && (
-                                            <div className="bg-black/20 p-2 rounded text-xs font-mono text-blue-300">
-                                                {decision.action}
+                                        {(decision.decision?.actions || decision.action) && (
+                                            <div className="bg-black/20 p-2 rounded text-xs font-mono text-blue-300 overflow-x-auto">
+                                                {JSON.stringify(decision.decision?.actions || decision.action, null, 2)}
                                             </div>
                                         )}
                                     </div>
