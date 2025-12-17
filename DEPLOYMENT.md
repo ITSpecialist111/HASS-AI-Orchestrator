@@ -25,10 +25,17 @@ This is the easiest way to install and get automatic updates.
 
 #### 2. Install Add-on
 1. Reload the page (important!).
-2. Find **AI Orchestrator** in the list.
-3. Click **Install**.
-4. Build time: **5-15 minutes** (it builds locally on your device).
-5. **Verify Version**: Ensure it is **v0.8.54** before installing.
+#### 2. Models
+1. Ensure your **Ollama** server is running.
+2. Pull the required models:
+   ```bash
+   ollama pull deepseek-r1:8b    # Smart Reasoning
+   ollama pull mistral:7b-instruct # Fast Execution
+   ollama pull nomic-embed-text  # RAG Embeddings (Mandatory)
+   ```
+   
+#### 3. Installation
+1. Go to **Settings > Add-ons > Add-on Store**.
 
 #### 3. Configuration
 Configure the add-on in the "Configuration" tab:

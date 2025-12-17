@@ -38,7 +38,10 @@ class RagManager:
         
         # Initialize ChromaDB client
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(path=persist_dir)
+        self.client = chromadb.PersistentClient(
+            path=persist_dir,
+            settings=Settings(anonymized_telemetry=False)
+        )
         
         # Initialize collections
         self.knowledge_base = self.client.get_or_create_collection(

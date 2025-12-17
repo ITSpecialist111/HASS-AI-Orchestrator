@@ -218,7 +218,7 @@ async def lifespan(app: FastAPI):
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
-        model_name=os.getenv("HEATING_MODEL", "mistral:7b-instruct"),  # Reusing the main config model
+        model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         planning_interval=int(os.getenv("DECISION_INTERVAL", "120"))
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
@@ -249,18 +249,13 @@ async def lifespan(app: FastAPI):
     print("✅ Shutdown complete")
 
 
-from agents.security_agent import SecurityAgent
-from analytics import router as analytics_router
 
-# Global state
-ha_client: Optional[HAWebSocketClient] = None
-# ... (existing globals)
 
 # Create FastAPI app
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.54",
+    version="0.8.55",
     lifespan=lifespan
 )
 
