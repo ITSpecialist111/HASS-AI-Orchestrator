@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Wand2, Plus, Save, X, Lightbulb } from 'lucide-react';
 
-export const AgentFactory = ({ onAgentCreated }) => {
+export const AgentFactory = ({ onAgentCreated, initialBlueprint }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [mode, setMode] = useState('prompt'); // prompt | review | loading
     const [prompt, setPrompt] = useState('');
@@ -15,6 +15,15 @@ export const AgentFactory = ({ onAgentCreated }) => {
             loadSuggestions();
         }
     }, [isOpen]);
+
+    // Handle initial blueprint from props (e.g. from suggestions click)
+    useEffect(() => {
+        if (initialBlueprint) {
+            setGeneratedConfig(initialBlueprint);
+            setMode('review');
+            setIsOpen(true);
+        }
+    }, [initialBlueprint]);
 
     const loadSuggestions = async () => {
         try {

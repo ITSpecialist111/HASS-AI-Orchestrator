@@ -103,7 +103,7 @@ const AgentCard = ({ agent, onClick }) => {
 
 import AgentDetails from './AgentDetails';
 
-export const AgentGrid = ({ agents, onAgentCreate }) => {
+export const AgentGrid = ({ agents, suggestions = [], onAgentCreate, onSuggestionClick }) => {
     const [selectedAgent, setSelectedAgent] = React.useState(null);
 
     const handleAgentClick = (agent) => {
@@ -133,6 +133,29 @@ export const AgentGrid = ({ agents, onAgentCreate }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                 {agents.map(agent => (
                     <AgentCard key={agent.agent_id} agent={agent} onClick={handleAgentClick} />
+                ))}
+
+                {/* Suggested Agents */}
+                {suggestions && suggestions.map((s, idx) => (
+                    <div
+                        key={`sugg-${idx}`}
+                        onClick={() => onSuggestionClick && onSuggestionClick(s.blueprint || { instruction: s.prompt })}
+                        className="group border border-dashed border-blue-500/30 bg-blue-500/5 rounded-xl p-5 cursor-pointer hover:bg-blue-500/10 hover:border-blue-400/50 transition-all flex flex-col h-full min-h-[160px]"
+                    >
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                <Lightbulb size={20} />
+                            </div>
+                            <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                                Suggestion
+                            </span>
+                        </div>
+                        <h3 className="font-bold text-slate-200 mb-1">{s.title}</h3>
+                        <p className="text-xs text-slate-400 line-clamp-3 mb-3 flex-1">{s.reason}</p>
+                        <div className="text-xs text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                            Review Blueprint <span>→</span>
+                        </div>
+                    </div>
                 ))}
 
                 {/* Add New Agent Card Place holder/Button */}
