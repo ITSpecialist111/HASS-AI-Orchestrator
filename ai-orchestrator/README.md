@@ -29,14 +29,15 @@ The system uses three distinct model roles to optimize for cost, speed, and inte
 
 ### 4. "Minority Report" Dashboard 🖥️
 -   **Live Decision Stream**: Watch your agents think in real-time. See *why* they made a decision.
--   **Agent Cards**: Check status, last thoughts, and activity heartbeat.
--   **No-Code Factory**: Chat with the "Architect" AI to build new agents interactively.
+-   **Smart Suggestions**: The Architect analyzes your home and suggests new automation opportunities directly in your grid.
+-   **No-Code Factory**: Click a suggestion or the "+" button to interview the Architect and build new agents interactively.
 
 ### 5. Chat Assistant (v0.9.0) 💬
 A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Quick Actions**: Hover over the icon for instant commands (Zap Lights, Arm Security).
 -   **Direct Control**: Chat with the Orchestrator directly. "Turn off the kitchen lights and lock the front door."
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
+-   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
 ---
 
@@ -51,7 +52,9 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
     *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
-4.  **Start**: The first startup determines your available hardware and may take a few minutes.
+4.  **Start**: The first startup determines your available hardware and ingests your entities into the Knowledge Base.
+    *   **First Run**: May take ~1 minute to embed all entities.
+    *   **Subsequent Runs**: Instant (v0.9.1+ Delta Check enabled).
 
 ## ⚙️ Configuration (`agents.yaml`)
 
@@ -120,6 +123,12 @@ Each agent is strictly limited to the Home Assistant services that match its ass
 ### "Agent is stuck in 'Initializing'?"
 *   **Cause**: The agent loop likely crashed or LLM is unreachable.
 *   **Fix**: Check the "Logs" tab in the Add-on. Ensure Ollama is running and accessible.
+
+### "Chat Assistant says 'No route to host'?"
+*   **Cause**: The Add-on container cannot reach your Ollama IP.
+*   **Fix**: 
+    1.  If Ollama is on the host, use your LAN IP (e.g., `192.168.1.x`), NOT `localhost`.
+    2.  Check the error details in the chat bubble for the exact URL it tried.
 
 ---
 

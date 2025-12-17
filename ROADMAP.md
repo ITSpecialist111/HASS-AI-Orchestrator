@@ -13,6 +13,10 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 - **Feature**: Implement a mechanism for dynamic agent loading and unloading.
 - **Use Case**: Rapid iteration on agent logic without service interruption.
 
+-   [x] **Chat Interface**: Floating dashboard assistant for natural language control. (v0.9.0)
+-   [x] **RAG Optimization**: Delta-based ingestion for instant startup. (v0.9.1)
+-   [ ] **Voice Interface**: Real-time voice interaction via Home Assistant Assist pipeline. (v1.0)
+
 ### 2. Voice Integration (HA Assist)
 - **Goal**: Talk to your agents via Home Assistant Assist / ESPHome satellites.
 - **Feature**: Expose the "Architect" and "Orchestrator" as conversation agents.
