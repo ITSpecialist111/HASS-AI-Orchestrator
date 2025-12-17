@@ -376,11 +376,10 @@ Only create tasks if action is needed. Return empty tasks array if everything is
         Process a direct chat message from the user.
         Acts as a general-purpose home assistant.
         """
+        # 1. Gather Context
         try:
-            # 1. Gather Context
             states = await self.ha_client.get_states()
-            # Summarize states to fit context (first 50 interesting ones?)
-            # Simplified for chat: just list names/ids of lights/switches/climate
+            # Summarize states to fit context (first 60 interesting ones)
             relevant_domains = ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum']
             state_desc = []
             for s in states:
@@ -389,9 +388,12 @@ Only create tasks if action is needed. Return empty tasks array if everything is
                     state_desc.append(f"- {friendly} ({s['entity_id']}): {s['state']}")
             
             context_str = "\n".join(state_desc[:60]) # Limit to 60 items
-            
-            # 2. Build Prompt
-            prompt = f"""
+        except Exception as e:
+            logger.error(f"Chat Context Error: {e}")
+            context_str = "Error fetching home state."
+
+        # 2. Build Prompt
+        prompt = f"""
 You are the AI Orchestrator for this home. 
 The user is asking you a question or giving a command.
 
@@ -418,16 +420,25 @@ INSTRUCTIONS:
 5. NO COMMENTS in JSON.
 """
 
-            # 3. Call LLM
+        # 3. Call LLM
+        try:
             response = self.llm_client.chat(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
                 format="json"
             )
-            
             content = response["message"]["content"]
-            
-            # 4. Parse & Execute
+        except Exception as e:
+            logger.error(f"LLM Chat Error: {e}")
+            import os
+            host = os.getenv("OLLAMA_HOST", "localhost")
+            return {
+                "response": f"⚠️ **Communication Error**: I couldn't reach my brain ({self.model_name}).\n\nTechnical Details:\n- Host: `{host}`\n- Error: `{str(e)}`",
+                "actions_executed": []
+            }
+
+        # 4. Parse & Execute
+        try:
             # Strip comments if any (safety)
             import re
             content = re.sub(r'//.*', '', content)
@@ -437,31 +448,41 @@ INSTRUCTIONS:
             execution_results = []
             if "actions" in data:
                 for action in data["actions"]:
-                    if action.get("tool") == "call_ha_service" or action.get("tool") == "execute_service":
-                        # Execute logic using MCP
-                        # Map generic params to MCP strict structure
+                    # Handle both tool naming conventions
+                    tool_name = action.get("tool")
+                    if tool_name in ["call_ha_service", "execute_service"]:
                         params = action.get("parameters", {})
                         
-                        # Safety: Ensure entity_id is provided logic
+                        # Safety fallback
                         if not params.get("entity_id") and not params.get("area_id"):
-                             # If missing, maybe warn user? or fail?
+                             # If missing, we might skip or let MCP catch it
                              pass
                              
-                        res = await self.mcp_server.execute_tool(
-                            tool_name="call_ha_service",
-                            parameters=params,
-                            agent_id="orchestrator_chat"
-                        )
-                        execution_results.append(res)
-            
+                        try:
+                            res = await self.mcp_server.execute_tool(
+                                tool_name="call_ha_service",
+                                arguments=params
+                            )
+                            # Create a readable summary
+                            summary = f"Executed {params.get('service')} on {params.get('entity_id')}"
+                            execution_results.append({"tool": summary, "result": res})
+                        except Exception as tool_err:
+                            execution_results.append({"tool": "Failed", "error": str(tool_err)})
+
             return {
-                "response": data.get("response", "Done."),
+                "response": data.get("response", "I've processed your request."),
                 "actions_executed": execution_results
             }
-
-        except Exception as e:
-            logger.error(f"Chat error: {e}")
+            
+        except json.JSONDecodeError:
+            logger.error(f"LLM JSON Error: {content}")
             return {
-                "response": f"I encountered an error processing your request: {e}",
+                "response": "I had trouble structuring my thoughts (JSON Error). Please try again.",
+                "actions_executed": []
+            }
+        except Exception as e:
+            logger.error(f"Chat Execution Error: {e}")
+            return {
+                "response": f"I encountered an unexpected error: {str(e)}",
                 "actions_executed": []
             }
