@@ -23,7 +23,12 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 - **Feature**: Responsive design updates for the React dashboard.
 - **Use Case**: Checking agent "thoughts" and approving decisions from your phone while away.
 
-### 3. Energy Optimization Agent
+### 4. Chat Assistant (Completed v0.9.0) ✅
+- **Goal**: Talk to your house via the Dashboard.
+- **Feature**: Floating Action Button with Quick Actions and Chat Interface.
+- **Use Case**: *"Turn off the lights"* -> Orchestrator executes immediately.
+
+### 5. Energy Optimization Agent
 - **Goal**: High ROI automation.
 - **Feature**: A specialized agent pre-trained on solar production, battery curves, and grid pricing.
 - **Use Case**: Automatically pre-cooling the house when solar is high and grid prices are low.

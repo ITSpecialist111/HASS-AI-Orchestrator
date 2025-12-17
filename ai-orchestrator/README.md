@@ -32,6 +32,12 @@ The system uses three distinct model roles to optimize for cost, speed, and inte
 -   **Agent Cards**: Check status, last thoughts, and activity heartbeat.
 -   **No-Code Factory**: Chat with the "Architect" AI to build new agents interactively.
 
+### 5. Chat Assistant (v0.9.0) 💬
+A floating AI assistant lives in your dashboard, ready to help at any time.
+-   **Quick Actions**: Hover over the icon for instant commands (Zap Lights, Arm Security).
+-   **Direct Control**: Chat with the Orchestrator directly. "Turn off the kitchen lights and lock the front door."
+-   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
+
 ---
 
 ## 📦 Installation
