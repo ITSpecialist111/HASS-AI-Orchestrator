@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.8.59",
+    "version": "0.8.60",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -38,7 +38,8 @@
         "decision_interval": 120,
         "enable_gpu": false,
         "smart_model": "deepseek-r1:8b",
-        "fast_model": "mistral:7b-instruct"
+        "fast_model": "mistral:7b-instruct",
+        "orchestrator_model": "deepseek-r1:8b"
     },
     "schema": {
         "ollama_host": "str",
@@ -48,6 +49,7 @@
         "decision_interval": "int(30,600)",
         "enable_gpu": "bool",
         "smart_model": "str",
-        "fast_model": "str"
+        "fast_model": "str",
+        "orchestrator_model": "str"
     }
 }
