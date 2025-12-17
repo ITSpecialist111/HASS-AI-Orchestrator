@@ -26,7 +26,40 @@ function App() {
         fetchSuggestions()
     }, [])
 
-    // ... (WebSocket code unchanged) ...
+    // WebSocket connection
+    useEffect(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        // Use relative path derivation for Ingress support
+        const wsUrl = `${protocol}//${window.location.host}${window.location.pathname.replace(/\/$/, '')}/ws`
+        const websocket = new WebSocket(wsUrl)
+
+        websocket.onopen = () => setConnected(true)
+        websocket.onclose = () => setConnected(false)
+
+        websocket.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data)
+
+                if (msg.type === 'status') {
+                    // Initial status, maybe reload agents
+                    fetchAgents()
+                } else if (msg.type === 'agent_update') {
+                    // Update single agent status in list
+                    setAgents(prev => prev.map(a =>
+                        a.agent_id === msg.data.agent_id ? { ...a, ...msg.data } : a
+                    ))
+                } else if (msg.type === 'decision') {
+                    // Add new decision to top of list
+                    setDecisions(prev => [msg.data, ...prev].slice(0, 50)) // Keep last 50
+                    fetchAgents() // Update agent status/last action
+                }
+            } catch (e) {
+                console.error("WS Parse Error", e)
+            }
+        }
+
+        return () => websocket.close()
+    }, [])
 
     const fetchSuggestions = async () => {
         try {
@@ -49,7 +82,31 @@ function App() {
         } catch (e) { console.error("Fetch Agents Failed:", e) }
     }
 
-    // ... (fetchDecisions, fetchAnalytics unchanged) ...
+    const fetchDecisions = async () => {
+        try {
+            const res = await fetch('api/decisions?limit=50')
+            if (!res.ok) throw new Error(`API Error ${res.status}`)
+            const data = await res.json()
+            if (Array.isArray(data)) {
+                setDecisions(data)
+            }
+        } catch (e) { console.error("Fetch Decisions Failed:", e) }
+    }
+
+    const fetchAnalytics = async () => {
+        try {
+            const [dailyRes, perfRes] = await Promise.all([
+                fetch('api/stats/daily'),
+                fetch('api/stats/performance')
+            ])
+
+            if (dailyRes.ok) {
+                const d = await dailyRes.json()
+                if (Array.isArray(d)) setDailyStats(d)
+            }
+            if (perfRes.ok) setPerformance(await perfRes.json())
+        } catch (e) { console.error("Fetch Analytics Failed:", e) }
+    }
 
     // Render active view
     const renderContent = () => {
