@@ -145,7 +145,23 @@ async def lifespan(app: FastAPI):
             rag_manager = None
     
     # 3. Initialize MCP server
-    dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+    # Prefer reading directly from options.json for reliability in HA Add-on environment
+    dry_run = True
+    options_path = Path("/data/options.json")
+    if options_path.exists():
+        try:
+            with open(options_path, "r") as f:
+                opts = json.load(f)
+                dry_run = opts.get("dry_run_mode", True)
+                print(f"DEBUG: Read dry_run={dry_run} from options.json")
+        except Exception as e:
+            print(f"⚠️ Failed to read options.json: {e}")
+            # Fallback to env var
+            dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+    else:
+        # Fallback to env var
+        dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+
     mcp_server = MCPServer(ha_client, rag_manager=rag_manager, dry_run=dry_run)
     print(f"✓ MCP Server initialized (dry_run={dry_run})")
     
@@ -255,7 +271,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.8.55",
+    version="0.8.56",
     lifespan=lifespan
 )
 

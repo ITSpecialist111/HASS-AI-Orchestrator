@@ -17,8 +17,9 @@ fi
 export OLLAMA_HOST=$(jq -r '.ollama_host // "http://localhost:11434"' $CONFIG_PATH)
 export DRY_RUN_MODE=$(jq -r '.dry_run_mode // true' $CONFIG_PATH)
 export LOG_LEVEL=$(jq -r '.log_level // "info"' $CONFIG_PATH | tr '[:lower:]' '[:upper:]')
-export HEATING_MODEL=$(jq -r '.heating_model // "mistral:7b-instruct"' $CONFIG_PATH)
-export HEATING_ENTITIES=$(jq -r '.heating_entities | join(",")' $CONFIG_PATH)
+export ORCHESTRATOR_MODEL=$(jq -r '.orchestrator_model // "deepseek-r1:8b"' $CONFIG_PATH)
+export SMART_MODEL=$(jq -r '.smart_model // "deepseek-r1:8b"' $CONFIG_PATH)
+export FAST_MODEL=$(jq -r '.fast_model // "mistral:7b-instruct"' $CONFIG_PATH)
 export DECISION_INTERVAL=$(jq -r '.decision_interval // 120' $CONFIG_PATH)
 export ENABLE_GPU=$(jq -r '.enable_gpu // false' $CONFIG_PATH)
 
@@ -32,7 +33,9 @@ echo "Configuration loaded:"
 echo "  Ollama Host: $OLLAMA_HOST"
 echo "  Dry Run Mode: $DRY_RUN_MODE"
 echo "  Log Level: $LOG_LEVEL"
-echo "  Heating Model: $HEATING_MODEL"
+echo "  Orchestrator Model: $ORCHESTRATOR_MODEL"
+echo "  Smart Model: $SMART_MODEL"
+echo "  Fast Model: $FAST_MODEL"
 echo "  Decision Interval: ${DECISION_INTERVAL}s"
 echo "  GPU Enabled: $ENABLE_GPU"
 if [ -n "$HA_ACCESS_TOKEN" ]; then
@@ -79,13 +82,17 @@ if [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"* ]
     echo "Checking for model: $HEATING_MODEL"
     echo "=========================================="
     
-    if ! ollama list | grep -q "${HEATING_MODEL%%:*}"; then
-        echo "Model not found. Pulling $HEATING_MODEL..."
-        echo "This may take several minutes depending on model size..."
-        ollama pull "$HEATING_MODEL"
-        echo "Model pulled successfully!"
+    if ! ollama list | grep -q "${SMART_MODEL%%:*}"; then
+        echo "Smart Model not found. Pulling $SMART_MODEL..."
+        ollama pull "$SMART_MODEL"
+    fi
+
+    if ! ollama list | grep -q "${FAST_MODEL%%:*}"; then
+        echo "Fast Model not found. Pulling $FAST_MODEL..."
+        ollama pull "$FAST_MODEL"
+        echo "Models pulled successfully!"
     else
-        echo "Model $HEATING_MODEL already available"
+        echo "Required models are available"
     fi
 fi
 
