@@ -293,7 +293,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "online",
-        "version": "0.9.0",
+        "version": "0.9.1",
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
         "agent_count": len(orchestrator.agents) if orchestrator else 0
     }

@@ -4,9 +4,9 @@ This is a **Home Assistant Add-on Repository**.
 
 ## 📦 Available Add-ons
 
-| Add-on | Description | Version |
-|--------|-------------|---------|
-| **[AI Orchestrator](ai-orchestrator/)** | Autonomous multi-agent AI system with RAG and No-Code Factory | v0.9.0 |
+| Add-on | Description | **Version**: v0.9.1 |
+|--------|-------------|--------------------|
+| **[AI Orchestrator](ai-orchestrator/)** | Autonomous multi-agent AI system with RAG and No-Code Factory | v0.9.1 |
 
 ## 🚀 How to Install
 
