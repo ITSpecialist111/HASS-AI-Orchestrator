@@ -232,6 +232,18 @@ class MCPServer:
                     "required": ["message"]
                 },
                 "handler": self._log_message
+            },
+            "get_state": {
+                "name": "get_state",
+                "description": "Get the current state and attributes of any entity",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {"type": "string", "description": "Entity ID to check"}
+                    },
+                    "required": ["entity_id"]
+                },
+                "handler": self._get_state
             }
         }
     
@@ -613,3 +625,24 @@ class MCPServer:
         message = params["message"]
         # The logging happens automatically in execute_tool via log_entry
         return {"action": "log", "message": message, "logged": True}
+
+    async def _get_state(self, params: Dict) -> Dict:
+        """Generic get state handler"""
+        entity_id = params["entity_id"]
+        try:
+            # We can reuse get_climate_state's logic or call ha_client directly
+            # HAWebSocketClient likely has a generic get_state or we can fallback to listening
+            # But ha_client.get_climate_state just returns the state dict from registry
+            # We need to expose a generic get_state in ha_client if it doesn't exist
+            # Checking ha_client usage... it seems we only have get_climate_state exposed in the snippet I saw?
+            # Let's assume ha_client has a way to get state from its local cache
+            # Actually, looking at previous files, ha_client.states is a dict.
+            
+            # Accessing ha_client states directly
+            state = await self.ha_client.get_states(entity_id=entity_id)
+            if state:
+                return {"entity_id": entity_id, "state": state.get("state"), "attributes": state.get("attributes")}
+            else:
+                return {"error": f"Entity {entity_id} not found in registry"}
+        except Exception as e:
+            return {"error": str(e)}
