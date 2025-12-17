@@ -4,6 +4,7 @@ import { AgentGrid } from './components/AgentGrid'
 import { AnalyticsCharts } from './components/AnalyticsCharts'
 import { AgentFactory } from './components/AgentFactory'
 import { DecisionStream } from './components/DecisionStream'
+import { ChatAssistant } from './components/ChatAssistant'
 import './index.css'
 
 function App() {
@@ -124,6 +125,7 @@ function App() {
             connected={connected}
         >
             {renderContent()}
+            <ChatAssistant />
         </Layout>
     )
 }

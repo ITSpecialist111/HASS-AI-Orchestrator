@@ -371,3 +371,97 @@ Only create tasks if action is needed. Return empty tasks array if everything is
         log_file = self.decision_log_dir / f"{state['timestamp'].replace(':', '-')}.json"
         with open(log_file, 'w') as f:
             json.dump(log_entry, f, indent=2)
+    async def process_chat_request(self, user_message: str) -> Dict[str, Any]:
+        """
+        Process a direct chat message from the user.
+        Acts as a general-purpose home assistant.
+        """
+        try:
+            # 1. Gather Context
+            states = await self.ha_client.get_states()
+            # Summarize states to fit context (first 50 interesting ones?)
+            # Simplified for chat: just list names/ids of lights/switches/climate
+            relevant_domains = ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum']
+            state_desc = []
+            for s in states:
+                if s['entity_id'].split('.')[0] in relevant_domains:
+                    friendly = s.get('attributes', {}).get('friendly_name', s['entity_id'])
+                    state_desc.append(f"- {friendly} ({s['entity_id']}): {s['state']}")
+            
+            context_str = "\n".join(state_desc[:60]) # Limit to 60 items
+            
+            # 2. Build Prompt
+            prompt = f"""
+You are the AI Orchestrator for this home. 
+The user is asking you a question or giving a command.
+
+CURRENT HOME STATE:
+{context_str}
+
+AVAILABLE TOOLS:
+- call_ha_service: Execute Home Assistant services. Params: domain, service, entity_id, service_data.
+
+USER MESSAGE: "{user_message}"
+
+INSTRUCTIONS:
+1. If this is a question, answer it based on the home state.
+2. If this is a command (e.g. "Turn on light"), execute it using the 'call_ha_service' tool.
+3. You can execute multiple tools if needed.
+4. Respond with a JSON object:
+{{
+  "thought": "Reasoning here...",
+  "response": "Natural language response to user...",
+  "actions": [
+    {{ "tool": "call_ha_service", "parameters": {{ ... }} }}
+  ]
+}}
+5. NO COMMENTS in JSON.
+"""
+
+            # 3. Call LLM
+            response = self.llm_client.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                format="json"
+            )
+            
+            content = response["message"]["content"]
+            
+            # 4. Parse & Execute
+            # Strip comments if any (safety)
+            import re
+            content = re.sub(r'//.*', '', content)
+            
+            data = json.loads(content)
+            
+            execution_results = []
+            if "actions" in data:
+                for action in data["actions"]:
+                    if action.get("tool") == "call_ha_service" or action.get("tool") == "execute_service":
+                        # Execute logic using MCP
+                        # Map generic params to MCP strict structure
+                        params = action.get("parameters", {})
+                        
+                        # Safety: Ensure entity_id is provided logic
+                        if not params.get("entity_id") and not params.get("area_id"):
+                             # If missing, maybe warn user? or fail?
+                             pass
+                             
+                        res = await self.mcp_server.execute_tool(
+                            tool_name="call_ha_service",
+                            parameters=params,
+                            agent_id="orchestrator_chat"
+                        )
+                        execution_results.append(res)
+            
+            return {
+                "response": data.get("response", "Done."),
+                "actions_executed": execution_results
+            }
+
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            return {
+                "response": f"I encountered an error processing your request: {e}",
+                "actions_executed": []
+            }

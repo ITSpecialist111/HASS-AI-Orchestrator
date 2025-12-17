@@ -299,6 +299,18 @@ async def health_check():
     }
 
 
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/api/chat")
+async def chat_with_orchestrator(req: ChatRequest):
+    """Direct chat with the Orchestrator"""
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator not ready")
+    
+    return await orchestrator.process_chat_request(req.message)
+
 @app.get("/api/agents", response_model=List[AgentStatus])
 async def get_agents():
     """Get status of all agents"""
