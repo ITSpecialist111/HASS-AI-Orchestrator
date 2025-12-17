@@ -603,18 +603,24 @@ class MCPServer:
                 "action": "call_ha_service",
                 "domain": domain,
                 "service": service,
-                "data": call_data,
+                "data": {"entity_id": entity_id, **service_data},
                 "executed": False,
                 "dry_run": True
             }
             
         try:
-            await self.ha_client.call_service(domain, service, call_data)
+            # Fix: Pass entity_id and service_data (kwargs) separately
+            await self.ha_client.call_service(
+                domain=domain, 
+                service=service, 
+                entity_id=entity_id, 
+                **service_data
+            )
             return {
                 "action": "call_ha_service",
                 "domain": domain,
                 "service": service,
-                "data": call_data,
+                "data": {"entity_id": entity_id, **service_data},
                 "executed": True
             }
         except Exception as e:

@@ -25,6 +25,7 @@ This is the easiest way to install and get automatic updates.
 
 #### 2. Install Add-on
 1. Reload the page (important!).
+#### 25. **Verify Version**: Ensure it is **v0.8.59** before installing.
 #### 2. Models
 1. Ensure your **Ollama** server is running.
 2. Pull the required models:
