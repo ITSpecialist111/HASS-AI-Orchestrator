@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.8.52
+**Version**: v0.8.60
 
 ## 🌟 Key Features
 
@@ -21,10 +21,11 @@ The system features a purpose-built **Model Context Protocol (MCP) Server** resp
 -   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
 -   It logs every action for transparency.
 
-### 3. Dual-Brain Architecture (v0.8.54) 🧠⚡
-The system now supports two distinct AI models to balance intelligence and speed:
--   **Smart Reasoning Model** (e.g., `deepseek-r1:8b`): Used for complex planning, "Orchestrator" duties, and tasks requiring deep thought (e.g. "If I leave for holiday, what should happen?").
--   **Fast Execution Model** (e.g., `mistral:7b-instruct`): Used for "Worker" agents that need to react instantly to motion, door sensors, or simple commands.
+### 3. Tri-Level Architecture (v0.8.60) 🧠⚡
+The system uses three distinct model roles to optimize for cost, speed, and intelligence:
+-   **Orchestrator** (e.g., `deepseek-r1:8b`): The "Boss". Plans high-level strategies, delegates tasks to agents, and resolves conflicts (e.g. heating vs cooling).
+-   **Smart Agents** (e.g., `deepseek-r1:8b`): Specialist agents that handle complex logic (Security, Energy Management).
+-   **Fast Agents** (e.g., `mistral:7b-instruct`): Worker agents that execute simple instructions instantly (Motion Lights).
 
 ### 4. "Minority Report" Dashboard 🖥️
 -   **Live Decision Stream**: Watch your agents think in real-time. See *why* they made a decision.
@@ -39,11 +40,9 @@ The system now supports two distinct AI models to balance intelligence and speed
 2.  **Install**: Find "AI Orchestrator" and click Install.
 3.  **Configure**:
     *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
-    *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
-3.  **Configure**:
-    *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
-    *   **Smart Model**: The reasoning model name (default: `deepseek-r1:8b`).
-    *   **Fast Model**: The execution model name (default: `mistral:7b-instruct`).
+    *   **Orchestrator Model**: The main brain for high-level planning (default: `deepseek-r1:8b`).
+    *   **Smart Model**: The reasoning model for complex agents (default: `deepseek-r1:8b`).
+    *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
 4.  **Start**: The first startup determines your available hardware and may take a few minutes.

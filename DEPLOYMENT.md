@@ -45,10 +45,13 @@ Configure the add-on in the "Configuration" tab:
 ollama_host: "http://localhost:11434" # Or external IP
 dry_run_mode: true                    # Keep TRUE for first run!
 log_level: "info"
-   ollama_host: "http://192.168.1.x:11434"
-   heating_model: "mistral:7b-instruct"
-   ha_access_token: "YOUR_LONG_LIVED_TOKEN_HERE" # Required for Direct Core Access
-   ```
+ha_access_token: "YOUR_LONG_LIVED_TOKEN_HERE" 
+
+# Model Selection (v0.8.60+)
+orchestrator_model: "deepseek-r1:8b"  # The "Brain" (Planning)
+smart_model: "deepseek-r1:8b"         # Complex Agents (Reasoning)
+fast_model: "mistral:7b-instruct"     # Fast Agents (Execution)
+```
 
 #### 4. Start
 Click **Start**. Monitor the **Log** tab.
