@@ -228,7 +228,8 @@ CRITICAL RULES:
 1. You MUST ONLY use entity IDs listed in 'ENTITY STATES'. Do NOT guess or hallucinate IDs.
 2. If the entity you need is not listed, use the 'log' tool to report "Entity X not found".
 3. Use 'call_ha_service' only for generic services. For climate/lights, prefer specialized tools like 'set_temperature' if available.
-4. Respond with VALID JSON only. Do not add markdown blocks.
+4. Respond with VALID STANDARD JSON only. NO COMMENTS (// or /*) allowed inside the JSON.
+5. Do not add markdown blocks.
 
 TOOL USAGE EXAMPLES:
 - Correct (Specific): {{"tool": "set_temperature", "parameters": {{"entity_id": "climate.ethan", "temperature": 21.0}}}}
@@ -254,13 +255,19 @@ Each action MUST have a 'tool' field (e.g. "set_temperature") and 'parameters'.
             if clean_response.startswith("json"):
                 clean_response = clean_response[4:]
             
-            # Helper to try fixing common JSON errors (trailing commas)
+            # Helper to try fixing common JSON errors (comments, trailing commas)
             def loose_json_parse(text):
+                import re
+                # 1. Strip C-style comments (// and /* */)
+                # Remove // comments
+                text = re.sub(r'//.*', '', text)
+                # Remove /* */ comments
+                text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+                
                 try:
                     return json.loads(text)
                 except json.JSONDecodeError:
-                    # Try removing trailing commas
-                    import re
+                    # 2. Try removing trailing commas
                     text = re.sub(r',\s*}', '}', text)
                     text = re.sub(r',\s*]', ']', text)
                     return json.loads(text)
