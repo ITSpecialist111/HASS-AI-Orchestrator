@@ -75,11 +75,21 @@ You can control ANY entity in your target list.
                 if self.rag_manager:
                     try:
                         print(f"🔍 Performing semantic entity search for instruction: '{self.instruction}'")
-                        rag_results = self.rag_manager.query(
-                            query_text=self.instruction,
-                            collection_names=["entity_registry"],
-                            n_results=10  # Get top 10 most relevant entities
-                        )
+                        
+                        # run_in_executor to prevent blocking the event loop (which kills HA connection)
+                        import asyncio
+                        loop = asyncio.get_running_loop()
+                        
+                        # Define wrapper for sync RAG call
+                        def _run_rag():
+                            return self.rag_manager.query(
+                                query_text=self.instruction,
+                                collection_names=["entity_registry"],
+                                n_results=10
+                            )
+                        
+                        # Execute in thread pool
+                        rag_results = await loop.run_in_executor(None, _run_rag)
                         
                         if rag_results:
                             found_entities = []
