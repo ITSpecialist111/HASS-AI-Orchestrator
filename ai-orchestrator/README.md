@@ -63,16 +63,6 @@ agents:
       
   - id: "security_guard"
     name: "Security"
-  - id: "living_room_manager"
-    name: "Living Room Manager"
-    model: "mistral:7b-instruct" # Optional: Override default model
-    # No entities listed? No problem. The agent will discover them.
-    instruction: |
-      Keep the living room cozy in the evening. 
-      Turn on warm lights if motion is detected after sunset.
-      
-  - id: "security_guard"
-    name: "Security"
     model: "deepseek-r1:8b" # Use Smart model for complex security logic
     decision_interval: 60
     entities:
@@ -81,6 +71,25 @@ agents:
     instruction: |
       If the front door is unlocked for > 15 mins, lock it and notify me.
 ```
+
+## 🧠 Anti-Hallucination & Entity Awareness
+
+The system now includes sophisticated mechanisms to ensure agents only interact with devices that actually exist in your home:
+
+### 🎯 Assigned Entities (Visual)
+In the Dashboard Agent Details, you can now see exactly which entities an agent has been assigned. 
+- **Green Badges**: Actuators (Lights, Switches, Locks)
+- **Blue Badges**: Sensors (Motion, Temperature, Contact)
+
+If an agent has "No assigned entities", it will attempt to discover them dynamically at runtime, but explicitly assigning them (or letting the auto-discovery find them) is safer.
+
+### 🔍 Auto-Discovery on Update
+When you change an agent's instruction in the Dashboard (e.g., changing "Manage the kitchen" to "Manage the garage"), the **Architect** immediately scans your Entity Registry.
+1.  It extracts keywords from your new instruction.
+2.  It finds matching entity IDs in your Home Assistant.
+3.  It automatically updates the agent's `entities` list.
+
+This prevents the "Hallucinated Entity ID" errors common in other LLM integrations.
 
 ---
 
