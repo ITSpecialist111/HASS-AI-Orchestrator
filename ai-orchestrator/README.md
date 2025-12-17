@@ -21,7 +21,12 @@ The system features a purpose-built **Model Context Protocol (MCP) Server** resp
 -   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
 -   It logs every action for transparency.
 
-### 3. "Minority Report" Dashboard 🖥️
+### 3. Dual-Brain Architecture (v0.8.54) 🧠⚡
+The system now supports two distinct AI models to balance intelligence and speed:
+-   **Smart Reasoning Model** (e.g., `deepseek-r1:8b`): Used for complex planning, "Orchestrator" duties, and tasks requiring deep thought (e.g. "If I leave for holiday, what should happen?").
+-   **Fast Execution Model** (e.g., `mistral:7b-instruct`): Used for "Worker" agents that need to react instantly to motion, door sensors, or simple commands.
+
+### 4. "Minority Report" Dashboard 🖥️
 -   **Live Decision Stream**: Watch your agents think in real-time. See *why* they made a decision.
 -   **Agent Cards**: Check status, last thoughts, and activity heartbeat.
 -   **No-Code Factory**: Chat with the "Architect" AI to build new agents interactively.
@@ -34,6 +39,11 @@ The system features a purpose-built **Model Context Protocol (MCP) Server** resp
 2.  **Install**: Find "AI Orchestrator" and click Install.
 3.  **Configure**:
     *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
+    *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
+3.  **Configure**:
+    *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
+    *   **Smart Model**: The reasoning model name (default: `deepseek-r1:8b`).
+    *   **Fast Model**: The execution model name (default: `mistral:7b-instruct`).
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
 4.  **Start**: The first startup determines your available hardware and may take a few minutes.
@@ -54,7 +64,17 @@ agents:
       
   - id: "security_guard"
     name: "Security"
-    model: "llama3:8b"
+  - id: "living_room_manager"
+    name: "Living Room Manager"
+    model: "mistral:7b-instruct" # Optional: Override default model
+    # No entities listed? No problem. The agent will discover them.
+    instruction: |
+      Keep the living room cozy in the evening. 
+      Turn on warm lights if motion is detected after sunset.
+      
+  - id: "security_guard"
+    name: "Security"
+    model: "deepseek-r1:8b" # Use Smart model for complex security logic
     decision_interval: 60
     entities:
       - lock.front_door  # Explicitly assigned entities are prioritized
