@@ -46,7 +46,23 @@ class KnowledgeBase:
                  logger.warning("Could not retrieve full entity list")
                  return
     
+            # Pre-fetch existing entities for delta check
+            logger.info("Fetching existing vector store for delta check...")
+            try:
+                existing_data = self.rag.entity_registry.get(include=['metadatas'])
+                existing_map = {
+                    id: meta.get('desc_hash') 
+                    for id, meta in zip(existing_data['ids'], existing_data['metadatas']) 
+                    if meta
+                }
+            except Exception as e:
+                logger.warning(f"Could not fetch existing data for delta check: {e}")
+                existing_map = {}
+
             count = 0
+            skipped = 0
+            import hashlib
+            
             for entity in states:
                 entity_id = entity.get("entity_id")
                 attributes = entity.get("attributes", {})
@@ -75,6 +91,15 @@ class KnowledgeBase:
                     if "color_temp" in attributes:
                         desc += " It supports color temperature control."
                 
+                # Compute hash for delta check
+                desc_hash = hashlib.md5(desc.encode('utf-8')).hexdigest()
+                doc_id = f"entity_{entity_id}"
+                
+                # Check cache
+                if doc_id in existing_map and existing_map[doc_id] == desc_hash:
+                    skipped += 1
+                    continue
+
                 # Add to vector store
                 self.rag.add_document(
                     text=desc,
@@ -82,13 +107,14 @@ class KnowledgeBase:
                     metadata={
                         "entity_id": entity_id,
                         "domain": domain,
-                        "last_updated": datetime.now().isoformat()
+                        "last_updated": datetime.now().isoformat(),
+                        "desc_hash": desc_hash
                     },
-                    doc_id=f"entity_{entity_id}"
+                    doc_id=doc_id
                 )
                 count += 1
                 
-            logger.info(f"Ingested {count} entities into Knowledge Base")
+            logger.info(f"Ingestion complete: Added/Updated {count}, Skipped {skipped} (Unchanged)")
             
         except TimeoutError:
             logger.warning("Timed out fetching Entity Registry. Knowledge Base will be partial.")
