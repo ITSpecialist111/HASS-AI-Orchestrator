@@ -8,7 +8,7 @@
 
 The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
 
-![Dashboard Preview](https://raw.githubusercontent.com/ITSpecialist111/HASS-AI-Orchestrator/main/ai-orchestrator/dashboard/src/assets/dashboard-preview.png)
+![Dashboard Preview](screenshot.png)
 *(Note: Dashboard images are representative)*
 
 ---

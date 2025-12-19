@@ -21,7 +21,7 @@ The system features a purpose-built **Model Context Protocol (MCP) Server** resp
 -   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
 -   It logs every action for transparency.
 
-### 3. Tri-Level Architecture (v0.8.60) 🧠⚡
+### 3. Tri-Level Architecture (v0.9.2) 🧠⚡
 The system uses three distinct model roles to optimize for cost, speed, and intelligence:
 -   **Orchestrator** (e.g., `deepseek-r1:8b`): The "Boss". Plans high-level strategies, delegates tasks to agents, and resolves conflicts (e.g. heating vs cooling).
 -   **Smart Agents** (e.g., `deepseek-r1:8b`): Specialist agents that handle complex logic (Security, Energy Management).
