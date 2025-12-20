@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.8 (Connectivity Hotfix)
+**Version**: v0.9.9 (Parameter Mapping & Diagnostics)
 
 ## 🌟 Key Features
 
@@ -131,7 +131,7 @@ Each agent is strictly limited to the Home Assistant services that match its ass
 ### "Agent is hallucinating entity IDs?"
 *   **Cause**: The agent is searching for devices that don't match its internal registry.
 *   **Fix**:
-    1.  Ensure you are on **v0.9.7+** (includes Dynamic Service Discovery and Anti-Hallucination).
+    1.  Ensure you are on **v0.9.9+** (includes Dynamic Service Discovery and Anti-Hallucination).
     2.  Check the "Decision Stream" log. Does it verify the entity exists?
     3.  Manually assign the entity in `agents.yaml` if auto-discovery is missing it.
 

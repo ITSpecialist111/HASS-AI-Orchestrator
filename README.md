@@ -1,10 +1,10 @@
 # 🏠 Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.9.8-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.9.9-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
 
 **The Autonomous Multi-Agent Brain for your Smart Home.**
 
-> 🚀 **Alpha Release (v0.9.8)**: Now seeking testers!
+> 🚀 **Alpha Release (v0.9.9)**: Now seeking testers!
 
 The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
 
@@ -66,7 +66,7 @@ Experience high-fidelity, skeuomorphic visualizations generated in real-time. Th
 ## 🔒 Privacy & Safety
 
 *   **100% Local**: Works with your local Ollama instance. No data leaves your network.
-*   **Safe Execution Engine (v0.9.8)**: 
+*   **Safe Execution Engine (v0.9.9)**: 
     *   **Configurable Safety**: All security settings (Allowlists, Blocked Domains, Impact Services, Temp Limits) are now editable via the Add-on Configuration tab in Home Assistant.
     *   **Domain Allowlist**: AI only has access to safe domains (`light`, `switch`, `climate`, etc.) by default.
     *   **Critical Guard**: Dangerous domains (`shell_command`, `hassio`, etc.) are explicitly blocked.

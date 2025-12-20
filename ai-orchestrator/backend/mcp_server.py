@@ -623,6 +623,12 @@ class MCPServer:
         entity_id = params.get("entity_id")
         service_data = params.get("service_data", {})
         
+        # Fix: If service_data is empty, collect all non-reserved keys from params
+        # This allows agents to send "flat" parameters for simpler tool usage
+        if not service_data:
+            reserved = ['domain', 'service', 'entity_id', 'service_data']
+            service_data = {k: v for k, v in params.items() if k not in reserved}
+        
         # Merge entity_id into service_data for the call
         call_data = {"entity_id": entity_id, **service_data}
         

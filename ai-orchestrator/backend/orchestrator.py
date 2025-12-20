@@ -61,6 +61,7 @@ class Orchestrator:
         # Ollama client for planning LLM
         self.ollama_client = ollama.Client(host=ollama_host)
         self.llm_client = self.ollama_client # Reference for other methods
+        self.ollama_host_used = ollama_host
         
         # Task and progress tracking
         self.task_ledger: List[Task] = []
@@ -585,16 +586,23 @@ OUTPUT REQUIREMENTS:
             return html_content
             
         except Exception as e:
-            logger.error(f"❌ Failed to generate dashboard: {e}")
+            host_info = getattr(self.ollama_client, '_client', {}).get('base_url', 'unknown') if hasattr(self.ollama_client, '_client') else 'unknown'
+            logger.error(f"❌ Failed to generate dashboard: {e} (Host: {host_info})")
             fallback_html = f"""
             <html>
             <body style="background: #0f172a; color: #f1f5f9; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column;">
                 <h1 style="color: #ef4444;">Dashboard Generation Failed</h1>
-                <p>{str(e)}</p>
-                <div style="background: #1e293b; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 20px;">
-                    Ensure your Ollama server is reachable and the model '{self.model_name}' is pulled.
+                <p><b>Error:</b> {str(e)}</p>
+                <div style="background: #1e293b; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 20px; border-left: 4px solid #ef4444;">
+                    <b>Diagnostics:</b><br/>
+                    - LLM Host: <code>{host_info}</code><br/>
+                    - Model: <code>{self.model_name}</code><br/>
+                    - Gemini API: <code>{'Enabled' if self.gemini_model else 'Disabled (Falling back to local)'}</code>
                 </div>
-                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Try Again</button>
+                <div style="margin-top: 20px; max-width: 600px; text-align: center;">
+                    <p>If you see "No route to host" or "Connection refused", ensure your <b>Ollama Host</b> matches your LAN IP if running in Docker.</p>
+                </div>
+                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Try Again</button>
             </body>
             </html>
             """
