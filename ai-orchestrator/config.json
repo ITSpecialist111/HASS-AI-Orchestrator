@@ -55,6 +55,7 @@
         "high_impact_services": "str",
         "min_temp": "float",
         "max_temp": "float",
-        "max_temp_change": "float"
+        "max_temp_change": "float",
+        "disable_telemetry": "bool"
     }
 }
