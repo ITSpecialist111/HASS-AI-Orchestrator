@@ -57,9 +57,11 @@ class UniversalAgent(BaseAgent):
 # KNOWLEDGE / CONTEXT
 {self.knowledge if self.knowledge else "No additional context provided."}
 
-# CAPABILITIES
-You have access to Home Assistant services via the 'call_ha_service' tool.
-You can control ANY entity in your target list.
+# CAPABILITIES & SAFETY
+1. You have access to Home Assistant services via the 'call_ha_service' tool.
+2. ACCESS RESTRICTIONS: You CANNOT access 'shell_command', 'hassio', 'script', or 'automation' domains.
+3. APPROVAL REQUIRED: High-impact actions (e.g., unlocking doors, disarming alarms) will be queued for human approval.
+4. VALIDATION: Generic service calls (e.g. set_temperature) must still adhere to safety limits (10-30°C).
         """
         return prompt
 

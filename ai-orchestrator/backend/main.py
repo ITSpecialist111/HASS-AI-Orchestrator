@@ -162,7 +162,7 @@ async def lifespan(app: FastAPI):
         # Fallback to env var
         dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
 
-    mcp_server = MCPServer(ha_client, rag_manager=rag_manager, dry_run=dry_run)
+    mcp_server = MCPServer(ha_client, approval_queue=approval_queue, rag_manager=rag_manager, dry_run=dry_run)
     print(f"✓ MCP Server initialized (dry_run={dry_run})")
     
     # 4. Initialize Approval Queue

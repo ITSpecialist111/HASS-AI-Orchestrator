@@ -25,7 +25,7 @@ This is the easiest way to install and get automatic updates.
 
 #### 2. Install Add-on
 #### 2. Version Check
-Ensure you are installing **v0.9.3** or later.
+Ensure you are installing **v0.9.4** or later.
 #### 2. Models
 1. Ensure your **Ollama** server is running.
 2. Pull the mandatory models:
@@ -56,7 +56,11 @@ fast_model: "mistral:7b-instruct"     # Fast Agents (Execution)
 #### 4. Start
 Click **Start**. Monitor the **Log** tab.
 
----
+### 🛡️ Security Features (New in v0.9.4)
+The AI Orchestrator now enforces strict tool safety:
+1.  **Domain Allowlist**: Only home automation domains (`light`, `climate`, etc.) are permitted.
+2.  **Explicit Blocks**: AI cannot run shell commands, scripts, or automations.
+3.  **Human Approval**: Any service involving locks or alarm panels will wait for your approval in the dashboard queue.
 
 ### Option 2: Manual Install (Legacy)
 1. Copy the `ai-orchestrator` folder to `/addons/` on your HA host.

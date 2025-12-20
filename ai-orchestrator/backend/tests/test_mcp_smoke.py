@@ -17,17 +17,18 @@ class TestMCPServerSmoke:
         
         assert mcp is not None
         assert mcp.dry_run is True
-        assert len(mcp.tools) == 3
+        assert len(mcp.tools) == 15
         assert "set_temperature" in mcp.tools
         assert "get_climate_state" in mcp.tools
         assert "set_hvac_mode" in mcp.tools
+        assert "call_ha_service" in mcp.tools
     
     def test_tool_schemas_available(self, mock_ha_client):
         """Test tool schemas can be retrieved"""
         mcp = MCPServer(mock_ha_client, dry_run=True)
         schemas = mcp.get_tool_schemas()
         
-        assert len(schemas) == 3
+        assert len(schemas) == 15
         assert all("name" in schema for schema in schemas)
         assert all("description" in schema for schema in schemas)
         assert all("parameters" in schema for schema in schemas)

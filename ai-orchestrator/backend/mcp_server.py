@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ValidationError
 
 from ha_client import HAWebSocketClient
 
@@ -40,22 +40,45 @@ class SetHVACModeParams(BaseModel):
         return v
 
 
+# Security Constants
+ALLOWED_DOMAINS = [
+    "light", "switch", "fan", "climate", "media_player", 
+    "cover", "input_boolean", "input_select", "input_number",
+    "scene", "button", "vacuum", "water_heater",
+    "lock", "alarm_control_panel", "camera"
+]
+
+HIGH_IMPACT_SERVICES = [
+    "lock.unlock",
+    "lock.lock",
+    "alarm_control_panel.alarm_disarm",
+    "alarm_control_panel.alarm_arm_home",
+    "alarm_control_panel.alarm_arm_away",
+    "camera.disable_motion_detection",
+    "camera.turn_off"
+]
+
+CRITICAL_DOMAINS = ["shell_command", "hassio", "script", "automation", "rest_command"]
+
+
 class MCPServer:
     """
     Model Context Protocol server for Home Assistant.
     Registers and executes tools with safety checks.
     """
     
-    def __init__(self, ha_client: HAWebSocketClient, rag_manager: Optional[Any] = None, dry_run: bool = True):
+    def __init__(self, ha_client: HAWebSocketClient, approval_queue: Optional[Any] = None, rag_manager: Optional[Any] = None, dry_run: bool = True):
         """
         Initialize MCP server.
         
         Args:
             ha_client: Connected Home Assistant WebSocket client
+            approval_queue: Optional Approval Queue for high-impact actions
             rag_manager: Optional RAG Manager for knowledge tools
             dry_run: If True, log actions without executing
         """
         self.ha_client = ha_client
+        self.approval_queue = approval_queue
         self.rag_manager = rag_manager
         self.dry_run = dry_run
         self.tools = self._register_tools()
@@ -608,6 +631,64 @@ class MCPServer:
                 "dry_run": True
             }
             
+        # 1. Domain Guard: Block critical/dangerous domains
+        if domain in CRITICAL_DOMAINS:
+            return {
+                "error": f"Access to domain '{domain}' is blocked for security reasons.",
+                "executed": False
+            }
+            
+        # 2. Allowlist Check: Warn or block unknown domains
+        if domain not in ALLOWED_DOMAINS:
+            return {
+                "error": f"Domain '{domain}' is not in the allowed list of safe domains.",
+                "executed": False,
+                "allowed_domains": ALLOWED_DOMAINS
+            }
+
+        # 3. High-Impact Check: Redirect to Approval Queue
+        service_full_name = f"{domain}.{service}"
+        if service_full_name in HIGH_IMPACT_SERVICES:
+            if self.approval_queue:
+                # Create a description for the user
+                reason = f"Agent requested high-impact service: {service_full_name} on {entity_id}"
+                if service_data:
+                    reason += f" with data: {json.dumps(service_data)}"
+                
+                await self.approval_queue.add_request(
+                    agent_id="mcp_security_guard",
+                    action_type=service_full_name,
+                    action_data={
+                        "domain": domain,
+                        "service": service,
+                        "entity_id": entity_id,
+                        "service_data": service_data
+                    },
+                    impact_level="high",
+                    reason=reason
+                )
+                return {
+                    "action": "call_ha_service",
+                    "status": "queued_for_approval",
+                    "message": f"Service {service_full_name} requires manual approval as it is high-impact."
+                }
+            else:
+                return {
+                    "error": f"Service {service_full_name} requires approval, but approval queue is not available.",
+                    "executed": False
+                }
+
+        # 4. Cross-Validation: Check specific tool rules
+        if domain == "climate" and service == "set_temperature":
+            try:
+                # Validate using existing Pydantic model
+                SetTemperatureParams(entity_id=entity_id, **service_data)
+            except ValidationError as e:
+                return {
+                    "error": f"Safety validation failed for {service_full_name}: {str(e)}",
+                    "executed": False
+                }
+
         try:
             # Fix: Pass entity_id and service_data (kwargs) separately
             await self.ha_client.call_service(

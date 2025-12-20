@@ -11,6 +11,15 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
+# Mock google.generativeai if not present
+try:
+    import google.generativeai
+except ImportError:
+    from unittest.mock import MagicMock
+    mock_genai = MagicMock()
+    sys.modules["google.generativeai"] = mock_genai
+    print("⚠️ Mocked google.generativeai (not installed)")
+
 # Set test environment variables
 os.environ["HA_URL"] = "http://test-ha:8123"
 os.environ["HA_TOKEN"] = "test-token"
