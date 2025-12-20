@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <title>Mixergy Smart Dashboard (MOCK)</title>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .tank-glow { box-shadow: 0 0 40px rgba(56, 189, 248, 0.2); }
+        
+        .bubble {
+            position: absolute; bottom: 0; background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%; animation: rise 3s infinite ease-in;
+        }
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(-300px) scale(0.5); opacity: 0; }
+        }
+        .water-gradient { 
+            background: linear-gradient(to top, #0ea5e9, #22d3ee);
+            transition: height 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(14,165,233,0.4)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight">Mixergy <span class="font-extralight text-slate-500 underline decoration-sky-500/30">Connect</span></h1>
+                    <p class="text-[10px] font-black text-sky-400 uppercase tracking-[0.3em]">System: Optimized</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 glass px-6 py-3 rounded-2xl ring-1 ring-white/10">
+                <div class="text-right">
+                    <p class="text-[9px] font-black text-slate-500 uppercase">Tariff Status</p>
+                    <p class="text-xs font-bold text-green-400">Agile Low (2.4p/kWh)</p>
+                </div>
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]"></div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- LEFT COLUMN: Control & Logic (Span 3) -->
+            <div class="lg:col-span-3 space-y-6">
+                <!-- Energy Flow Card -->
+                <div class="glass p-6 rounded-[2rem] relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Energy Flow</h2>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-slate-500 uppercase">Grid Input</span>
+                            <span class="text-white font-bold">0.0<span class="text-[10px] ml-1 text-slate-500">kW</span></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-slate-500 uppercase">Solar Yield</span>
+                            <span class="text-amber-400 font-bold">2.4<span class="text-[10px] ml-1">kW</span></span>
+                        </div>
+                        <div class="mt-6 p-4 bg-sky-500/10 rounded-2xl border border-sky-500/20 ring-1 ring-sky-500/20">
+                            <p class="text-[9px] font-black text-sky-400 uppercase mb-1">AI Decision</p>
+                            <p class="text-xs font-medium text-sky-100 italic lead-tight">Prioritize Heat Pump storage using Solar surplus.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions Card -->
+                <div class="glass p-6 rounded-[2rem]">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Quick Boost</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="aspect-square glass rounded-2xl border-white/5 flex flex-col items-center justify-center gap-2 hover:bg-sky-500/20 hover:ring-2 hover:ring-sky-500/50 transition-all active:scale-95 group">
+                            <span class="text-2xl group-hover:scale-110 transition-transform">🚿</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Shower</span>
+                        </button>
+                        <button class="aspect-square glass rounded-2xl border-white/5 flex flex-col items-center justify-center gap-2 hover:bg-sky-500/20 hover:ring-2 hover:ring-sky-500/50 transition-all active:scale-95 group">
+                            <span class="text-2xl group-hover:scale-110 transition-transform">🛁</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Bath</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER COLUMN: Tank Hero (Span 6) -->
+            <div class="lg:col-span-6 glass p-8 md:p-12 rounded-[3.5rem] flex flex-col items-center justify-center relative tank-glow ring-2 ring-white/5 overflow-hidden">
+                <!-- Background visual flair -->
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-tr from-sky-500/5 via-transparent to-indigo-500/5 pointer-events-none"></div>
+                <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-sky-500/10 to-transparent pointer-events-none"></div>
+
+                <div class="relative z-10 w-full flex flex-col items-center">
+                    <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.4em] mb-12">Thermal Reservoir</h3>
+                    
+                    <!-- THE TANK -->
+                    <div class="relative w-48 h-[30rem] rounded-full border-4 border-slate-700/80 bg-slate-900/40 shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-md ring-8 ring-white/[0.02]">
+                        <!-- Reflection -->
+                        <div class="absolute inset-y-0 left-4 w-1 bg-white/10 rounded-full blur-sm"></div>
+                        
+                        <!-- Water Fill -->
+                        <div class="absolute bottom-0 w-full water-gradient shadow-[0_-10px_30px_rgba(34,211,238,0.4)]" style="height: 75%">
+                            <!-- Bubbles -->
+                            <div class="bubble" style="left: 15%; width: 6px; height: 6px; animation-delay: 0.2s;"></div>
+                            <div class="bubble" style="left: 45%; width: 10px; height: 10px; animation-delay: 0.8s;"></div>
+                            <div class="bubble" style="left: 75%; width: 4px; height: 4px; animation-delay: 1.5s;"></div>
+                            <div class="bubble" style="left: 25%; width: 8px; height: 8px; animation-delay: 2.1s;"></div>
+                            <div class="bubble" style="left: 65%; width: 5px; height: 5px; animation-delay: 0.5s;"></div>
+                            
+                            <!-- Internal readout -->
+                            <div class="absolute inset-0 flex items-center justify-center pt-10">
+                                <div class="text-center">
+                                    <p class="text-5xl font-black text-white drop-shadow-lg tracking-tighter">75<span class="text-2xl opacity-50 ml-1">%</span></p>
+                                    <p class="text-[10px] font-black text-sky-100 uppercase tracking-widest opacity-80">Charged</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Temperature Block -->
+                    <div class="mt-12 text-center group">
+                        <div class="flex items-center justify-center gap-3 mb-2">
+                             <div class="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,1)]"></div>
+                             <p class="text-6xl font-black text-white tracking-tighter group-hover:scale-105 transition-transform duration-500">52.4<span class="text-2xl text-slate-500 font-light ml-2">°C</span></p>
+                        </div>
+                        <p class="text-[11px] font-bold text-sky-400 uppercase tracking-[0.2em] shadow-sky-500/20">Optimal Storage Temperature</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Analytics (Span 3) -->
+            <div class="lg:col-span-3 space-y-6">
+                <!-- Cost Comparison Card -->
+                <div class="glass p-6 rounded-[2rem] ring-1 ring-white/5">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 text-right">Cost Analysis</h2>
+                    <div class="space-y-6">
+                        <div class="p-5 bg-white/5 rounded-2xl border border-white/5 relative group cursor-pointer hover:bg-white/10 transition-colors">
+                            <p class="text-[8px] font-black text-slate-500 uppercase mb-3">Rate Comparison</p>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-semibold text-slate-300">Electric</span>
+                                    <span class="text-xl font-black text-sky-400">£0.07<span class="text-[10px] ml-0.5 opacity-50">/kWh</span></span>
+                                </div>
+                                <div class="flex justify-between items-center opacity-60">
+                                    <span class="text-xs font-semibold text-slate-400">Gas Equiv.</span>
+                                    <span class="text-xl font-black text-orange-400">£0.09<span class="text-[10px] ml-0.5">/kWh</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 text-center ring-1 ring-emerald-500/10">
+                            <p class="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Saving Generated: £1.24 Today</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Retention Card -->
+                <div class="glass p-6 rounded-[2rem] relative overflow-hidden">
+                    <div class="absolute inset-0 shimmer opacity-50 pointer-events-none"></div>
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Efficiency</h2>
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex-1 space-y-2">
+                             <div class="h-1.5 bg-slate-800 rounded-full w-full">
+                                <div class="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full w-[94%]" style="width: 94%"></div>
+                             </div>
+                             <div class="h-1 bg-slate-800 rounded-full w-4/5 overflow-hidden">
+                                <div class="h-full bg-slate-700 rounded-full w-[80%]"></div>
+                             </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-4xl font-black text-white">0.4</span>
+                            <p class="text-[9px] font-black text-slate-500 uppercase block">Daily <br/>Thermal Loss</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- System ID -->
+                <div class="flex justify-end pr-4">
+                    <div class="text-right">
+                        <p class="text-[9px] font-black text-slate-600 uppercase tracking-tighter">System ID: MX-5529-B</p>
+                        <p class="text-[8px] font-medium text-slate-700">Firmware: v2.4.1 (Stable)</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center">
+            <div class="inline-flex items-center gap-6 glass px-8 py-3 rounded-full text-[9px] font-black text-slate-500 uppercase tracking-[0.4em] ring-1 ring-white/5 opacity-80">
+                <span>Mixergy Intelligence</span>
+                <span class="w-1 h-1 bg-slate-700 rounded-full"></span>
+                <span>Powered by Gemini 1.5 Pro</span>
+                <span class="w-1 h-1 bg-slate-700 rounded-full"></span>
+                <span>HASS Core 2025.12</span>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

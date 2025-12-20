@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.2
+**Version**: v0.9.3
 
 ## 🌟 Key Features
 
@@ -21,7 +21,7 @@ The system features a purpose-built **Model Context Protocol (MCP) Server** resp
 -   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
 -   It logs every action for transparency.
 
-### 3. Tri-Level Architecture (v0.9.2) 🧠⚡
+### 3. Tri-Level Architecture (v0.9.3) 🧠⚡
 The system uses three distinct model roles to optimize for cost, speed, and intelligence:
 -   **Orchestrator** (e.g., `deepseek-r1:8b`): The "Boss". Plans high-level strategies, delegates tasks to agents, and resolves conflicts (e.g. heating vs cooling).
 -   **Smart Agents** (e.g., `deepseek-r1:8b`): Specialist agents that handle complex logic (Security, Energy Management).
@@ -39,6 +39,13 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
 -   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
+### 6. AI Visual Dashboard (v0.9.3) 🎨
+The system now features a real-time, LLM-driven visualization engine.
+-   **Dynamic UI Generation**: Use local or cloud-based LLMs to generate bespoke, high-fidelity dashboards.
+-   **Mixergy-Style Visuals**: Features skeuomorphic designs like animated vertical water tanks, "Deep Ocean" themes, and glassmorphism.
+-   **Context-Aware**: The dashboard reflects live Home Assistant data and AI decision logic directly in its layout.
+-   **Integrated API**: New endpoints allow for manual refresh and instant serving of the generated UI (`/api/dashboard/dynamic`).
+
 ---
 
 ## 📦 Installation
@@ -46,10 +53,17 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 1.  **Add Repository**: Add this repo URL to your Home Assistant Add-on Store.
 2.  **Install**: Find "AI Orchestrator" and click Install.
 3.  **Configure**:
+    *   **Ollama Models**: Pull the required models on your Ollama server:
+        ```bash
+        ollama pull deepseek-r1:8b
+        ollama pull mistral:7b-instruct
+        ollama pull nomic-embed-text
+        ```
     *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
     *   **Orchestrator Model**: The main brain for high-level planning (default: `deepseek-r1:8b`).
     *   **Smart Model**: The reasoning model for complex agents (default: `deepseek-r1:8b`).
     *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
+    *   **Cloud AI API Key**: (Optional) Add your Google AI API key for high-fidelity "AI Visual Dashboard" generation.
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
 4.  **Start**: The first startup determines your available hardware and ingests your entities into the Knowledge Base.

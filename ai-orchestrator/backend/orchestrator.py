@@ -10,6 +10,8 @@ from typing import List, Dict, Optional, Any
 from pathlib import Path
 
 import ollama
+import os
+import google.generativeai as genai
 from workflow_graph import (
     OrchestratorState, Task, Decision, Conflict,
     create_workflow
@@ -65,9 +67,21 @@ class Orchestrator:
         # Conflict resolution rules
         self.conflict_rules = self._load_conflict_rules()
         
-        # Logging
+        # Dashboard and logging
         self.decision_log_dir = Path("/data/decisions/orchestrator")
         self.decision_log_dir.mkdir(parents=True, exist_ok=True)
+        self.dashboard_dir = Path("/data/dashboard")
+        self.dashboard_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Gemini setup (optional)
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if self.gemini_api_key:
+            genai.configure(api_key=self.gemini_api_key)
+            self.gemini_model = genai.GenerativeModel('gemini-1.5-pro')
+            logger.info("Gemini API detected - visual dashboard will use high-fidelity generation.")
+        else:
+            self.gemini_model = None
+            logger.info("No Gemini API key found - visual dashboard will fallback to Ollama.")
         
         logger.info(f"Orchestrator initialized with model: {model_name}")
         logger.info(f"Managing {len(agents)} specialist agents: {list(agents.keys())}")
@@ -486,3 +500,83 @@ INSTRUCTIONS:
                 "response": f"I encountered an unexpected error: {str(e)}",
                 "actions_executed": []
             }
+    async def generate_visual_dashboard(self) -> str:
+        """
+        Generate a high-fidelity 'Mixergy-style' dashboard based on current home state.
+        Returns the generated HTML.
+        """
+        logger.info("🎨 Generating dynamic visual dashboard...")
+        
+        # 1. Gather Context (Similar to chat but specifically for visualization)
+        states = await self.ha_client.get_states()
+        
+        # Filter for interesting entities (Energy, Climate, Security, etc.)
+        relevant_domains = ['sensor', 'climate', 'light', 'binary_sensor', 'switch', 'lock']
+        relevant_states = [s for s in states if s['entity_id'].split('.')[0] in relevant_domains]
+        
+        # Limit context size
+        data_json = json.dumps(relevant_states[:30], indent=2)
+        
+        # 2. Build Prompt (The 'Mixergy' style prompt)
+        system_prompt = """
+You are a World-Class Data Visualization Expert and UI Designer.
+Your goal is to create a "Mixergy Smart Dashboard" (Dashboard View) using a standalone HTML/Tailwind CSS file.
+
+VISUAL & LAYOUT REQUIREMENTS (IT MUST 'POP'):
+1. STYLE: "Deep Ocean" aesthetic. Dark blue/slate backgrounds (bg-slate-900), glassmorphism (backdrop-blur-md), and neon accents.
+2. LAYOUT: A 3-column grid:
+    - LEFT (Control): "Energy Logic" flow (inputs from Grid/Battery/Solar leading to a decision) and "Quick Actions" (Buttons like Shower/Bath).
+    - CENTER (Hero): A "TankVisual" component. This is a vertical pill-shaped glass tank. 
+      - Use a CSS gradient (blue to cyan) that fills up based on the 'charge' level % or 'hot water' status.
+      - If heating is active, add animated rising bubbles (CSS animations).
+      - Add backdrop-blur to the tank glass and a ring-2 glow effect using Tailwind for active state.
+    - RIGHT (Analytics): Cost cards (comparing Electric vs Gas rates) and efficiency stats.
+3. COMPONENTS:
+    - Use Lucide Icons (via CDN) or SVG icons.
+    - Ensure smooth CSS transitions when levels change.
+    - Give cards a ring-2 glow effect and deep shadows.
+4. DATA HANDLING: 
+    - The HTML should be self-contained (JS/CSS/HTML).
+    - Map the provided Home Assistant entity states to the UI elements.
+
+OUTPUT REQUIREMENTS:
+- Provide ONLY the complete, standalone HTML/CSS/JS code.
+- No markdown wrappers, no explanations. Just the HTML.
+"""
+        user_prompt = f"Generate the Mixergy Smart Dashboard for these Home Assistant entities:\n\n{data_json}"
+
+        # 3. Call LLM (Gemini preferred, Ollama fallback)
+        html_content = ""
+        try:
+            if self.gemini_model:
+                # Use Gemini 1.5 Pro for best design results
+                response = self.gemini_model.generate_content([system_prompt, user_prompt])
+                html_content = response.text
+            else:
+                # Fallback to local Ollama (might be less 'poppy' but functional)
+                response = self.llm_client.chat(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ]
+                )
+                html_content = response["message"]["content"]
+            
+            # Clean up markdown code blocks if present
+            import re
+            html_content = re.sub(r'^```html\s*', '', html_content, flags=re.MULTILINE)
+            html_content = re.sub(r'^```\s*$', '', html_content, flags=re.MULTILINE)
+            html_content = html_content.strip()
+            
+            # 4. Save to /data/dashboard/dynamic.html
+            output_path = self.dashboard_dir / "dynamic.html"
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            
+            logger.info(f"✅ Dynamic dashboard generated at {output_path}")
+            return html_content
+            
+        except Exception as e:
+            logger.error(f"Dashboard generation failed: {e}")
+            return f"Error: {str(e)}"

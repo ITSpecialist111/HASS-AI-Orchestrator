@@ -24,13 +24,13 @@ This is the easiest way to install and get automatic updates.
 5. Click **Add**.
 
 #### 2. Install Add-on
-1. Reload the page (important!).
-#### 25. **Current Version**: `0.9.2`Ensure it is **v0.8.60** before installing.
+#### 2. Version Check
+Ensure you are installing **v0.9.3** or later.
 #### 2. Models
 1. Ensure your **Ollama** server is running.
-2. Pull the required models:
+2. Pull the mandatory models:
    ```bash
-   ollama pull deepseek-r1:8b    # Smart Reasoning
+   ollama pull deepseek-r1:8b    # Smart Reasoning / Orchestrator
    ollama pull mistral:7b-instruct # Fast Execution
    ollama pull nomic-embed-text  # RAG Embeddings (Mandatory)
    ```

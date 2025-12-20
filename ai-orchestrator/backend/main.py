@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from pydantic import BaseModel
 
 from ha_client import HAWebSocketClient
@@ -271,7 +271,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.9.2",
+    version="0.9.3",
     lifespan=lifespan
 )
 
@@ -293,7 +293,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "online",
-        "version": "0.9.2",
+        "version": "0.9.3",
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
         "agent_count": len(orchestrator.agents) if orchestrator else 0
     }
@@ -421,6 +421,30 @@ async def handle_approval(request_id: str, action: str):
         raise HTTPException(status_code=404, detail="Request not found or not pending")
         
     return {"status": "success", "action": action, "request_id": request_id}
+
+
+@app.get("/api/dashboard/dynamic")
+async def get_dynamic_dashboard():
+    """Serve the latest dynamic visual dashboard"""
+    path = Path("/data/dashboard/dynamic.html")
+    if not path.exists():
+        # Trigger an initial generation if it doesn't exist
+        if orchestrator:
+            await orchestrator.generate_visual_dashboard()
+        else:
+            raise HTTPException(status_code=404, detail="Dashboard not found and Orchestrator busy")
+            
+    return FileResponse(path)
+
+
+@app.post("/api/dashboard/refresh")
+async def refresh_dashboard():
+    """Manually trigger a dashboard regeneration"""
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator not ready")
+    
+    html = await orchestrator.generate_visual_dashboard()
+    return {"status": "success", "length": len(html)}
 
 
 @app.get("/api/config")

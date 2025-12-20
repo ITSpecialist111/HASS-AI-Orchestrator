@@ -1,10 +1,10 @@
 # 🏠 Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.9.2-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.9.3-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
 
 **The Autonomous Multi-Agent Brain for your Smart Home.**
 
-> 🚀 **Alpha Release (v0.9.2)**: Now seeking testers!
+> 🚀 **Alpha Release (v0.9.3)**: Now seeking testers!
 
 The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
 
@@ -31,6 +31,10 @@ Don't know how to prompt? The **Architect AI** will interview you and build the 
 Feed your AI manuals, PDF guides, or specific house rules. The agents read them before acting.
 > *"Don't turn on the dishwasher if the 'Clean' sign is flipped."*
 
+### 🎨 AI Visual Dashboard
+Experience high-fidelity, skeuomorphic visualizations generated in real-time. The **AI Visual Dashboard** uses advanced LLMs to create stunning, context-aware UIs for your home.
+> *"Show me a Mixergy-style water tank view."*
+
 ---
 
 ## 📦 How to Install
@@ -45,8 +49,12 @@ Feed your AI manuals, PDF guides, or specific house rules. The agents read them 
     Find it in the list and click **Install**.
 
 3.  **Configure**:
-    *   **Ollama Host**: Point to your local LLM server (e.g., `http://192.168.1.50:11434`).
-    *   **Models**: Use `deepseek-r1:8b` for reasoning and `mistral:7b-instruct` for speed.
+    *   **Ollama Models**: Ensure you have pulled the required models on your Ollama server:
+        ```bash
+        ollama pull deepseek-r1:8b
+        ollama pull mistral:7b-instruct
+        ollama pull nomic-embed-text  # Mandatory for RAG Knowledge Base
+        ```
     *   **Tokens**: Create a Long-Lived Access Token in your Profile.
 
 4.  **Start & Explore**:
