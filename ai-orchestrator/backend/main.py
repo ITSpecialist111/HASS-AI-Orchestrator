@@ -143,11 +143,31 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to connect to Home Assistant: {e}")
         raise e
     
-    # 2. Initialize RAG & Knowledge Base (Phase 3)
+    # 2. Load Configuration Options
+    # Prefer reading directly from options.json for reliability in HA Add-on environment
+    dry_run = True
+    disable_telemetry = True
+    options_path = Path("/data/options.json")
+    if options_path.exists():
+        try:
+            with open(options_path, "r") as f:
+                opts = json.load(f)
+                dry_run = opts.get("dry_run_mode", True)
+                disable_telemetry = opts.get("disable_telemetry", True)
+                print(f"DEBUG: Read dry_run={dry_run}, disable_telemetry={disable_telemetry} from options.json")
+        except Exception as e:
+            print(f"⚠️ Failed to read options.json: {e}")
+            # Fallback to env var
+            dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+    else:
+        # Fallback to env var
+        dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+
+    # 3. Initialize RAG & Knowledge Base (Phase 3)
     enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
     if enable_rag:
         try:
-            rag_manager = RagManager(persist_dir="/data/chroma")
+            rag_manager = RagManager(persist_dir="/data/chroma", disable_telemetry=disable_telemetry)
             knowledge_base = KnowledgeBase(rag_manager, ha_client)
             print("✓ RAG Manager & Knowledge Base initialized")
             
@@ -157,25 +177,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ RAG initialization failed: {e}")
             rag_manager = None
-    
-    # 3. Initialize MCP server
-    # Prefer reading directly from options.json for reliability in HA Add-on environment
-    dry_run = True
-    options_path = Path("/data/options.json")
-    if options_path.exists():
-        try:
-            with open(options_path, "r") as f:
-                opts = json.load(f)
-                dry_run = opts.get("dry_run_mode", True)
-                print(f"DEBUG: Read dry_run={dry_run} from options.json")
-        except Exception as e:
-            print(f"⚠️ Failed to read options.json: {e}")
-            # Fallback to env var
-            dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
-    else:
-        # Fallback to env var
-        dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
 
+    # 4. Initialize MCP server
     mcp_server = MCPServer(ha_client, approval_queue=approval_queue, rag_manager=rag_manager, dry_run=dry_run)
     print(f"✓ MCP Server initialized (dry_run={dry_run})")
     

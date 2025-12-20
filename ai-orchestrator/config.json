@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.9.11",
+    "version": "0.9.12",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -37,7 +37,8 @@
         "high_impact_services": "lock.unlock,lock.lock,alarm_control_panel.alarm_disarm,alarm_control_panel.alarm_arm_home,alarm_control_panel.alarm_arm_away,camera.disable_motion_detection,camera.turn_off",
         "min_temp": 10.0,
         "max_temp": 30.0,
-        "max_temp_change": 3.0
+        "max_temp_change": 3.0,
+        "disable_telemetry": true
     },
     "schema": {
         "ollama_host": "str",

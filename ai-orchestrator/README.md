@@ -151,6 +151,48 @@ Each agent is strictly limited to the Home Assistant services that match its ass
 
 ---
 
+## 📊 Telemetry & Data Collection
+
+We value your privacy. The AI Orchestrator uses **ChromaDB** for local vector storage (Knowledge Base). 
+
+### What is collected?
+ChromaDB collects basic, anonymous usage events:
+*   When the client starts.
+*   When a collection is created.
+*   The version of the library.
+
+### What is NOT collected?
+*   **Your Home Data**: Entity names, states, and history stay local.
+*   **Agent Instructions**: Your prompts and logic are never shared.
+*   **Personal Info**: No names, IPs, or location data.
+
+### How to disable?
+Set the following environment variable in your Home Assistant configuration:
+`CHROMA_TELEMETRY_EXCEPT_OPT_OUT=True`
+
+---
+
+## ⚡ Agent Speed & "Real-Time" Monitoring
+
+By default, agents operate on a **120-second heartbeat**. This balances intelligence with hardware resources.
+
+### Changing the Interval
+You can customize this per-agent in `agents.yaml`:
+```yaml
+- id: "lighting_agent"
+  decision_interval: 10 # Check every 10 seconds
+```
+
+### Real-Time Monitoring
+For mission-critical monitoring (Greenhouses, Security), you can set the interval to **"Real-Time"** (effectively 1-5 seconds). 
+> [!IMPORTANT]
+> Real-time monitoring significantly increases CPU/GPU usage as the LLM is constantly processing home state. Use a capable LLM server for the best experience.
+
+---
+
+## 🔬 Advanced Monitoring (MLFlow)
+Pro users can wrap the `orchestrator.process_chat_request` or `rag_manager.query` methods in Python to connect their own **MLFlow** tracking server for real-time monitoring of agent reasoning and retrieval accuracy.
+
 ## 🗺️ Roadmap
 
 -   **v1.0**: Voice Integration (Talk to your house).

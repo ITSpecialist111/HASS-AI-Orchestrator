@@ -72,6 +72,17 @@ Experience high-fidelity, skeuomorphic visualizations generated in real-time. Th
     *   **Critical Guard**: Dangerous domains (`shell_command`, `hassio`, etc.) are explicitly blocked.
     *   **Approval Queue**: High-impact actions (unlocking doors, disarming alarms) require manual approval.
 *   **Dry Run Mode**: Test your agents efficiently without them actually touching your devices until you trust them.
+*   **Anonymized Telemetry**: We use ChromaDB for local vector storage. By default, it sends basic, anonymized usage statistics (client start, collection creation). No personal house data is ever collected. You can disable this by setting `CHROMA_TELEMETRY_EXCEPT_OPT_OUT=True` in your environment.
+
+---
+
+## ⚡ Agent Speed & Real-Time Monitoring
+
+Agents are rate-limited by default to a **120-second decision interval** to save CPU and LLM resources. 
+
+*   **Custom Intervals**: Set individual intervals in your `agents.yaml` or directly in the Dashboard.
+*   **Real-Time Monitoring**: Want an agent to react instantly? Set its interval to **5-10 seconds**. We call this "Real-Time" mode—ideal for lighting or security presence.
+*   **Speed Note**: The actual reaction time is limited by your LLM inference speed. A dedicated GPU server is recommended for "Real-Time" behavior.
 
 ---
 

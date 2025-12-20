@@ -24,7 +24,8 @@ class RagManager:
     def __init__(
         self, 
         persist_dir: str = "/data/chroma",
-        embedding_model: str = "nomic-embed-text"
+        embedding_model: str = "nomic-embed-text",
+        disable_telemetry: bool = True
     ):
         """
         Initialize RAG Manager.
@@ -32,6 +33,7 @@ class RagManager:
         Args:
             persist_dir: Directory to store ChromaDB data
             embedding_model: Ollama model for generating embeddings
+            disable_telemetry: Whether to opt out of ChromaDB telemetry
         """
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
@@ -40,7 +42,7 @@ class RagManager:
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(
             path=persist_dir,
-            settings=Settings(anonymized_telemetry=False)
+            settings=Settings(anonymized_telemetry=not disable_telemetry)
         )
         
         # Initialize collections
