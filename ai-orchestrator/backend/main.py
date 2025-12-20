@@ -3,6 +3,10 @@ FastAPI application for AI Orchestrator backend.
 Serves REST API, WebSocket connections, and static dashboard files.
 """
 import os
+# Disable broken ChromaDB telemetry
+os.environ["CHROMA_TELEMETRY_EXCEPT_OPT_OUT"] = "True"
+os.environ["TELEMETRY_DISABLED"] = "1"
+
 import json
 import asyncio
 from typing import Dict, List, Optional
@@ -13,6 +17,18 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Requ
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from pydantic import BaseModel
+from starlette.types import Scope, Receive, Send
+
+# Wrapper to prevent StaticFiles from crashing on WebSocket requests
+class SafeStaticFiles(StaticFiles):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "websocket":
+            # Gracefully close if a WebSocket request falls through to static handler
+            await send({"type": "websocket.close", "code": 1000})
+            return
+        if scope["type"] != "http":
+            return
+        await super().__call__(scope, receive, send)
 
 from ha_client import HAWebSocketClient
 from mcp_server import MCPServer
@@ -123,25 +139,9 @@ async def lifespan(app: FastAPI):
     
     # Pass both: 'ha_token' for the auth payload, 'header_token' for the proxy header
     ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=header_token)
-    try:
-        await ha_client.connect()
-        print(f"✓ Connected to Home Assistant at {ha_url}")
-    except ValueError as e:
-        if "auth_invalid" in str(e):
-            print("\n" + "="*50)
-            print("❌ AUTHENTICATION ERROR")
-            print("="*50)
-            print("The Supervisor Token was rejected by Home Assistant.")
-            print("Please configure a Long-Lived Access Token (LLAT):")
-            print("1. Go to your HA Profile (bottom left user icon).")
-            print("2. Scroll to 'Long-Lived Access Tokens'.")
-            print("3. Create a token (e.g., named 'AI Orchestrator').")
-            print("4. Paste it into the 'ha_access_token' field in this Add-on's Configuration.")
-            print("="*50 + "\n")
-        raise e
-    except Exception as e:
-        print(f"❌ Failed to connect to Home Assistant: {e}")
-        raise e
+    # START AS BACKGROUND TASK to prevent blocking system boot if HA is unreachable
+    asyncio.create_task(ha_client.connect())
+    print(f"⌛ Connecting to Home Assistant at {ha_url} in background...")
     
     # 2. Load Configuration Options
     # Prefer reading directly from options.json for reliability in HA Add-on environment
@@ -585,7 +585,7 @@ dashboard_path = Path(__file__).parent.parent / "dashboard" / "dist"
 
 if dashboard_path.exists():
     print(f"✓ Mounting dashboard from {dashboard_path}")
-    app.mount("/", StaticFiles(directory=str(dashboard_path), html=True), name="static")
+    app.mount("/", SafeStaticFiles(directory=str(dashboard_path), html=True), name="static")
 else:
     print(f"⚠️ Dashboard bundle not found at {dashboard_path}")
     

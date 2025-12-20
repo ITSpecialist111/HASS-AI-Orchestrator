@@ -33,13 +33,16 @@ class IngressMiddleware:
             while "//" in path:
                 path = path.replace("//", "/")
             
-            # 3. WS Fallback (Manual fix if header missing but looks like WS)
-            if scope["type"] == "websocket" and path.endswith("/ws") and path != "/ws":
-                 # e.g. /hassio/ingress/.../ws -> /ws
-                if path.strip("/") == "ws" or path.endswith("/ws"):
-                     # This is a bit aggressive, but safe for this specific app structure
-                     # We only have one WS endpoint at /ws
+            # 3. WS Fallback & Normalization
+            # Ensure proper handling of the critical /ws endpoint
+            if scope["type"] == "websocket":
+                # Normalize any variation of /ws (e.g. //ws, /ingress/ws) to just /ws
+                if path.endswith("/ws") or path.endswith("/ws/"):
                      path = "/ws"
+                
+                # Update scope if changed
+                if path != original_path:
+                    scope["path"] = path
 
             if path != original_path:
                 print(f"DEBUG REWRITE: {original_path} -> {path}", flush=True)

@@ -54,8 +54,8 @@ class HAWebSocketClient:
                 self.ws_url, 
                 extra_headers=headers,
                 max_size=10 * 1024 * 1024, # 10MB
-                ping_interval=20,
-                ping_timeout=20
+                ping_interval=60,
+                ping_timeout=60
             )
             
             # Receive auth_required message
