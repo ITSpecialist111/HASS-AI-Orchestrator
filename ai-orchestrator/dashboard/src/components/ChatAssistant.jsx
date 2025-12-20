@@ -69,11 +69,7 @@ export const ChatAssistant = () => {
     return (
         <>
             {/* Floating Buttion & Quick Actions Container */}
-            <div
-                className="fixed bottom-24 right-8 z-50 flex flex-col items-end gap-4"
-                onMouseEnter={() => setShowQuickActions(true)}
-                onMouseLeave={() => setShowQuickActions(false)}
-            >
+            <div className="fixed bottom-24 right-8 z-50 flex flex-col items-end gap-4">
                 {/* Quick Actions Menu (Fade in on hover) */}
                 <div className={`
                     bg-slate-900/90 backdrop-blur-md border border-slate-700 p-2 rounded-xl shadow-2xl mb-2 min-w-[240px]
@@ -88,9 +84,10 @@ export const ChatAssistant = () => {
                     <QuickAction icon={Server} label="Visual Dashboard" query="Generate a visual dashboard for my house" />
                 </div>
 
-                {/* FAB */}
                 <button
                     onClick={() => setIsOpen(!isOpen)}
+                    onMouseEnter={() => setShowQuickActions(true)}
+                    onMouseLeave={() => setShowQuickActions(false)}
                     className={`
                         w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300
                         ${isOpen ? 'bg-slate-800 rotate-90 text-slate-400' : 'bg-blue-600 hover:bg-blue-500 text-white animate-pulse-slow'}

@@ -7,6 +7,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [instruction, setInstruction] = useState(agent?.instruction || "");
     const [name, setName] = useState(agent?.name || "");
+    const [interval, setIntervalValue] = useState(agent?.decision_interval || 120);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -14,6 +15,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
             fetchDecisions();
             setInstruction(agent.instruction || ""); // Reset on agent change
             setName(agent.name || "");
+            setIntervalValue(agent.decision_interval || 120);
         }
     }, [agent]);
 
@@ -35,7 +37,8 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     instruction: instruction,
-                    name: name
+                    name: name,
+                    decision_interval: parseInt(interval)
                 })
             });
 
@@ -221,14 +224,35 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                 </div>
 
                                 {isEditing ? (
-                                    <textarea
-                                        value={instruction}
-                                        onChange={(e) => setInstruction(e.target.value)}
-                                        className="w-full h-48 bg-slate-900/50 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-sm leading-relaxed"
-                                    />
+                                    <div className="space-y-4">
+                                        <textarea
+                                            value={instruction}
+                                            onChange={(e) => setInstruction(e.target.value)}
+                                            className="w-full h-48 bg-slate-900/50 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-sm leading-relaxed"
+                                        />
+                                        <div className="flex items-center gap-4 bg-slate-900/30 p-4 rounded-lg border border-slate-700/50">
+                                            <div className="text-slate-400 text-sm font-medium">Decision Interval: <span className="text-blue-400 font-mono">{interval}s</span></div>
+                                            <input
+                                                type="range"
+                                                min="5"
+                                                max="600"
+                                                step="5"
+                                                value={interval}
+                                                onChange={(e) => setIntervalValue(e.target.value)}
+                                                className="flex-1 accent-blue-500"
+                                            />
+                                            <div className="text-[10px] text-slate-500 w-12 text-right">600s</div>
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <div className="prose prose-invert max-w-none text-slate-300 text-sm whitespace-pre-wrap font-mono bg-slate-900/30 p-4 rounded-lg border border-slate-700/30">
-                                        {agent.instruction || instruction}
+                                    <div className="space-y-4">
+                                        <div className="prose prose-invert max-w-none text-slate-300 text-sm whitespace-pre-wrap font-mono bg-slate-900/30 p-4 rounded-lg border border-slate-700/30">
+                                            {agent.instruction || instruction}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-slate-400 px-1">
+                                            <Check size={12} className="text-blue-500" />
+                                            Updating every <span className="text-slate-200 font-bold">{agent.decision_interval || interval} seconds</span>
+                                        </div>
                                     </div>
                                 )}
                             </div>
