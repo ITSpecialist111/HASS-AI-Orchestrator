@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Wand2, Plus, Save, X, Lightbulb } from 'lucide-react';
 
-export const AgentFactory = ({ onAgentCreated, initialBlueprint }) => {
-    const [isOpen, setIsOpen] = useState(false);
+export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = false }) => {
+    const [isOpen, setIsOpen] = useState(startOpen);
     const [mode, setMode] = useState('prompt'); // prompt | review | loading
     const [prompt, setPrompt] = useState('');
     const [suggestions, setSuggestions] = useState([]);

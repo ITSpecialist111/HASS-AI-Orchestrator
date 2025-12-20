@@ -15,7 +15,8 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
             fetchDecisions();
             setInstruction(agent.instruction || ""); // Reset on agent change
             setName(agent.name || "");
-            setIntervalValue(agent.decision_interval || 120);
+            // Ensure strictly integer
+            setIntervalValue(agent.decision_interval ? parseInt(agent.decision_interval) : 120);
         }
     }, [agent]);
 
@@ -230,18 +231,19 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                             onChange={(e) => setInstruction(e.target.value)}
                                             className="w-full h-48 bg-slate-900/50 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-sm leading-relaxed"
                                         />
-                                        <div className="flex items-center gap-4 bg-slate-900/30 p-4 rounded-lg border border-slate-700/50">
-                                            <div className="text-slate-400 text-sm font-medium">Decision Interval: <span className="text-blue-400 font-mono">{interval}s</span></div>
+                                        <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-lg border border-slate-700">
+                                            <div className="text-slate-200 text-sm font-medium whitespace-nowrap">Decision Interval:</div>
+                                            <div className="text-blue-400 font-mono w-12 text-right">{interval}s</div>
                                             <input
                                                 type="range"
                                                 min="5"
                                                 max="600"
                                                 step="5"
                                                 value={interval}
-                                                onChange={(e) => setIntervalValue(e.target.value)}
-                                                className="flex-1 accent-blue-500"
+                                                onChange={(e) => setIntervalValue(parseInt(e.target.value))}
+                                                className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                                             />
-                                            <div className="text-[10px] text-slate-500 w-12 text-right">600s</div>
+                                            <div className="text-[10px] text-slate-500 w-8 text-right">600s</div>
                                         </div>
                                     </div>
                                 ) : (

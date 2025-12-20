@@ -135,6 +135,7 @@ function App() {
                 return <AnalyticsCharts dailyData={dailyStats} performanceData={performance} />
             case 'factory':
                 return <AgentFactory
+                    startOpen={true}
                     initialBlueprint={pendingBlueprint}
                     onAgentCreated={() => {
                         fetchAgents()

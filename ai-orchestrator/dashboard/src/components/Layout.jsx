@@ -4,7 +4,7 @@ import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } fr
 import { useState, useEffect } from 'react';
 import { SettingsModal } from './SettingsModal';
 
-export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.14" }) {
+export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.15" }) {
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
 
