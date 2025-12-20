@@ -439,21 +439,32 @@ async def handle_approval(request_id: str, action: str):
 
 
 @app.get("/api/dashboard/dynamic")
-async def get_dynamic_dashboard():
+async def get_dynamic_dashboard(refresh: bool = False):
     """Serve the latest dynamic visual dashboard"""
     try:
         path = Path("/data/dashboard/dynamic.html")
         if not path.exists():
-            # Fallback to local
             path = Path(__file__).parent.parent / "data" / "dashboard" / "dynamic.html"
             
-        if not path.exists():
-            # Trigger an initial generation if it doesn't exist
+        # Force refresh or auto-retry if it's an old failure page
+        should_generate = refresh or not path.exists()
+        
+        if path.exists() and not should_generate:
+            # Check if it's a failure page (contains specific error text)
+            # This helps users get the new v0.9.9 diagnostics even if they have an old cache
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if "Dashboard Generation Failed" in content:
+                    print("🔄 Detected failure page, attempting auto-refresh...")
+                    should_generate = True
+
+        if should_generate:
             if orchestrator:
-                print("🎨 No dashboard found, triggering initial generation...")
+                print("🎨 Generating dynamic dashboard...")
                 await orchestrator.generate_visual_dashboard()
             else:
-                raise HTTPException(status_code=503, detail="Dashboard not found and Orchestrator busy")
+                if not path.exists():
+                    raise HTTPException(status_code=503, detail="Dashboard not found and Orchestrator busy")
                 
         if not path.exists():
             raise HTTPException(status_code=404, detail="Dashboard file could not be generated")
