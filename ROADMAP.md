@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.9.8 (Chat & Routing Polish)
+**Current Version**: v0.9.9 (Parameter Mapping & Diagnostics)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 
@@ -38,6 +38,11 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 - **Goal**: High ROI automation.
 - **Feature**: A specialized agent pre-trained on solar production, battery curves, and grid pricing.
 - **Use Case**: Automatically pre-cooling the house when solar is high and grid prices are low.
+
+### 6. MLFlow Integration (Advanced Diagnostics)
+- **Goal**: Allow pro users to monitor agent performance.
+- **Feature**: Add `MLFLOW_TRACKING_URI` support to the Add-on configuration.
+- **Use Case**: Track agent decisions, retrieval accuracy (RAG), and model latency in real-time.
 
 ---
 
