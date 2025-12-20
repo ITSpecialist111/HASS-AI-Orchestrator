@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.4
+**Version**: v0.9.5
 
 ## 🌟 Key Features
 
@@ -19,13 +19,14 @@ Move beyond rigid YAML automations. Create agents with simple natural language j
 The system features a purpose-built **Model Context Protocol (MCP) Server** responsible for safely executing agent decisions. This is the bridge between the AI's "brain" and Home Assistant's "hands".
 -   It strictly maps AI intent to valid Home Assistant Service calls (`climate.set_temperature`, `light.turn_on`, etc.).
 -   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
--   **Multi-Layer Security (v0.9.4)**:
+-   **Multi-Layer Security (v0.9.5)**:
+    -   **Configurable Safety**: All security settings (Allowlists, Blocked Domains, Impact Services, Temp Limits) are now editable via the Add-on Configuration tab in Home Assistant.
     -   **Domain Allowlist**: Only approved domains are allowed for generic service calls.
     -   **Critical Block**: Dangerous domains (`shell_command`, `script`, etc.) are strictly prohibited.
     -   **Approval Queue**: High-impact actions (Entry/Security) require human-in-the-loop approval.
 -   It logs every action for transparency.
 
-### 3. Tri-Level Architecture (v0.9.4) 🧠⚡
+### 3. Tri-Level Architecture (v0.9.5) 🧠⚡
 The system uses three distinct model roles to optimize for cost, speed, and intelligence:
 -   **Orchestrator** (e.g., `deepseek-r1:8b`): The "Boss". Plans high-level strategies, delegates tasks to agents, and resolves conflicts (e.g. heating vs cooling).
 -   **Smart Agents** (e.g., `deepseek-r1:8b`): Specialist agents that handle complex logic (Security, Energy Management).
@@ -43,12 +44,12 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
 -   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
-### 6. AI Visual Dashboard (v0.9.4) 🎨
+### 6. AI Visual Dashboard (v0.9.5) 🎨
 The system now features a real-time, LLM-driven visualization engine.
 -   **Dynamic UI Generation**: Use local or cloud-based LLMs to generate bespoke, high-fidelity dashboards.
 -   **Mixergy-Style Visuals**: Features skeuomorphic designs like animated vertical water tanks, "Deep Ocean" themes, and glassmorphism.
+-   **Integrated Experience**: Access the dashboard directly via the new sidebar button or trigger it from the Chat Assistant quick actions.
 -   **Context-Aware**: The dashboard reflects live Home Assistant data and AI decision logic directly in its layout.
--   **Integrated API**: New endpoints allow for manual refresh and instant serving of the generated UI (`/api/dashboard/dynamic`).
 
 ---
 

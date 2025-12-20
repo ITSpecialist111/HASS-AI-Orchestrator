@@ -23,6 +23,14 @@ export FAST_MODEL=$(jq -r '.fast_model // "mistral:7b-instruct"' $CONFIG_PATH)
 export DECISION_INTERVAL=$(jq -r '.decision_interval // 120' $CONFIG_PATH)
 export ENABLE_GPU=$(jq -r '.enable_gpu // false' $CONFIG_PATH)
 
+# Security Controls
+export ALLOWED_DOMAINS=$(jq -r '.allowed_domains // ""' $CONFIG_PATH)
+export BLOCKED_DOMAINS=$(jq -r '.blocked_domains // ""' $CONFIG_PATH)
+export HIGH_IMPACT_SERVICES=$(jq -r '.high_impact_services // ""' $CONFIG_PATH)
+export MIN_TEMP=$(jq -r '.min_temp // 10.0' $CONFIG_PATH)
+export MAX_TEMP=$(jq -r '.max_temp // 30.0' $CONFIG_PATH)
+export MAX_TEMP_CHANGE=$(jq -r '.max_temp_change // 3.0' $CONFIG_PATH)
+
 # Home Assistant API configuration
 # Home Assistant API configuration
 export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"

@@ -44,6 +44,20 @@ knowledge_base: Optional[KnowledgeBase] = None
 agents: Dict[str, object] = {}
 dashboard_clients: List[WebSocket] = []
 
+# Load version from config.json
+VERSION = "0.0.0"
+try:
+    config_path = Path(__file__).parent / "config.json"
+    if not config_path.exists():
+        # Fallback to parent dir (local dev)
+        config_path = Path(__file__).parent.parent / "config.json"
+        
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            VERSION = json.load(f).get("version", VERSION)
+except Exception as e:
+    print(f"⚠️ Failed to load version from config.json: {e}")
+
 
 class AgentStatus(BaseModel):
     """Agent status response model"""
@@ -271,7 +285,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Orchestrator API",
     description="Home Assistant Multi-Agent Orchestration System",
-    version="0.9.3",
+    version=VERSION,
     lifespan=lifespan
 )
 
@@ -293,7 +307,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "online",
-        "version": "0.9.3",
+        "version": VERSION,
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
         "agent_count": len(orchestrator.agents) if orchestrator else 0
     }
@@ -456,7 +470,7 @@ async def get_config():
         "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         "smart_model": os.getenv("SMART_MODEL", "deepseek-r1:8b"),
         "fast_model": os.getenv("FAST_MODEL", "mistral:7b-instruct"),
-        "version": app.version,
+        "version": VERSION,
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
         }

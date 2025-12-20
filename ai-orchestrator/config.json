@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.9.4",
+    "version": "0.9.5",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -39,7 +39,13 @@
         "enable_gpu": false,
         "smart_model": "deepseek-r1:8b",
         "fast_model": "mistral:7b-instruct",
-        "orchestrator_model": "deepseek-r1:8b"
+        "orchestrator_model": "deepseek-r1:8b",
+        "allowed_domains": "light,switch,fan,climate,media_player,cover,input_boolean,input_select,input_number,scene,button,vacuum,water_heater,lock,alarm_control_panel,camera",
+        "blocked_domains": "shell_command,hassio,script,automation,rest_command",
+        "high_impact_services": "lock.unlock,lock.lock,alarm_control_panel.alarm_disarm,alarm_control_panel.alarm_arm_home,alarm_control_panel.alarm_arm_away,camera.disable_motion_detection,camera.turn_off",
+        "min_temp": 10.0,
+        "max_temp": 30.0,
+        "max_temp_change": 3.0
     },
     "schema": {
         "ollama_host": "str",
@@ -50,6 +56,12 @@
         "enable_gpu": "bool",
         "smart_model": "str",
         "fast_model": "str",
-        "orchestrator_model": "str"
+        "orchestrator_model": "str",
+        "allowed_domains": "str",
+        "blocked_domains": "str",
+        "high_impact_services": "str",
+        "min_temp": "float",
+        "max_temp": "float",
+        "max_temp_change": "float"
     }
 }

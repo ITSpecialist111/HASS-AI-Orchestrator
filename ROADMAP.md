@@ -15,6 +15,8 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 
 -   [x] **Chat Interface**: Floating dashboard assistant for natural language control. (v0.9.0)
 -   [x] **RAG Optimization**: Delta-based ingestion for instant startup. (v0.9.1)
+-   [x] **Configurable Security**: Domain blocking and hardware limits via UI. (v0.9.5)
+-   [x] **Visual Dashboard Integration**: Sidebar access and quick actions. (v0.9.5)
 -   [ ] **Voice Interface**: Real-time voice interaction via Home Assistant Assist pipeline. (v1.0)
 
 ### 2. Voice Integration (HA Assist)

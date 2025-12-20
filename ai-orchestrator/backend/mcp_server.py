@@ -1,10 +1,7 @@
-"""
-Model Context Protocol (MCP) server for Home Assistant tool execution.
-Provides tools for agents to interact with HA services safely.
-"""
+import os
 import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, ValidationError
@@ -15,14 +12,16 @@ from ha_client import HAWebSocketClient
 class SetTemperatureParams(BaseModel):
     """Parameters for set_temperature tool"""
     entity_id: str = Field(..., description="Climate entity ID")
-    temperature: float = Field(..., ge=10.0, le=30.0, description="Target temperature (10-30°C)")
+    temperature: float = Field(..., description="Target temperature")
     hvac_mode: Optional[str] = Field(None, description="HVAC mode: heat, cool, auto, off")
     
     @field_validator("temperature")
     @classmethod
     def validate_temperature(cls, v):
-        if not (10.0 <= v <= 30.0):
-            raise ValueError("Temperature must be between 10°C and 30°C")
+        min_temp = float(os.getenv("MIN_TEMP", "10.0"))
+        max_temp = float(os.getenv("MAX_TEMP", "30.0"))
+        if not (min_temp <= v <= max_temp):
+            raise ValueError(f"Temperature must be between {min_temp}°C and {max_temp}°C")
         return round(v, 1)
 
 
@@ -40,15 +39,15 @@ class SetHVACModeParams(BaseModel):
         return v
 
 
-# Security Constants
-ALLOWED_DOMAINS = [
+# Default Security Settings (Fallbacks)
+DEFAULT_ALLOWED_DOMAINS = [
     "light", "switch", "fan", "climate", "media_player", 
     "cover", "input_boolean", "input_select", "input_number",
     "scene", "button", "vacuum", "water_heater",
     "lock", "alarm_control_panel", "camera"
 ]
 
-HIGH_IMPACT_SERVICES = [
+DEFAULT_HIGH_IMPACT_SERVICES = [
     "lock.unlock",
     "lock.lock",
     "alarm_control_panel.alarm_disarm",
@@ -58,7 +57,14 @@ HIGH_IMPACT_SERVICES = [
     "camera.turn_off"
 ]
 
-CRITICAL_DOMAINS = ["shell_command", "hassio", "script", "automation", "rest_command"]
+DEFAULT_BLOCKED_DOMAINS = ["shell_command", "hassio", "script", "automation", "rest_command"]
+
+# Security Configuration Helpers
+def get_env_list(name: str, default: List[str]) -> List[str]:
+    raw = os.getenv(name, "")
+    if not raw:
+        return default
+    return [x.strip() for x in raw.split(",") if x.strip()]
 
 
 class MCPServer:
@@ -365,9 +371,10 @@ class MCPServer:
             
             if current_temp is not None:
                 temp_change = abs(validated.temperature - current_temp)
-                if temp_change > 3.0:
+                max_change = float(os.getenv("MAX_TEMP_CHANGE", "3.0"))
+                if temp_change > max_change:
                     return {
-                        "error": f"Temperature change too large: {temp_change:.1f}°C (max 3°C per decision)",
+                        "error": f"Temperature change too large: {temp_change:.1f}°C (max {max_change}°C per decision)",
                         "current": current_temp,
                         "requested": validated.temperature
                     }
@@ -632,23 +639,26 @@ class MCPServer:
             }
             
         # 1. Domain Guard: Block critical/dangerous domains
-        if domain in CRITICAL_DOMAINS:
+        blocked_domains = get_env_list("BLOCKED_DOMAINS", DEFAULT_BLOCKED_DOMAINS)
+        if domain in blocked_domains:
             return {
                 "error": f"Access to domain '{domain}' is blocked for security reasons.",
                 "executed": False
             }
             
         # 2. Allowlist Check: Warn or block unknown domains
-        if domain not in ALLOWED_DOMAINS:
+        allowed_domains = get_env_list("ALLOWED_DOMAINS", DEFAULT_ALLOWED_DOMAINS)
+        if domain not in allowed_domains:
             return {
                 "error": f"Domain '{domain}' is not in the allowed list of safe domains.",
                 "executed": False,
-                "allowed_domains": ALLOWED_DOMAINS
+                "allowed_domains": allowed_domains
             }
 
         # 3. High-Impact Check: Redirect to Approval Queue
         service_full_name = f"{domain}.{service}"
-        if service_full_name in HIGH_IMPACT_SERVICES:
+        high_impact_services = get_env_list("HIGH_IMPACT_SERVICES", DEFAULT_HIGH_IMPACT_SERVICES)
+        if service_full_name in high_impact_services:
             if self.approval_queue:
                 # Create a description for the user
                 reason = f"Agent requested high-impact service: {service_full_name} on {entity_id}"

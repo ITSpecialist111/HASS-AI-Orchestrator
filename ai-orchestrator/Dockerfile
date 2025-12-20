@@ -32,6 +32,7 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /app/backend/requirem
 
 # Copy backend application
 COPY backend/ /app/backend/
+COPY config.json /app/backend/config.json
 
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/dashboard/dist /app/dashboard/dist

@@ -85,6 +85,7 @@ export const ChatAssistant = () => {
                     <QuickAction icon={Shield} label="Arm Security System" query="Arm the security system" />
                     <QuickAction icon={Activity} label="System Status" query="What is the current status of the house?" />
                     <QuickAction icon={Thermometer} label="Optimize Heating" query="Set heating to 20C everywhere" />
+                    <QuickAction icon={Server} label="Visual Dashboard" query="Generate a visual dashboard for my house" />
                 </div>
 
                 {/* FAB */}
@@ -186,4 +187,4 @@ export const ChatAssistant = () => {
 };
 
 // Icon imports need to be comprehensive
-import { Shield, Thermometer } from 'lucide-react';
+import { Shield, Thermometer, Server } from 'lucide-react';

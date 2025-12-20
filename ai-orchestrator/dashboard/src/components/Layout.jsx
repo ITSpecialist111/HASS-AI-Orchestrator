@@ -4,7 +4,7 @@ import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } fr
 import { useState, useEffect } from 'react';
 import { SettingsModal } from './SettingsModal';
 
-export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.3" }) {
+export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.5" }) {
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
 
@@ -36,6 +36,7 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
         { id: 'stream', label: 'Decision Stream', icon: Activity },
         { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         { id: 'factory', label: 'Agent Factory', icon: Bot },
+        { id: 'visual', label: 'Visual Dashboard', icon: Server, isLink: true, url: 'api/dashboard/dynamic' },
     ];
 
     return (
@@ -61,7 +62,13 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                         return (
                             <button
                                 key={item.id}
-                                onClick={() => onTabChange(item.id)}
+                                onClick={() => {
+                                    if (item.isLink) {
+                                        window.open(item.url, '_blank');
+                                    } else {
+                                        onTabChange(item.id);
+                                    }
+                                }}
                                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group
                   ${isActive
                                         ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.15)]'

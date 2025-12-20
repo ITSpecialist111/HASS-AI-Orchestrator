@@ -1,4 +1,4 @@
-# 🚀 AI Orchestrator - Production Deployment Guide (Phase 6)
+# 🚀 AI Orchestrator - Production Deployment Guide (v0.9.5)
 
 ## ✅ System Status: COMPLETE
 This deployment package includes the full **Phase 6** feature set:
@@ -25,7 +25,7 @@ This is the easiest way to install and get automatic updates.
 
 #### 2. Install Add-on
 #### 2. Version Check
-Ensure you are installing **v0.9.4** or later.
+Ensure you are installing **v0.9.5** or later.
 #### 2. Models
 1. Ensure your **Ollama** server is running.
 2. Pull the mandatory models:
@@ -56,11 +56,12 @@ fast_model: "mistral:7b-instruct"     # Fast Agents (Execution)
 #### 4. Start
 Click **Start**. Monitor the **Log** tab.
 
-### 🛡️ Security Features (New in v0.9.4)
+### 🛡️ Security Features (New in v0.9.5)
 The AI Orchestrator now enforces strict tool safety:
-1.  **Domain Allowlist**: Only home automation domains (`light`, `climate`, etc.) are permitted.
-2.  **Explicit Blocks**: AI cannot run shell commands, scripts, or automations.
-3.  **Human Approval**: Any service involving locks or alarm panels will wait for your approval in the dashboard queue.
+1.  **Configurable Allowlists**: Define exactly which domains and services the AI can access.
+2.  **Explicit Blocks**: Hard-block dangerous domains like `automation` and `script`.
+3.  **Physical Limits**: Protect hardware with user-defined temperature bounds and change limits.
+4.  **Human Approval**: Any high-impact service (e.g., locks) will wait for your approval in the dashboard queue.
 
 ### Option 2: Manual Install (Legacy)
 1. Copy the `ai-orchestrator` folder to `/addons/` on your HA host.
