@@ -64,7 +64,10 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                                 key={item.id}
                                 onClick={() => {
                                     if (item.isLink) {
-                                        window.open(item.url, '_blank');
+                                        // Handle Ingress pathing: Derive absolute URL from current relative base
+                                        const basePath = window.location.pathname.replace(/\/$/, '');
+                                        const url = `${window.location.origin}${basePath}/${item.url}`;
+                                        window.open(url, '_blank');
                                     } else {
                                         onTabChange(item.id);
                                     }

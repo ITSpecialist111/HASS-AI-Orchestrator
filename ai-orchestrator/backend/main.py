@@ -440,15 +440,31 @@ async def handle_approval(request_id: str, action: str):
 @app.get("/api/dashboard/dynamic")
 async def get_dynamic_dashboard():
     """Serve the latest dynamic visual dashboard"""
-    path = Path("/data/dashboard/dynamic.html")
-    if not path.exists():
-        # Trigger an initial generation if it doesn't exist
-        if orchestrator:
-            await orchestrator.generate_visual_dashboard()
-        else:
-            raise HTTPException(status_code=404, detail="Dashboard not found and Orchestrator busy")
+    try:
+        path = Path("/data/dashboard/dynamic.html")
+        if not path.exists():
+            # Fallback to local
+            path = Path(__file__).parent.parent / "data" / "dashboard" / "dynamic.html"
             
-    return FileResponse(path)
+        if not path.exists():
+            # Trigger an initial generation if it doesn't exist
+            if orchestrator:
+                print("🎨 No dashboard found, triggering initial generation...")
+                await orchestrator.generate_visual_dashboard()
+            else:
+                raise HTTPException(status_code=503, detail="Dashboard not found and Orchestrator busy")
+                
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="Dashboard file could not be generated")
+            
+        return FileResponse(path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Dashboard Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 @app.post("/api/dashboard/refresh")

@@ -69,8 +69,13 @@ class Orchestrator:
         
         # Dashboard and logging
         self.decision_log_dir = Path("/data/decisions/orchestrator")
+        if not os.access("/", os.W_OK) and not self.decision_log_dir.exists():
+             self.decision_log_dir = Path(__file__).parent.parent / "data" / "decisions" / "orchestrator"
         self.decision_log_dir.mkdir(parents=True, exist_ok=True)
+        
         self.dashboard_dir = Path("/data/dashboard")
+        if not os.access("/", os.W_OK) and not self.dashboard_dir.exists():
+            self.dashboard_dir = Path(__file__).parent.parent / "data" / "dashboard"
         self.dashboard_dir.mkdir(parents=True, exist_ok=True)
         
         # Gemini setup (optional)
@@ -578,5 +583,23 @@ OUTPUT REQUIREMENTS:
             return html_content
             
         except Exception as e:
-            logger.error(f"Dashboard generation failed: {e}")
-            return f"Error: {str(e)}"
+            logger.error(f"❌ Failed to generate dashboard: {e}")
+            fallback_html = f"""
+            <html>
+            <body style="background: #0f172a; color: #f1f5f9; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column;">
+                <h1 style="color: #ef4444;">Dashboard Generation Failed</h1>
+                <p>{str(e)}</p>
+                <div style="background: #1e293b; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 20px;">
+                    Ensure your Ollama server is reachable and the model '{self.model_name}' is pulled.
+                </div>
+                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Try Again</button>
+            </body>
+            </html>
+            """
+            try:
+                output_path = self.dashboard_dir / "dynamic.html"
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(fallback_html)
+            except Exception as save_err:
+                logger.error(f"Could not save fallback HTML: {save_err}")
+            return fallback_html
