@@ -249,7 +249,8 @@ async def lifespan(app: FastAPI):
         approval_queue=approval_queue,
         agents=agents,
         model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
-        planning_interval=int(os.getenv("DECISION_INTERVAL", "120"))
+        planning_interval=int(os.getenv("DECISION_INTERVAL", "120")),
+        ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     

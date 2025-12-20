@@ -33,7 +33,8 @@ class Orchestrator:
         approval_queue,
         agents: Dict[str, any],
         model_name: str = "deepseek-r1:8b",
-        planning_interval: int = 120
+        planning_interval: int = 120,
+        ollama_host: str = "http://localhost:11434"
     ):
         """
         Initialize orchestrator.
@@ -58,7 +59,8 @@ class Orchestrator:
         self.compiled_workflow = self.workflow.compile()
         
         # Ollama client for planning LLM
-        self.llm_client = ollama.Client()
+        self.ollama_client = ollama.Client(host=ollama_host)
+        self.llm_client = self.ollama_client # Reference for other methods
         
         # Task and progress tracking
         self.task_ledger: List[Task] = []
