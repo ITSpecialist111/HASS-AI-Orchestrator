@@ -52,7 +52,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 # Expose ports
-EXPOSE 8099
+EXPOSE 8999
 
 # Labels for Home Assistant
 ARG BUILD_VERSION
@@ -64,7 +64,7 @@ LABEL io.hass.version="${BUILD_VERSION}" \
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8099/api/health || exit 1
+  CMD curl -f http://localhost:8999/api/health || exit 1
 
 # Run entrypoint
 CMD ["/app/run.sh"]
