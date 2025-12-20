@@ -482,7 +482,7 @@ INSTRUCTIONS:
                         try:
                             res = await self.mcp_server.execute_tool(
                                 tool_name="call_ha_service",
-                                arguments=params
+                                parameters=params
                             )
                             # Create a readable summary
                             summary = f"Executed {params.get('service')} on {params.get('entity_id')}"

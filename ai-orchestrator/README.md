@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.7 (Connectivity Hotfix)
+**Version**: v0.9.8 (Connectivity Hotfix)
 
 ## 🌟 Key Features
 

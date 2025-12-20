@@ -4,7 +4,7 @@ import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } fr
 import { useState, useEffect } from 'react';
 import { SettingsModal } from './SettingsModal';
 
-export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.7" }) {
+export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.8" }) {
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
 
@@ -65,9 +65,10 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                                 onClick={() => {
                                     if (item.isLink) {
                                         // Handle Ingress pathing: Derive absolute URL from current relative base
-                                        // Ensure basePath does not end with a slash, and then join with item.url
-                                        const basePath = window.location.pathname.replace(/\/+$/, '');
-                                        const url = `${window.location.origin}${basePath}/${item.url}`;
+                                        // Robust normalization: remove all trailing and leading slashes from parts before joining
+                                        const cleanPath = window.location.pathname.replace(/\/+$/, '');
+                                        const cleanItemUrl = item.url.replace(/^\/+/, '');
+                                        const url = `${window.location.origin}${cleanPath}/${cleanItemUrl}`;
                                         window.open(url, '_blank');
                                     } else {
                                         onTabChange(item.id);

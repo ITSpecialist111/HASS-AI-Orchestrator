@@ -246,7 +246,20 @@ Each action MUST have a 'tool' field (e.g. "set_temperature") and 'parameters'.
         # Call LLM
         response = await self._call_llm(prompt)
         
-        # Parse response (reuse basic parsing logic if available, or simple json load)
+        # 1. Handle explicit errors from BaseAgent
+        if response.startswith("ERROR:"):
+            return {
+                "reasoning": f"LLM Communication Failure: {response[6:].strip()}",
+                "actions": []
+            }
+            
+        if not response.strip():
+            return {
+                "reasoning": "LLM returned an empty response. Ensure the model is running.",
+                "actions": []
+            }
+
+        # 2. Parse response (reuse basic parsing logic if available, or simple json load)
         try:
             # Simple cleanup for markdown
             clean_response = response.strip()
