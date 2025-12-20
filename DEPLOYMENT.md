@@ -1,4 +1,4 @@
-# 🚀 AI Orchestrator - Production Deployment Guide (v0.9.5)
+# 🚀 AI Orchestrator - Production Deployment Guide (v0.9.6)
 
 ## ✅ System Status: COMPLETE
 This deployment package includes the full **Phase 6** feature set:
@@ -25,7 +25,7 @@ This is the easiest way to install and get automatic updates.
 
 #### 2. Install Add-on
 #### 2. Version Check
-Ensure you are installing **v0.9.5** or later.
+Ensure you are installing **v0.9.6** or later.
 #### 2. Models
 1. Ensure your **Ollama** server is running.
 2. Pull the mandatory models:
