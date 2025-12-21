@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.38] - 2025-12-21
+### Fixed
+- **Instantiation Fix**: Corrected keyword arguments for global `HAWebSocketClient` instantiation in `main.py` (`url` -> `ha_url`).
+
 ## [0.9.37] - 2025-12-21
 ### Fixed
 - **Connectivity Restoration**: Restored missing `ha_client` instantiation in `main.py` which was causing global `NoneType` errors.

@@ -237,9 +237,9 @@ async def lifespan(app: FastAPI):
         print(f"DEBUG: No specific connection mode detected, using default")
 
     ha_client = HAWebSocketClient(
-        url=ha_url,
+        ha_url=ha_url,
         token=ha_token,
-        header_token=header_token
+        supervisor_token=header_token
     )
     asyncio.create_task(ha_client.connect())
     print(f"✓ HA Client configured (URL: {ha_url})")
