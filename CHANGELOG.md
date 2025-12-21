@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.33] - 2025-12-21
+### Fixed
+- **Deployment Verification**: Added `VERSION` tag to `MCPServer` and removed ambiguous docstring to verify fresh code deployment.
+
 ## [0.9.32] - 2025-12-21
 ### Fixed
 - **Integrity Fix**: Restored `mcp_server.py` to a clean state to eliminate persistent syntax errors.

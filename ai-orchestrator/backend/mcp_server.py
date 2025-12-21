@@ -72,6 +72,7 @@ class MCPServer:
     Model Context Protocol server for Home Assistant.
     Registers and executes tools with safety checks.
     """
+    VERSION = "0.9.33"
     
     def __init__(self, ha_client: HAWebSocketClient, approval_queue: Optional[Any] = None, rag_manager: Optional[Any] = None, dry_run: bool = True):
         """
@@ -737,7 +738,7 @@ class MCPServer:
         return {"action": "log", "message": message, "logged": True}
 
     async def _get_state(self, params: Dict) -> Dict:
-        """Generic get state handler"""
+        # Generic get state handler
         entity_id = params["entity_id"]
         try:
             # We can reuse get_climate_state's logic or call ha_client directly
