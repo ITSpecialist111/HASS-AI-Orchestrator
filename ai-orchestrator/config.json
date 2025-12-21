@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.9.21",
+    "version": "0.9.22",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -11,6 +11,7 @@
     ],
     "startup": "application",
     "boot": "auto",
+    "host_network": true,
     "init": false,
     "ingress": true,
     "ingress_port": 8999,

@@ -27,12 +27,20 @@ class KnowledgeBase:
         Ingest Home Assistant Entity Registry.
         Learns about available devices and their capabilities.
         """
-        logger.info("Starting HA Entity Registry ingestion...")
-        
+        # Wait for connection to be established (background task in main.py)
+        # We check self.ha.ws because self.ha.connected is the state we want
+        wait_count = 0
+        while not (self.ha.ws and self.ha.ws.open):
+            if wait_count % 10 == 0:
+                logger.info("⏳ Waiting for Home Assistant connection before starting ingestion...")
+            await asyncio.sleep(1)
+            wait_count += 1
+            if wait_count > 60:
+                logger.warning("⚠️ Ingestion wait exceeded 60s, attempting connection-less startup...")
+                break
+
         try:
-            # Get all states (acting as registry for now)
-            # In a real scenario, we'd use the entity registry API if available
-            # Use a very long timeout (5 minutes) for large installations
+            # Get all states
             states = await self.ha.get_states(timeout=300.0)
             
             # Check if states is a list (dump of all states) or single dict

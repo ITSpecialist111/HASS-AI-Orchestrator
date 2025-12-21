@@ -1,6 +1,6 @@
 # 🏠 Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.9.21-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.9.22-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
 
 **The Autonomous Multi-Agent Brain for your Smart Home.**
 

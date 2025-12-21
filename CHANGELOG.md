@@ -1,9 +1,10 @@
 # Changelog
 
-## [0.9.21] - 2025-12-20
+## [0.9.22] - 2025-12-21
 ### Fixed
-- **Stability Restoration**: Reverted to v0.9.15 base and selectively applied critical stability fixes.
-- **System Startup Hang**: Home Assistant connection is now backgrounded.
-- **Telemetry Suppression**: Disabled broken ChromaDB telemetry.
-- **WebSocket Resilience**: Increased keepalive timeouts to 60s.
-- **Path Hardening**: Fixed double-slash routing issues in Ingress middleware.
+- **No Route to Host**: Enabled **Host Networking** for the addon. This allows the backend to reach Ollama and other local network devices (e.g. 192.168.x.x) directly.
+- **Startup Crash**: Fixed a `NoneType` error where the Knowledge Base would try to sync before the Home Assistant connection was ready.
+- **Telemetry Silence**: Moved telemetry suppression to the start of the application to ensure logs stay clean.
+- **Connectivity Check**: Added a startup reachability test for the Ollama host with helpful error diagnostics.
+
+## [0.9.21] - 2025-12-20

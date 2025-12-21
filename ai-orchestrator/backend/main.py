@@ -1,14 +1,15 @@
+import os
+# Disable broken ChromaDB telemetry (MUST BE AT ABSOLUTE TOP)
+os.environ["CHROMA_TELEMETRY_EXCEPT_OPT_OUT"] = "True"
+os.environ["TELEMETRY_DISABLED"] = "1"
+
 """
 FastAPI application for AI Orchestrator backend.
 Serves REST API, WebSocket connections, and static dashboard files.
 """
-import os
-# Disable broken ChromaDB telemetry
-os.environ["CHROMA_TELEMETRY_EXCEPT_OPT_OUT"] = "True"
-os.environ["TELEMETRY_DISABLED"] = "1"
-
 import json
 import asyncio
+import httpx
 from typing import Dict, List, Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -29,6 +30,21 @@ class SafeStaticFiles(StaticFiles):
         if scope["type"] != "http":
             return
         await super().__call__(scope, receive, send)
+
+async def check_ollama_connectivity(host: str):
+    """Check if Ollama is reachable and log helpful error if not"""
+    print(f"🔍 Checking Ollama connectivity at {host}...")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{host}/api/tags")
+            if resp.status_code == 200:
+                print(f"✓ Ollama is reachable at {host}")
+                return True
+    except Exception as e:
+        print(f"❌ OLLAMA CONNECTIVITY ERROR: {e}")
+        print(f"   Ensure 'host_network: true' is in your addon configuration.")
+        print(f"   If Ollama is on another machine, ensure its port 11434 is open/exposed.")
+    return False
 
 from ha_client import HAWebSocketClient
 from mcp_server import MCPServer
@@ -143,6 +159,10 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(ha_client.connect())
     print(f"⌛ Connecting to Home Assistant at {ha_url} in background...")
     
+    # Reachability check for Ollama
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    asyncio.create_task(check_ollama_connectivity(ollama_host))
+
     # 2. Load Configuration Options
     # Prefer reading directly from options.json for reliability in HA Add-on environment
     dry_run = True
