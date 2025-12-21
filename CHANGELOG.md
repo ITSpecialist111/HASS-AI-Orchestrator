@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.40] - 2025-12-21
+### Fixed
+- **Connectivity Fallback**: Implemented automatic fallback to Direct Core Access (`http://homeassistant:8123`) when the Home Assistant Supervisor Token is missing in Add-on mode.
+- **Agent Configuration Path**: Updated `agents.yaml` loading to prioritize `/config/agents.yaml` for persistent storage in Home Assistant Add-ons.
+
 ## [0.9.39] - 2025-12-21
 ### Fixed
 - **Deployment**: Version bump to force update detection in Home Assistant (functional equivalent to v0.9.38).

@@ -201,40 +201,38 @@ async def lifespan(app: FastAPI):
     print(f"DEBUG: ENV - HA_URL: {os.getenv('HA_URL')}")
     print(f"DEBUG: ENV - HA_ACCESS_TOKEN: {bool(os.getenv('HA_ACCESS_TOKEN'))}")
 
-    # 1. Initialize Home Assistant WebSocket client
-    # If we are in an add-on, we MUST use the supervisor.
-    is_addon = os.getenv("SUPERVISOR_TOKEN") or options_path.exists()
+    # If we are in an add-on, we MUST use the supervisor Proxy ONLY if the token is present.
+    # Otherwise, fallback to Direct Core Access.
+    is_addon = bool(os.getenv("SUPERVISOR_TOKEN")) or options_path.exists()
+    supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
     
     ha_url = os.getenv("HA_URL")
-    if is_addon:
+    if is_addon and supervisor_token:
         ha_url = "http://supervisor/core"
-        print(f"DEBUG: Add-on environment detected. Forcing HA_URL={ha_url}")
+        print(f"DEBUG: Add-on environment detected with Supervisor Token. Using Proxy: {ha_url}")
+    elif is_addon:
+        # Fallback to internal DNS if supervisor token is missing
+        ha_url = ha_url or "http://homeassistant:8123"
+        print(f"DEBUG: Add-on environment detected but NO Supervisor Token. Falling back to Direct Access: {ha_url}")
     elif not ha_url:
         ha_url = "http://homeassistant.local:8123"
         print(f"DEBUG: No HA_URL set and not in add-on. Defaulting to {ha_url}")
 
-    supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
-    
     # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
     ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip() or ha_access_token_opt
     
     # Determine which token to use for headers
-    if ha_token and not is_addon:
-        # Direct Core Access Mode (outside add-on)
-        header_token = None
-        print(f"DEBUG: Using Direct Core Access with LLAT")
-    elif is_addon:
+    if supervisor_token:
         # Supervisor Proxy Mode
-        # Use LLAT if provided in options, else use Supervisor Token
+        header_token = supervisor_token
+        # Ensure we have a token (either manually provided or supervisor)
         if not ha_token:
              ha_token = supervisor_token
-        
-        header_token = supervisor_token
-        print(f"DEBUG: Using Supervisor Proxy Mode (Supervisor Token present: {bool(supervisor_token)}, LLAT present: {bool(ha_access_token_opt)})")
+        print(f"DEBUG: Using Supervisor Proxy Mode (LLAT priority: {bool(ha_access_token_opt)})")
     else:
-        # Fallback
+        # Direct Core Access Mode
         header_token = None
-        print(f"DEBUG: No specific connection mode detected, using default")
+        print(f"DEBUG: Using Direct Core Access Mode (Token present: {bool(ha_token)})")
 
     ha_client = HAWebSocketClient(
         ha_url=ha_url,
@@ -278,10 +276,16 @@ async def lifespan(app: FastAPI):
         return [e.strip() for e in raw.split(",") if e.strip()]
 
     # 5. Initialize Agents (Phase 5: Dynamic Loading)
-    def load_agents_from_config(config_path: str = "agents.yaml"):
-        if not os.path.exists(config_path):
-            print(f"⚠️ Config {config_path} not found, skipping dynamic agents.")
+    def load_agents_from_config():
+        # Search priority: /config/agents.yaml (Persistent) -> local agents.yaml
+        config_paths = ["/config/agents.yaml", "agents.yaml"]
+        config_path = next((p for p in config_paths if os.path.exists(p)), None)
+        
+        if not config_path:
+            print(f"⚠️ No agent config found in {config_paths}, skipping dynamic agents.")
             return
+        
+        print(f"🔍 Loading agents from {config_path}...")
 
         try:
             with open(config_path, 'r') as f:
@@ -318,7 +322,7 @@ async def lifespan(app: FastAPI):
             print(f"❌ Failed to load agents from config: {e}")
 
     # Load agents
-    print("Loading agents from agents.yaml...")
+    print("Detecting agent configuration...")
     load_agents_from_config()
     
     # If config was empty/missing, we could optionally load default hardcoded agents here
