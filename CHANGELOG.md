@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.32] - 2025-12-21
+### Fixed
+- **Integrity Fix**: Restored `mcp_server.py` to a clean state to eliminate persistent syntax errors.
+
 ## [0.9.31] - 2025-12-21
 ### Fixed
 - **Hotfix**: Resolved SyntaxError in `MCPServer` caused by artifacts in v0.9.30 release.
