@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.26] - 2025-12-21
+### Added
+- Specific static mount for `/assets` to ensure Ingress consistency.
+- Environment diagnostics for Home Assistant connection tokens.
+### Fixed
+- Improved Supervisor detection in Add-on environment (checks for `/data/options.json`).
+- Read `ha_access_token` from add-on options if environment variables are missing.
+- Refined Ingress middleware to prevent double-slash asset 404s.
+
 ## [v0.9.25] - 2025-12-21
 - **Stability Fix**: Hardened Home Assistant WebSocket client against `NoneType` crashes.
 - **Connection Logic**: Improved Supervisor URL detection in Add-on environment.

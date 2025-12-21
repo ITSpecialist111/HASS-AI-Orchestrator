@@ -173,45 +173,12 @@ async def lifespan(app: FastAPI):
     
     print("🚀 Starting AI Orchestrator backend (Phase 2 Multi-Agent)...")
     
-    # 1. Initialize Home Assistant WebSocket client
-    # Priority for Supervisor Proxy (Add-on Mode)
-    ha_url = os.getenv("HA_URL", "http://supervisor/core")
-    
-    # Check if we are in Add-on environment and override for robustness
-    if os.getenv("SUPERVISOR_TOKEN"):
-        ha_url = "http://supervisor/core"
-        print(f"DEBUG: Add-on mode detected, forcing HA_URL={ha_url}")
-
-    supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
-    
-    # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
-    ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip()
-    
-    # Determine which token to use for headers
-    if ha_token:
-        # Direct Core Access Mode
-        header_token = None
-        print(f"DEBUG: Using Direct Core Access with LLAT")
-    else:
-        # Supervisor Proxy Mode
-        ha_token = supervisor_token
-        header_token = supervisor_token
-        print(f"DEBUG: Using Supervisor Proxy Mode (Supervisor Token)")
-    
-    # Pass both: 'ha_token' for the auth payload, 'header_token' for the proxy header
-    ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=header_token)
-    # START AS BACKGROUND TASK
-    asyncio.create_task(ha_client.connect())
-    print(f"⌛ Connecting to Home Assistant at {ha_client.ws_url} in background...")
-    
-    # Reachability check for Ollama
-    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    asyncio.create_task(check_ollama_connectivity(ollama_host))
-
     # 2. Load Configuration Options
     # Prefer reading directly from options.json for reliability in HA Add-on environment
     dry_run = True
     disable_telemetry = True
+    ha_access_token_opt = ""
+    
     options_path = Path("/data/options.json")
     if options_path.exists():
         try:
@@ -219,7 +186,8 @@ async def lifespan(app: FastAPI):
                 opts = json.load(f)
                 dry_run = opts.get("dry_run_mode", True)
                 disable_telemetry = opts.get("disable_telemetry", True)
-                print(f"DEBUG: Read dry_run={dry_run}, disable_telemetry={disable_telemetry} from options.json")
+                ha_access_token_opt = opts.get("ha_access_token", "").strip()
+                print(f"DEBUG: Read dry_run={dry_run}, disable_telemetry={disable_telemetry}, has_token={bool(ha_access_token_opt)} from options.json")
         except Exception as e:
             print(f"⚠️ Failed to read options.json: {e}")
             # Fallback to env var
@@ -227,6 +195,46 @@ async def lifespan(app: FastAPI):
     else:
         # Fallback to env var
         dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+
+    # Diagnostics
+    print(f"DEBUG: ENV - SUPERVISOR_TOKEN: {bool(os.getenv('SUPERVISOR_TOKEN'))}")
+    print(f"DEBUG: ENV - HA_URL: {os.getenv('HA_URL')}")
+    print(f"DEBUG: ENV - HA_ACCESS_TOKEN: {bool(os.getenv('HA_ACCESS_TOKEN'))}")
+
+    # 1. Initialize Home Assistant WebSocket client
+    # If we are in an add-on, we MUST use the supervisor.
+    is_addon = os.getenv("SUPERVISOR_TOKEN") or options_path.exists()
+    
+    ha_url = os.getenv("HA_URL")
+    if is_addon:
+        ha_url = "http://supervisor/core"
+        print(f"DEBUG: Add-on environment detected. Forcing HA_URL={ha_url}")
+    elif not ha_url:
+        ha_url = "http://homeassistant.local:8123"
+        print(f"DEBUG: No HA_URL set and not in add-on. Defaulting to {ha_url}")
+
+    supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
+    
+    # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
+    ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip() or ha_access_token_opt
+    
+    # Determine which token to use for headers
+    if ha_token and not is_addon:
+        # Direct Core Access Mode (outside add-on)
+        header_token = None
+        print(f"DEBUG: Using Direct Core Access with LLAT")
+    elif is_addon:
+        # Supervisor Proxy Mode
+        # Use LLAT if provided in options, else use Supervisor Token
+        if not ha_token:
+             ha_token = supervisor_token
+        
+        header_token = supervisor_token
+        print(f"DEBUG: Using Supervisor Proxy Mode (Supervisor Token present: {bool(supervisor_token)}, LLAT present: {bool(ha_access_token_opt)})")
+    else:
+        # Fallback
+        header_token = None
+        print(f"DEBUG: No specific connection mode detected, using default")
 
     # 3. Initialize RAG & Knowledge Base (Phase 3)
     enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
@@ -650,6 +658,12 @@ dashboard_path = Path(__file__).parent.parent / "dashboard" / "dist"
 
 if dashboard_path.exists():
     print(f"✓ Mounting dashboard from {dashboard_path}")
+    # Explicitly mount /assets to handle rewritten Ingress paths correctly
+    assets_path = dashboard_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", SafeStaticFiles(directory=str(assets_path)), name="assets")
+        print(f"  ✓ Explicitly mounted /assets from {assets_path}")
+    
     app.mount("/", SafeStaticFiles(directory=str(dashboard_path), html=True), name="static")
 else:
     print(f"⚠️ Dashboard bundle not found at {dashboard_path}")
