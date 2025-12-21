@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.39] - 2025-12-21
+### Fixed
+- **Deployment**: Version bump to force update detection in Home Assistant (functional equivalent to v0.9.38).
+
 ## [0.9.38] - 2025-12-21
 ### Fixed
 - **Instantiation Fix**: Corrected keyword arguments for global `HAWebSocketClient` instantiation in `main.py` (`url` -> `ha_url`).
