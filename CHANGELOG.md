@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.41] - 2025-12-21
+### Fixed
+- **Docker Image Integrity**: Updated `Dockerfile` to correctly include `agents.yaml`, `skills/`, and `translations/` in the build, resolving issues with missing agents and tools in the Add-on environment.
+
 ## [0.9.40] - 2025-12-21
 ### Fixed
 - **Connectivity Fallback**: Implemented automatic fallback to Direct Core Access (`http://homeassistant:8123`) when the Home Assistant Supervisor Token is missing in Add-on mode.
