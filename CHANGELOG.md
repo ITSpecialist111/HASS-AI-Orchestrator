@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.29] - 2025-12-21
+### Fixed
+- **Knowledge Base Crash**: Guarded `ingest_ha_registry` against `NoneType` WebSocket error during startup loop.
+- **Connection Logic**: Clarified need for `ha_access_token` when Supervisor API injection fails.
+
 ## [0.9.28] - 2025-12-21
 ### Fixed
 - **Critical Crash Fix**: Resolved `NoneType` error in Universal Agent when Entity Discovery runs without a connection.

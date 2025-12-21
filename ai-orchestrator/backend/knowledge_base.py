@@ -30,7 +30,11 @@ class KnowledgeBase:
         # Wait for connection to be established (background task in main.py)
         # We check self.ha.ws because self.ha.connected is the state we want
         wait_count = 0
-        while not (self.ha.ws and self.ha.ws.open):
+        while True:
+            # Check if self.ha.ws is not None AND open
+            if self.ha.connected and self.ha.ws and self.ha.ws.open:
+                break
+                
             if wait_count % 10 == 0:
                 logger.info("⏳ Waiting for Home Assistant connection before starting ingestion...")
             await asyncio.sleep(1)
