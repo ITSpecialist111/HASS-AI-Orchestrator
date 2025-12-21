@@ -40,6 +40,11 @@ class KnowledgeBase:
                 break
 
         try:
+            # Final check before proceed
+            if not (self.ha.ws and self.ha.ws.open):
+                logger.error("❌ Knowledge Base ingestion aborted: Home Assistant not reachable.")
+                return
+
             # Get all states
             states = await self.ha.get_states(timeout=300.0)
             

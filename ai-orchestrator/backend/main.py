@@ -174,29 +174,35 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting AI Orchestrator backend (Phase 2 Multi-Agent)...")
     
     # 1. Initialize Home Assistant WebSocket client
+    # Priority for Supervisor Proxy (Add-on Mode)
     ha_url = os.getenv("HA_URL", "http://supervisor/core")
+    
+    # Check if we are in Add-on environment and override for robustness
+    if os.getenv("SUPERVISOR_TOKEN"):
+        ha_url = "http://supervisor/core"
+        print(f"DEBUG: Add-on mode detected, forcing HA_URL={ha_url}")
+
     supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
     
     # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
     ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip()
     
     # Determine which token to use for headers
-    # If using LLAT (Direct Mode implies homeassistant:8123), we don't need Supervisor Proxy headers
     if ha_token:
         # Direct Core Access Mode
         header_token = None
-        print(f"DEBUG: Using Direct Core Access with LLAT (No Supervisor Headers)")
+        print(f"DEBUG: Using Direct Core Access with LLAT")
     else:
         # Supervisor Proxy Mode
         ha_token = supervisor_token
         header_token = supervisor_token
-        print(f"DEBUG: Using Supervisor Proxy Mode")
+        print(f"DEBUG: Using Supervisor Proxy Mode (Supervisor Token)")
     
     # Pass both: 'ha_token' for the auth payload, 'header_token' for the proxy header
     ha_client = HAWebSocketClient(ha_url, token=ha_token, supervisor_token=header_token)
-    # START AS BACKGROUND TASK to prevent blocking system boot if HA is unreachable
+    # START AS BACKGROUND TASK
     asyncio.create_task(ha_client.connect())
-    print(f"⌛ Connecting to Home Assistant at {ha_url} in background...")
+    print(f"⌛ Connecting to Home Assistant at {ha_client.ws_url} in background...")
     
     # Reachability check for Ollama
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")

@@ -86,14 +86,20 @@ class HAWebSocketClient:
             self.connected = False
             raise
     
-    async def disconnect(self):
-        """Disconnect from Home Assistant WebSocket"""
-        if self.ws:
-            await self.ws.close()
-            self.connected = False
-    
+    async def wait_until_connected(self, timeout: float = 30.0):
+        """Wait until connection is established or timeout occurs"""
+        start_time = asyncio.get_event_loop().time()
+        while not self.connected:
+            if asyncio.get_event_loop().time() - start_time > timeout:
+                return False
+            await asyncio.sleep(0.5)
+        return True
+
     async def _send_message(self, message: Dict) -> int:
         """Send message to HA and return message ID"""
+        if not self.ws:
+            raise RuntimeError("WebSocket is not connected")
+        
         self.message_id += 1
         message["id"] = self.message_id
         await self.ws.send(json.dumps(message))

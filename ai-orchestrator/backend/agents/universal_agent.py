@@ -165,7 +165,10 @@ class UniversalAgent(BaseAgent):
             except Exception as e:
                 # If everything fails (including HA client), return empty to avoid breaking the agent completely
                 # but log the specific error
-                print(f"❌ Entity Discovery Fatal Error: {e}")
+                if not self.ha_client.connected:
+                    print(f"⚠️ Entity Discovery Paused (HA Client Disconnected)")
+                else:
+                    print(f"❌ Entity Discovery Fatal Error: {e}")
                 return "Error: Could not discover entities. Please check Home Assistant connection."
 
         # ... (rest of method unchanged)
