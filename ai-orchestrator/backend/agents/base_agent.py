@@ -25,7 +25,7 @@ class BaseAgent(ABC):
         agent_id: str,
         name: str,
         mcp_server: MCPServer,
-        ha_client: HAWebSocketClient,
+        ha_client, #: Union[HAWebSocketClient, Callable[[], HAWebSocketClient]]
         skills_path: str,
         rag_manager: Optional[Any] = None,
         model_name: str = "mistral:7b-instruct",
@@ -50,7 +50,20 @@ class BaseAgent(ABC):
         self.agent_id = agent_id
         self.name = name
         self.mcp_server = mcp_server
-        self.ha_client = ha_client
+        self.mcp_server = mcp_server
+        # Support lazy loading
+        self._ha_provider = ha_client
+        
+    @property
+    def ha_client(self):
+        """Lazy retrieval of HA client"""
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
+
+    @ha_client.setter
+    def ha_client(self, value):
+        self._ha_provider = value
         self.skills_path = Path(skills_path)
         self.rag_manager = rag_manager
         self.model_name = model_name

@@ -18,9 +18,17 @@ class KnowledgeBase:
     Manages ingestion of knowledge into the RAG system.
     """
     
-    def __init__(self, rag_manager: RagManager, ha_client: HAWebSocketClient):
+    def __init__(self, rag_manager: RagManager, ha_client_provider):
         self.rag = rag_manager
-        self.ha = ha_client
+        # ha_client_provider can be an instance or a callable returning the instance
+        self._ha_provider = ha_client_provider
+        
+    @property
+    def ha(self):
+        """Lazy retrieval of HA client to handle late initialization"""
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
         
     async def ingest_ha_registry(self):
         """
@@ -45,7 +53,7 @@ class KnowledgeBase:
 
         try:
             # Final check before proceed
-            if not (self.ha.ws and self.ha.ws.open):
+            if not self.ha or not (self.ha.ws and self.ha.ws.open):
                 logger.error("❌ Knowledge Base ingestion aborted: Home Assistant not reachable.")
                 return
 

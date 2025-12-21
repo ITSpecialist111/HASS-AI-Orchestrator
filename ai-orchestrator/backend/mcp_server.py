@@ -78,18 +78,26 @@ class MCPServer:
         Initialize MCP server.
         
         Args:
-            ha_client: Connected Home Assistant WebSocket client
+            ha_client: Connected Home Assistant WebSocket client (or provider function)
             approval_queue: Optional Approval Queue for high-impact actions
             rag_manager: Optional RAG Manager for knowledge tools
             dry_run: If True, log actions without executing
         """
-        self.ha_client = ha_client
+        """
+        self._ha_provider = ha_client
         self.approval_queue = approval_queue
         self.rag_manager = rag_manager
         self.dry_run = dry_run
         self.tools = self._register_tools()
         self.log_dir = Path("/data/decisions")
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+    @property
+    def ha_client(self):
+        """Lazy retrieval of HA client"""
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider<bos>
     
     def _register_tools(self) -> Dict[str, Dict]:
         """Register available tools with schemas"""

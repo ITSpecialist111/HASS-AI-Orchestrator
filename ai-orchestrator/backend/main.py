@@ -241,7 +241,8 @@ async def lifespan(app: FastAPI):
     if enable_rag:
         try:
             rag_manager = RagManager(persist_dir="/data/chroma", disable_telemetry=disable_telemetry)
-            knowledge_base = KnowledgeBase(rag_manager, ha_client)
+            # FIX: Pass lambda to resolve the global ha_client at runtime, not now (which is None)
+            knowledge_base = KnowledgeBase(rag_manager, lambda: ha_client)
             print("✓ RAG Manager & Knowledge Base initialized")
             
             # Start background ingestion
@@ -252,7 +253,8 @@ async def lifespan(app: FastAPI):
             rag_manager = None
 
     # 4. Initialize MCP server
-    mcp_server = MCPServer(ha_client, approval_queue=approval_queue, rag_manager=rag_manager, dry_run=dry_run)
+    # FIX: Pass lambda for lazy resolution
+    mcp_server = MCPServer(lambda: ha_client, approval_queue=approval_queue, rag_manager=rag_manager, dry_run=dry_run)
     print(f"✓ MCP Server initialized (dry_run={dry_run})")
     
     # 4. Initialize Approval Queue
@@ -294,7 +296,7 @@ async def lifespan(app: FastAPI):
                     name=agent_cfg['name'],
                     instruction=agent_cfg['instruction'],
                     mcp_server=mcp_server,
-                    ha_client=ha_client,
+                    ha_client=lambda: ha_client,
                     entities=entities,
                     rag_manager=rag_manager,
                     model_name=agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "mistral:7b-instruct")),
@@ -320,7 +322,7 @@ async def lifespan(app: FastAPI):
     # Use the configured model (default: mistral:7b-instruct) for the orchestrator too,
     # since the user might only have one model available on the remote Ollama.
     orchestrator = Orchestrator(
-        ha_client=ha_client,
+        ha_client=lambda: ha_client,
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
@@ -341,7 +343,7 @@ async def lifespan(app: FastAPI):
             print(f"✓ Started decision loop for {agent_id}")
     
     # 8. Initialize Architect (Phase 6)
-    architect = ArchitectAgent(ha_client, rag_manager=rag_manager)
+    architect = ArchitectAgent(lambda: ha_client, rag_manager=rag_manager)
     app.state.architect = architect
     print("✓ Architect Agent initialized")
     

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.30] - 2025-12-21
+### Fixed
+- **Startup Crash Loop**: Refactored entire backend to use Lazy Injection for `ha_client`. Use `lambda: ha_client` to resolve the connection object at runtime, preventing components from holding a stale `None` reference.
+
 ## [0.9.29] - 2025-12-21
 ### Fixed
 - **Knowledge Base Crash**: Guarded `ingest_ha_registry` against `NoneType` WebSocket error during startup loop.
