@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.34] - 2025-12-21
+### Fixed
+- **Startup Logic**: Fixed `Orchestrator` initialization scope issues and added robust `None` checks in `KnowledgeBase` to handle lazy connection availability.
+
 ## [0.9.33] - 2025-12-21
 ### Fixed
 - **Deployment Verification**: Added `VERSION` tag to `MCPServer` and removed ambiguous docstring to verify fresh code deployment.

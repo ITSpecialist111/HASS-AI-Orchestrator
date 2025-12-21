@@ -40,7 +40,9 @@ class KnowledgeBase:
         wait_count = 0
         while True:
             # Check if self.ha.ws is not None AND open
-            if self.ha.connected and self.ha.ws and self.ha.ws.open:
+            # Check if self.ha is ready
+            client = self.ha
+            if client and client.connected and client.ws and client.ws.open:
                 break
                 
             if wait_count % 10 == 0:

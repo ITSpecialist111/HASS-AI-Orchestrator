@@ -51,17 +51,18 @@ class Orchestrator:
         self.mcp_server = mcp_server
         self.approval_queue = approval_queue
         
-    @property
-    def ha_client(self):
-        if callable(self._ha_provider):
-            return self._ha_provider()
-        return self._ha_provider
         self.agents = agents
         self.model_name = model_name
         self.planning_interval = planning_interval
         
         # LangGraph workflow
         self.workflow = create_workflow()
+
+    @property
+    def ha_client(self):
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
         self.compiled_workflow = self.workflow.compile()
         
         # Ollama client for planning LLM
