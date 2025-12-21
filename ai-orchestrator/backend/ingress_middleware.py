@@ -29,24 +29,31 @@ class IngressMiddleware:
                     path = "/" + path
 
             # 2. Normalize Double Slashes (The fix for 405/WS crashes)
-            # Repeat until clean (e.g. /// -> /)
             while "//" in path:
                 path = path.replace("//", "/")
             
-            # 3. WS Fallback & Normalization
-            # Ensure proper handling of the critical /ws endpoint
+            # 3. Handle Missing Trailing Slash (Critical for relative assets)
+            # If we are at the root (empty or just /) and it came through Ingress,
+            # we must ensure a trailing slash so ./assets/ works.
+            if ingress_path and (path == "" or path == "/"):
+                 # We don't redirect (to avoid loop), we just ensure the app sees /
+                 path = "/"
+
+            # 4. Asset Normalization
+            # Force /assets/ to be relative to root for the static mount
+            if "assets/" in path and not path.startswith("/assets/"):
+                path = "/assets/" + path.split("assets/")[-1]
+
+            # 5. WS Fallback & Normalization
             if scope["type"] == "websocket":
-                # Normalize any variation of /ws (e.g. //ws, /ingress/ws, /ws/) to just /ws
-                # We also check if it contains /ws to catch deeply nested ingress paths
                 if "/ws" in path:
                      path = "/ws"
                 
-                # Update scope if changed
                 if path != original_path:
                     scope["path"] = path
 
             if path != original_path:
-                print(f"DEBUG REWRITE: {original_path} -> {path}", flush=True)
+                print(f"DEBUG REWRITE: {original_path} -> {path} (Ingress: {ingress_path})", flush=True)
                 scope["path"] = path
         
         await self.app(scope, receive, send)
