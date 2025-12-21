@@ -36,8 +36,9 @@ class IngressMiddleware:
             # 3. WS Fallback & Normalization
             # Ensure proper handling of the critical /ws endpoint
             if scope["type"] == "websocket":
-                # Normalize any variation of /ws (e.g. //ws, /ingress/ws) to just /ws
-                if path.endswith("/ws") or path.endswith("/ws/"):
+                # Normalize any variation of /ws (e.g. //ws, /ingress/ws, /ws/) to just /ws
+                # We also check if it contains /ws to catch deeply nested ingress paths
+                if "/ws" in path:
                      path = "/ws"
                 
                 # Update scope if changed

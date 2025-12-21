@@ -1,7 +1,18 @@
 import os
+import sys
+
 # Disable broken ChromaDB telemetry (MUST BE AT ABSOLUTE TOP)
 os.environ["CHROMA_TELEMETRY_EXCEPT_OPT_OUT"] = "True"
 os.environ["TELEMETRY_DISABLED"] = "1"
+
+# NUCLEAR OPTION: Monkey-patch PostHog to silence the capture error
+try:
+    import posthog
+    def noop_capture(*args, **kwargs): pass
+    posthog.capture = noop_capture
+    print("✓ PostHog monkey-patched to silence telemetry errors.")
+except ImportError:
+    pass
 
 """
 FastAPI application for AI Orchestrator backend.
@@ -10,6 +21,7 @@ Serves REST API, WebSocket connections, and static dashboard files.
 import json
 import asyncio
 import httpx
+import socket
 from typing import Dict, List, Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -32,18 +44,45 @@ class SafeStaticFiles(StaticFiles):
         await super().__call__(scope, receive, send)
 
 async def check_ollama_connectivity(host: str):
-    """Check if Ollama is reachable and log helpful error if not"""
-    print(f"🔍 Checking Ollama connectivity at {host}...")
+    """Deep network diagnostic for Ollama connectivity"""
+    print(f"🔍 [NETWORK DIAG] Testing Ollama connectivity at {host}...")
+    
+    # 1. Parse host
+    from urllib.parse import urlparse
+    parsed = urlparse(host)
+    ip_or_host = parsed.hostname
+    port = parsed.port or 11434
+    
+    # 2. DNS/Resolve check
+    try:
+        remote_ip = socket.gethostbyname(ip_or_host)
+        print(f"  ✓ DNS Resolve: {ip_or_host} -> {remote_ip}")
+    except Exception as e:
+        print(f"  ❌ DNS Resolve FAILED for {ip_or_host}: {e}")
+        return False
+
+    # 3. Connection (Socket level)
+    try:
+        print(f"  Connecting to {remote_ip}:{port}...")
+        conn = socket.create_connection((remote_ip, port), timeout=3.0)
+        conn.close()
+        print(f"  ✓ Socket Level: Reachable!")
+    except Exception as e:
+        print(f"  ❌ Socket Level FAILED: {e}")
+        print(f"     TIP: If this is 'No route to host', check your router/firewall or use 'host_network: true'.")
+
+    # 4. HTTP check
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{host}/api/tags")
             if resp.status_code == 200:
-                print(f"✓ Ollama is reachable at {host}")
+                print(f"  ✓ HTTP Level: Ollama API is responding correctly.")
                 return True
+            else:
+                print(f"  ⚠️ HTTP Level: Ollama responded with status {resp.status_code}")
     except Exception as e:
-        print(f"❌ OLLAMA CONNECTIVITY ERROR: {e}")
-        print(f"   Ensure 'host_network: true' is in your addon configuration.")
-        print(f"   If Ollama is on another machine, ensure its port 11434 is open/exposed.")
+        print(f"  ❌ HTTP Level FAILED: {e}")
+    
     return False
 
 from ha_client import HAWebSocketClient

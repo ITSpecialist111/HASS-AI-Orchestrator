@@ -1,10 +1,12 @@
 # Changelog
 
-## [0.9.22] - 2025-12-21
+## [0.9.23] - 2025-12-21
 ### Fixed
-- **No Route to Host**: Enabled **Host Networking** for the addon. This allows the backend to reach Ollama and other local network devices (e.g. 192.168.x.x) directly.
-- **Startup Crash**: Fixed a `NoneType` error where the Knowledge Base would try to sync before the Home Assistant connection was ready.
-- **Telemetry Silence**: Moved telemetry suppression to the start of the application to ensure logs stay clean.
-- **Connectivity Check**: Added a startup reachability test for the Ollama host with helpful error diagnostics.
+- **Telemetry Silence [CRITICAL]**: Implemented monkey-patching for PostHog. This finally silences the ChromaDB capture errors.
+- **Network Diagnostics**: Added deep socket-level diagnostics to troubleshoot connection issues to Ollama.
+- **WebSocket Stability**: Hardened WebSocket path normalization to resolve black-screen issues in Ingress.
+- **Ingress Performance**: Smoothed out double-slash normalization for all backend routes.
+
+## [0.9.22] - 2025-12-21
 
 ## [0.9.21] - 2025-12-20
