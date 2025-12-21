@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.35] - 2025-12-21
+### Fixed
+- **Orchestrator Init**: Fixed `AttributeError` by correctly positioning the `ha_client` property definition outside the `__init__` method, ensuring full initialization of all attributes.
+
 ## [0.9.34] - 2025-12-21
 ### Fixed
 - **Startup Logic**: Fixed `Orchestrator` initialization scope issues and added robust `None` checks in `KnowledgeBase` to handle lazy connection availability.

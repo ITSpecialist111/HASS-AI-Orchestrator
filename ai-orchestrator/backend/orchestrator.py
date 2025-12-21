@@ -58,11 +58,7 @@ class Orchestrator:
         # LangGraph workflow
         self.workflow = create_workflow()
 
-    @property
-    def ha_client(self):
-        if callable(self._ha_provider):
-            return self._ha_provider()
-        return self._ha_provider
+
         self.compiled_workflow = self.workflow.compile()
         
         # Ollama client for planning LLM
@@ -620,3 +616,9 @@ OUTPUT REQUIREMENTS:
             except Exception as save_err:
                 logger.error(f"Could not save fallback HTML: {save_err}")
             return fallback_html
+
+    @property
+    def ha_client(self):
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
