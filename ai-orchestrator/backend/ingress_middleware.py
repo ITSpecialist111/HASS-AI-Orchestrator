@@ -41,8 +41,12 @@ class IngressMiddleware:
 
             # 4. Asset Normalization
             # Force /assets/ to be relative to root for the static mount
-            if "assets/" in path and not path.startswith("/assets/"):
-                path = "/assets/" + path.split("assets/")[-1]
+            # FIX: More aggressive matching for any asset path request
+            if "assets/" in path:
+                # Strip everything before /assets/
+                parts = path.split("/assets/")
+                if len(parts) > 1:
+                     path = "/assets/" + parts[-1]
 
             # 5. WS Fallback & Normalization
             if scope["type"] == "websocket":

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.27] - 2025-12-21
+### Fixed
+- **Emergency Fix**: Guarded `ha_client` against `NoneType` crashes when disconnected.
+- **Dashboard**: Relaxed Ingress path normalization to fix "black screen" 404 errors.
+- **Diagnostics**: Added cleaner error handling for failed WebSocket message artifacts.
+
 ## [0.9.26] - 2025-12-21
 ### Added
 - Specific static mount for `/assets` to ensure Ingress consistency.

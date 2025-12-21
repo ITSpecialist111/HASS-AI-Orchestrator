@@ -97,13 +97,21 @@ class HAWebSocketClient:
 
     async def _send_message(self, message: Dict) -> int:
         """Send message to HA and return message ID"""
-        if not self.ws:
-            raise RuntimeError("WebSocket is not connected")
+        if not self.ws or not self.connected:
+            # Instead of raising RuntimeError which crashes the caller, 
+            # we log and return 0 (invalid ID) to signal failure safely.
+            print(f"⚠️ Cannot send message (disconnected): {message.get('type')}")
+            return 0
         
-        self.message_id += 1
-        message["id"] = self.message_id
-        await self.ws.send(json.dumps(message))
-        return self.message_id
+        try:
+            self.message_id += 1
+            message["id"] = self.message_id
+            await self.ws.send(json.dumps(message))
+            return self.message_id
+        except Exception as e:
+            print(f"❌ Error sending WebSocket message: {e}")
+            self.connected = False
+            return 0
     
     async def _receive_messages(self):
         """Continuously receive and process messages from HA"""
