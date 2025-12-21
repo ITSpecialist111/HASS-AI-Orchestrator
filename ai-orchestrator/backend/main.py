@@ -236,6 +236,14 @@ async def lifespan(app: FastAPI):
         header_token = None
         print(f"DEBUG: No specific connection mode detected, using default")
 
+    ha_client = HAWebSocketClient(
+        url=ha_url,
+        token=ha_token,
+        header_token=header_token
+    )
+    asyncio.create_task(ha_client.connect())
+    print(f"✓ HA Client configured (URL: {ha_url})")
+
     # 3. Initialize RAG & Knowledge Base (Phase 3)
     enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
     if enable_rag:

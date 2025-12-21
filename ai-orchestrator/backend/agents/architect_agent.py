@@ -34,6 +34,12 @@ class ArchitectAgent:
         and generates ready-to-use agent blueprints.
         """
         candidates = []
+        
+        # Guard: Check if HA is connected
+        if not self.ha_client or not self.ha_client.connected:
+            self.logger.warning("Architect cannot suggest agents: Home Assistant not connected.")
+            return []
+            
         try:
             states = await self.ha_client.get_states()
             
@@ -165,6 +171,7 @@ class ArchitectAgent:
 
         except Exception as e:
             self.logger.error(f"Error scanning entities: {e}")
+            return []
             
         # Cap at 20
         return candidates[:20]

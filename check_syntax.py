@@ -3,7 +3,7 @@ import traceback
 import sys
 
 files = [
-    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\agents\\base_agent.py",
+    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\main.py",
     "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\agents\\architect_agent.py"
 ]
 

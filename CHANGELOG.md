@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.37] - 2025-12-21
+### Fixed
+- **Connectivity Restoration**: Restored missing `ha_client` instantiation in `main.py` which was causing global `NoneType` errors.
+- **Architect Stability**: Added runtime guards to `ArchitectAgent` to prevent crashes when Home Assistant is unreachable.
+
 ## [0.9.36] - 2025-12-21
 ### Fixed
 - **Agent Initialization**: Fixed `AttributeError` in `BaseAgent` and `ArchitectAgent` by correctly positioning property definitions, ensuring `decision_dir` and `logger` are properly initialized.
