@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.31] - 2025-12-21
+### Fixed
+- **Hotfix**: Resolved SyntaxError in `MCPServer` caused by artifacts in v0.9.30 release.
+
 ## [0.9.30] - 2025-12-21
 ### Fixed
 - **Startup Crash Loop**: Refactored entire backend to use Lazy Injection for `ha_client`. Use `lambda: ha_client` to resolve the connection object at runtime, preventing components from holding a stale `None` reference.

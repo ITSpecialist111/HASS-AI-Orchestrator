@@ -83,7 +83,6 @@ class MCPServer:
             rag_manager: Optional RAG Manager for knowledge tools
             dry_run: If True, log actions without executing
         """
-        """
         self._ha_provider = ha_client
         self.approval_queue = approval_queue
         self.rag_manager = rag_manager
@@ -97,7 +96,7 @@ class MCPServer:
         """Lazy retrieval of HA client"""
         if callable(self._ha_provider):
             return self._ha_provider()
-        return self._ha_provider<bos>
+        return self._ha_provider
     
     def _register_tools(self) -> Dict[str, Dict]:
         """Register available tools with schemas"""
