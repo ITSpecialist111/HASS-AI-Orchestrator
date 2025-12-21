@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.28] - 2025-12-21
+### Fixed
+- **Critical Crash Fix**: Resolved `NoneType` error in Universal Agent when Entity Discovery runs without a connection.
+- **Port Consistency**: Verified and locked internal port to 8999 to resolve potential Ingress mismatches.
+
 ## [0.9.27] - 2025-12-21
 ### Fixed
 - **Emergency Fix**: Guarded `ha_client` against `NoneType` crashes when disconnected.
