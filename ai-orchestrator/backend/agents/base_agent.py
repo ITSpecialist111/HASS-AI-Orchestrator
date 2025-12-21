@@ -54,16 +54,7 @@ class BaseAgent(ABC):
         # Support lazy loading
         self._ha_provider = ha_client
         
-    @property
-    def ha_client(self):
-        """Lazy retrieval of HA client"""
-        if callable(self._ha_provider):
-            return self._ha_provider()
-        return self._ha_provider
 
-    @ha_client.setter
-    def ha_client(self, value):
-        self._ha_provider = value
         self.skills_path = Path(skills_path)
         self.rag_manager = rag_manager
         self.model_name = model_name
@@ -379,3 +370,14 @@ If no action is needed, return an empty actions array.
             Context dict with current state
         """
         pass
+
+    @property
+    def ha_client(self):
+        """Lazy retrieval of HA client"""
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
+
+    @ha_client.setter
+    def ha_client(self, value):
+        self._ha_provider = value

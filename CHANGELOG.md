@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.36] - 2025-12-21
+### Fixed
+- **Agent Initialization**: Fixed `AttributeError` in `BaseAgent` and `ArchitectAgent` by correctly positioning property definitions, ensuring `decision_dir` and `logger` are properly initialized.
+
 ## [0.9.35] - 2025-12-21
 ### Fixed
 - **Orchestrator Init**: Fixed `AttributeError` by correctly positioning the `ha_client` property definition outside the `__init__` method, ensuring full initialization of all attributes.

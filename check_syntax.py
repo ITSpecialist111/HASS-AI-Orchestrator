@@ -3,9 +3,8 @@ import traceback
 import sys
 
 files = [
-    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\mcp_server.py",
-    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\orchestrator.py",
-    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\knowledge_base.py"
+    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\agents\\base_agent.py",
+    "C:\\Users\\graham\\Documents\\GitHub\\HASS-AI-Orchestrator\\ai-orchestrator\\backend\\agents\\architect_agent.py"
 ]
 
 has_error = False

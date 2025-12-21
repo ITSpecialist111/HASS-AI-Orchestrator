@@ -24,11 +24,7 @@ class ArchitectAgent:
         self._ha_provider = ha_client
         self.rag_manager = rag_manager
         
-    @property
-    def ha_client(self):
-        if callable(self._ha_provider):
-            return self._ha_provider()
-        return self._ha_provider
+
         self.model_name = model_name
         self.logger = logging.getLogger("Architect")
 
@@ -260,3 +256,9 @@ class ArchitectAgent:
         }
             
         return generated
+
+    @property
+    def ha_client(self):
+        if callable(self._ha_provider):
+            return self._ha_provider()
+        return self._ha_provider
