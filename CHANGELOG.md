@@ -1,6 +1,14 @@
 # Changelog
 <br>
 
+## [0.9.45] - 2025-12-22
+### Fixed
+- **HA Connectivity Robustness**: Improved error logging in `ha_client.py` with full URI and exception details. Added a startup wait period in `main.py` to prevent race conditions during early ingestion.
+- **Custom HA URL Support**: Modified `run.sh` to allow user-defined `HA_URL` (from `options.json`) to take precedence even when a Long-Lived Access Token is provided.
+- **Improved Reliability**: Architect suggestions and Knowledge Base ingestion now handle connection delays more gracefully.
+<br>
+<br>
+
 ## [0.9.44] - 2025-12-22
 ### Fixed
 - **Chat Tool Execution**: Resolved `UnboundLocalError` (cannot access local variable 'params') when the AI Assistant triggers tools.
