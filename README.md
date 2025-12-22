@@ -1,10 +1,10 @@
 # 🏠 Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.9.45-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.9.47-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
 
 **The Autonomous Multi-Agent Brain for your Smart Home.**
 
-> 🚀 **Alpha Release (v0.9.45)**: Now seeking testers!
+> 🚀 **Alpha Release (v0.9.47)**: Now seeking testers!
 
 The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
 
@@ -32,9 +32,14 @@ Feed your AI manuals, PDF guides, or specific house rules. The agents read them 
 > *"Don't turn on the dishwasher if the 'Clean' sign is flipped."*
 
 ### 🎨 AI Visual Dashboard
-Experience high-fidelity, skeuomorphic visualizations generated in real-time. The **AI Visual Dashboard** supports both local (Ollama) and cloud-based (**Google Gemini**) advanced LLMs to create stunning, context-aware UIs for your home.
-*   **Easy Access**: Access via the new sidebar button or ask the Assistant.
-*   **Quick Trigger**: Use the FAB quick actions for instant generation.
+Experience high-fidelity, skeuomorphic visualizations generated in real-time. The **AI Visual Dashboard** allows you to dynamically request and rebuild your entire home interface using natural language.
+
+![AI Visual Dashboard](AI_Visual_Dashboard.gif)
+
+*   **No YAML, No Coding**: Because the system has deep access to your Home Assistant Entity Registry, it builds the dashboard autonomously. You don't need to manually configure cards or write a single line of YAML.
+*   **Dynamic Design**: Just tell the Architect Agent: *"Make a dashboard focused on energy usage with a dark oceanic theme"* or *"Build a 3-column view for my heating and security"* and watch it regenerate in seconds.
+*   **Advanced LLM Support**: Leverages both local (Ollama) and cloud-based (**Google Gemini**) advanced LLMs for stunning, context-aware UIs.
+*   **Quick Trigger**: Use the FAB quick actions for instant generation or access via the dedicated sidebar button.
 
 ---
 

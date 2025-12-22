@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.45 (Gemini Integration & Connectivity Robustness)
+**Version**: v0.9.47 (Gemini Integration & Connectivity Robustness)
 
 ## 🌟 Key Features
 
@@ -44,9 +44,14 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
 -   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
-### 6. AI Visual Dashboard (v0.9.45) 🎨
-The system now features a real-time, LLM-driven visualization engine.
+### 6. AI Visual Dashboard (v0.9.47) 🎨
+The system now features a real-time, LLM-driven visualization engine that builds your entire home interface using natural language.
+
+![AI Visual Dashboard](AI_Visual_Dashboard.gif)
+
 -   **Dynamic UI Generation**: Use local (Ollama) or state-of-the-art cloud models (**Google Gemini**) to generate bespoke, high-fidelity dashboards.
+-   **No YAML, No Coding**: Because the system has deep access to your Home Assistant Entity Registry, it builds the dashboard autonomously. You don't need to manually configure cards or write a single line of YAML.
+-   **Dynamic Design**: Just tell the Architect Agent: *"Make a dashboard focused on energy usage with a dark oceanic theme"* or *"Build a 3-column view for my heating and security"* and watch it regenerate in seconds.
 -   **Gemini Robotics Model**: Explicitly supports `gemini-robotics-er-1.5-preview` for advanced robotics-grade visualizations.
 -   **Mixergy-Style Visuals**: Features skeuomorphic designs like animated vertical water tanks, "Deep Ocean" themes, and glassmorphism.
 -   **Integrated Experience**: Access the dashboard directly via the new sidebar button or trigger it from the Chat Assistant quick actions.
