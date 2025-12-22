@@ -179,6 +179,11 @@ async def lifespan(app: FastAPI):
     disable_telemetry = True
     ha_access_token_opt = ""
     
+    # Gemini Options (Initialize to avoid NameError on failure)
+    gemini_api_key_opt = ""
+    use_gemini_dashboard_opt = False
+    gemini_model_name_opt = "gemini-1.5-pro"
+    
     options_path = Path("/data/options.json")
     if options_path.exists():
         try:
