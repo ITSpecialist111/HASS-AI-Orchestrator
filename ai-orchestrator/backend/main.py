@@ -340,7 +340,10 @@ async def lifespan(app: FastAPI):
         agents=agents,
         model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         planning_interval=int(os.getenv("DECISION_INTERVAL", "120")),
-        ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        gemini_api_key=os.getenv("GEMINI_API_KEY"),
+        use_gemini_for_dashboard=os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true",
+        gemini_model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-robotics-er-1.5-preview")
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
@@ -588,6 +591,9 @@ async def get_config():
         "smart_model": os.getenv("SMART_MODEL", "deepseek-r1:8b"),
         "fast_model": os.getenv("FAST_MODEL", "mistral:7b-instruct"),
         "version": VERSION,
+        "gemini_active": orchestrator.gemini_model is not None if orchestrator else False,
+        "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else False,
+        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else "gemini-1.5-pro",
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
         }
@@ -596,6 +602,9 @@ async def get_config():
 
 class UpdateConfigRequest(BaseModel):
     dry_run_mode: Optional[bool] = None
+    use_gemini_for_dashboard: Optional[bool] = None
+    gemini_api_key: Optional[str] = None
+    gemini_model_name: Optional[str] = None
 
 
 @app.patch("/api/config")
@@ -610,7 +619,31 @@ async def update_config(req: UpdateConfigRequest):
         else:
             raise HTTPException(status_code=503, detail="MCP Server not initialized")
             
-    return {"status": "success", "dry_run_mode": mcp_server.dry_run}
+    if orchestrator:
+        if req.use_gemini_for_dashboard is not None:
+            orchestrator.use_gemini_for_dashboard = req.use_gemini_for_dashboard
+            print(f"🔄 Runtime Config Update: Use Gemini for Dashboard set to {req.use_gemini_for_dashboard}")
+        
+        if req.gemini_api_key is not None:
+            import google.generativeai as genai
+            orchestrator.gemini_api_key = req.gemini_api_key
+            genai.configure(api_key=req.gemini_api_key)
+            # Re-init model with current or new model name
+            orchestrator.gemini_model = genai.GenerativeModel(orchestrator.gemini_model_name)
+            print(f"🔄 Runtime Config Update: Gemini API Key updated")
+
+        if req.gemini_model_name is not None:
+            import google.generativeai as genai
+            orchestrator.gemini_model_name = req.gemini_model_name
+            orchestrator.gemini_model = genai.GenerativeModel(req.gemini_model_name)
+            print(f"🔄 Runtime Config Update: Gemini Model set to {req.gemini_model_name}")
+
+    return {
+        "status": "success", 
+        "dry_run_mode": mcp_server.dry_run if mcp_server else None,
+        "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else None,
+        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else None
+    }
 
 
 @app.websocket("/ws")

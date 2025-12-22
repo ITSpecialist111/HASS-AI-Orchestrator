@@ -1,6 +1,15 @@
 # Changelog
 <br>
 
+## [0.9.43] - 2025-12-22
+### Added
+- **Gemini LLM Integration**: Added world-class LLM support for visual dashboard generation using Google Gemini.
+- **Model Choice**: Users can now choose between local Ollama and Gemini (highly recommended for high-fidelity designs).
+- **Robotics Preview Model**: Specifically added support for `gemini-robotics-er-1.5-preview` for advanced spatial and thermal visualizations.
+- **Integration Settings**: New configuration fields in the UI for Gemini API Key, Model Selection, and a prioritization toggle.
+- **Runtime Updates**: Gemini settings can be updated in-memory from the UI without requiring a full server restart.
+<br>
+
 ## [0.9.42] - 2025-12-22
 ### Added
 - **AI Visual Dashboard (Dynamic)**: Fully integrated natural language dashboard generation. Users can now command the dashboard style and focus via chat or a new dedicated UI tab.

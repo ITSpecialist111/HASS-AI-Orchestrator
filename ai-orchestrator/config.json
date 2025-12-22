@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.9.42",
+    "version": "0.9.43",
     "slug": "ai-orchestrator",
     "description": "Phase 6: Universal Agents, RAG, and No-Code Factory for Home Assistant",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -39,7 +39,10 @@
         "min_temp": 10.0,
         "max_temp": 30.0,
         "max_temp_change": 3.0,
-        "disable_telemetry": true
+        "disable_telemetry": true,
+        "gemini_api_key": "",
+        "use_gemini_for_dashboard": false,
+        "gemini_model_name": "gemini-robotics-er-1.5-preview"
     },
     "schema": {
         "ollama_host": "str",
@@ -57,6 +60,9 @@
         "min_temp": "float",
         "max_temp": "float",
         "max_temp_change": "float",
-        "disable_telemetry": "bool"
+        "disable_telemetry": "bool",
+        "gemini_api_key": "str?",
+        "use_gemini_for_dashboard": "bool",
+        "gemini_model_name": "str"
     }
 }

@@ -34,7 +34,10 @@ class Orchestrator:
         agents: Dict[str, any],
         model_name: str = "deepseek-r1:8b",
         planning_interval: int = 120,
-        ollama_host: str = "http://localhost:11434"
+        ollama_host: str = "http://localhost:11434",
+        gemini_api_key: Optional[str] = None,
+        use_gemini_for_dashboard: bool = False,
+        gemini_model_name: str = "gemini-1.5-pro"
     ):
         """
         Initialize orchestrator.
@@ -46,6 +49,10 @@ class Orchestrator:
             agents: Dict of {agent_id: agent_instance}
             model_name: Ollama model for planning (default: deepseek-r1:8b)
             planning_interval: Seconds between planning cycles
+            ollama_host: Host URL for Ollama API
+            gemini_api_key: Optional Google AI API Key
+            use_gemini_for_dashboard: Whether to prioritize Gemini for visual dashboard
+            gemini_model_name: Gemini model to use (default: gemini-1.5-pro)
         """
         self._ha_provider = ha_client
         self.mcp_server = mcp_server
@@ -91,11 +98,14 @@ class Orchestrator:
         self.dashboard_dir.mkdir(parents=True, exist_ok=True)
         
         # Gemini setup (optional)
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+        self.use_gemini_for_dashboard = use_gemini_for_dashboard or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
+        self.gemini_model_name = gemini_model_name or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
-            self.gemini_model = genai.GenerativeModel('gemini-1.5-pro')
-            logger.info("Gemini API detected - visual dashboard will use high-fidelity generation.")
+            self.gemini_model = genai.GenerativeModel(self.gemini_model_name)
+            logger.info(f"Gemini API detected - visual dashboard configured to use {self.gemini_model_name} (Active: {self.use_gemini_for_dashboard}).")
         else:
             self.gemini_model = None
             logger.info("No Gemini API key found - visual dashboard will fallback to Ollama.")
@@ -573,32 +583,42 @@ INSTRUCTIONS:
         
         # 2. Build Prompt (The 'Mixergy' style prompt)
         system_prompt = f"""
-You are a World-Class Data Visualization Expert and UI Designer.
-Your goal is to create a dynamic dashboard using a standalone HTML/Tailwind CSS file.
+You are a World-Class Data Visualization Expert and UI Designer specializing in High-End Smart Home Dashboards.
+Your goal is to create a dynamic, skeuomorphic dashboard using a standalone HTML/Tailwind CSS file.
 
 USER REQUESTED STYLE/FUNCTION: "{user_instruction}"
 
-VISUAL & LAYOUT REQUIREMENTS (IT MUST 'POP'):
-1. STYLE: Match the user's request. If none specified, use "Deep Ocean" aesthetic (Dark blue/slate bg-slate-900, glassmorphism, neon accents).
-2. COMPONENTS:
-    - Use Lucide Icons (via CDN) or SVG icons.
-    - Ensure smooth CSS transitions.
-    - Give cards a ring-2 glow effect and deep shadows.
-3. DATA HANDLING: 
-    - The HTML should be self-contained (JS/CSS/HTML).
-    - Map the provided Home Assistant entity states to the UI elements.
+DESIGN SPECIFICATION (IT MUST 'WOW' THE USER):
+1. THEME: Default is "Deep Ocean" (bg-slate-900, glassmorphism, neon blue/purple accents) unless the user requested otherwise.
+2. LAYOUT: Follow a 3-column grid unless specified otherwise:
+    - LEFT (Control): Compact cards for binary sensors and quick toggles.
+    - CENTER (Hero): A "Skeuomorphic Central Visual". For energy/water, use a pill-shaped glass tank (backdrop-blur-md) with a CSS gradient fill. 
+      - CRITICAL: Add animated rising bubbles (CSS @keyframes) if state is 'charging', 'heating', or 'active'.
+      - Use ring-2 glow effects for active containers.
+    - RIGHT (Analytics): Cost cards and performance stats with mini-charts (using CSS/divs or simple SVG).
+3. FIDELITY:
+    - Use Lucide Icons (via CDN: https://unpkg.com/lucide@latest).
+    - Implement heavy glassmorphism (backdrop-blur, border-white/20).
+    - Every level change must have a smooth CSS transition.
+    - Add "glow" accents (shadow-blue-500/50, text-shadow).
+
+DATA INTEGRATION:
+- Map the Home Assistant states provided below to these components.
+- If a sensor name contains 'charge' or 'hot water', map it to the Central Tank Visual.
 
 OUTPUT REQUIREMENTS:
 - Provide ONLY the complete, standalone HTML/CSS/JS code.
 - No markdown wrappers, no explanations. Just the HTML.
+- Ensure all CSS and JS are embedded in the single file.
 """
         user_prompt = f"Generate the following dashboard: {user_instruction}\n\nHome Assistant Data:\n\n{data_json}"
 
         # 3. Call LLM (Gemini preferred, Ollama fallback)
         html_content = ""
         try:
-            if self.gemini_model:
-                # Use Gemini 1.5 Pro for best design results
+            if self.gemini_model and self.use_gemini_for_dashboard:
+                # Use Gemini for best design results
+                logger.info(f"Generating dashboard using Gemini model: {self.gemini_model_name}")
                 response = self.gemini_model.generate_content([system_prompt, user_prompt])
                 html_content = response.text
             else:

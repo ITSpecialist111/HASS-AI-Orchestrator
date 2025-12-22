@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Shield, Terminal, Settings } from 'lucide-react';
+import { X, Shield, Terminal, Settings, Cpu, Key, Wand2 } from 'lucide-react';
 
 export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
     const [config, setConfig] = useState(currentConfig || { dry_run_mode: true });
@@ -9,26 +9,28 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
         if (currentConfig) setConfig(currentConfig);
     }, [currentConfig]);
 
-    const handleToggleDryRun = async () => {
-        const newValue = !config.dry_run_mode;
+    const updateConfigField = async (field, value) => {
         setLoading(true);
         try {
             const res = await fetch('api/config', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dry_run_mode: newValue })
+                body: JSON.stringify({ [field]: value })
             });
             if (res.ok) {
                 const data = await res.json();
-                setConfig(prev => ({ ...prev, dry_run_mode: data.dry_run_mode }));
-                if (onUpdate) onUpdate({ ...config, dry_run_mode: data.dry_run_mode });
+                setConfig(prev => ({ ...prev, ...data }));
+                if (onUpdate) onUpdate({ ...config, ...data });
             }
         } catch (e) {
-            console.error("Failed to update config", e);
+            console.error(`Failed to update ${field}`, e);
         } finally {
             setLoading(false);
         }
     };
+
+    const handleToggleDryRun = () => updateConfigField('dry_run_mode', !config.dry_run_mode);
+    const handleToggleGeminiDashboard = () => updateConfigField('use_gemini_for_dashboard', !config.use_gemini_for_dashboard);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -71,6 +73,48 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                         </p>
                         <div className="text-[10px] text-slate-500 italic border-t border-slate-700/50 pt-2">
                             Note: Toggling this here applies immediately but resets on server restart. To make it permanent, change "dry_run_mode" in the Add-on Configuration tab in Home Assistant.
+                        </div>
+                    </div>
+
+                    {/* Gemini Settings */}
+                    <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Wand2 size={18} className={config.use_gemini_for_dashboard ? 'text-blue-400' : 'text-slate-400'} />
+                                <h3 className="font-semibold text-slate-200">Use Gemini for Dashboard</h3>
+                            </div>
+                            <button
+                                onClick={handleToggleGeminiDashboard}
+                                disabled={loading}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${config.use_gemini_for_dashboard ? 'bg-blue-600' : 'bg-slate-700'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.use_gemini_for_dashboard ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Gemini API Key</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="password"
+                                        defaultValue={config.gemini_api_key || ""}
+                                        onBlur={(e) => updateConfigField('gemini_api_key', e.target.value)}
+                                        className="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 w-full focus:outline-none focus:border-blue-500/50"
+                                        placeholder="Paste your Google AI API Key..."
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Gemini Model</label>
+                                <input
+                                    type="text"
+                                    defaultValue={config.gemini_model_name || "gemini-robotics-er-1.5-preview"}
+                                    onBlur={(e) => updateConfigField('gemini_model_name', e.target.value)}
+                                    className="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 w-full focus:outline-none focus:border-blue-500/50"
+                                />
+                                <p className="text-[10px] text-slate-500 mt-1">Recommended: gemini-robotics-er-1.5-preview for high-fidelity robotics/vis.</p>
+                            </div>
                         </div>
                     </div>
 
