@@ -1,6 +1,13 @@
 # Changelog
 <br>
 
+## [0.9.44] - 2025-12-22
+### Fixed
+- **Chat Tool Execution**: Resolved `UnboundLocalError` (cannot access local variable 'params') when the AI Assistant triggers tools.
+- **Agent Persistence**: Standardized `agents.yaml` pathing to ensure agents created through the UI are saved to the persistent `/config/agents.yaml` in Home Assistant Add-on environments.
+<br>
+<br>
+
 ## [0.9.43] - 2025-12-22
 ### Added
 - **Gemini LLM Integration**: Added world-class LLM support for visual dashboard generation using Google Gemini.

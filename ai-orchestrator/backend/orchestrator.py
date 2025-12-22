@@ -510,9 +510,9 @@ INSTRUCTIONS:
                 for action in data["actions"]:
                     # Handle both tool naming conventions
                     tool_name = action.get("tool")
+                    params = action.get("parameters", {})
+                    
                     if tool_name in ["call_ha_service", "execute_service"]:
-                        params = action.get("parameters", {})
-                        
                         # Safety fallback
                         if not params.get("entity_id") and not params.get("area_id"):
                              # If missing, we might skip or let MCP catch it

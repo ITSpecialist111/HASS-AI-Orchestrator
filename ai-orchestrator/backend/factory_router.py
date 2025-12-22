@@ -38,12 +38,18 @@ async def generate_config(req: GenerateRequest, request: Request):
     config = await architect.generate_config(req.prompt)
     return config
 
+def get_config_path():
+    # Priority: /config/agents.yaml (Add-on persistent storage)
+    if os.path.exists("/config"):
+        return "/config/agents.yaml"
+    return "agents.yaml"
+
 @router.post("/save")
 async def save_agent(req: SaveRequest):
     """
     Appends the new agent config to agents.yaml and triggers a reload (optional)
     """
-    config_path = "agents.yaml"
+    config_path = get_config_path()
     new_agent = req.config
     
     try:
@@ -78,7 +84,7 @@ async def save_agent(req: SaveRequest):
 @router.delete("/agents/{agent_id}")
 async def delete_agent(agent_id: str, request: Request):
     """Delete an agent from configuration and memory"""
-    config_path = "agents.yaml"
+    config_path = get_config_path()
     
     try:
         # 1. Provide info to Orchestrator to stop the loop? 
@@ -118,7 +124,7 @@ class UpdateAgentRequest(BaseModel):
 @router.patch("/agents/{agent_id}")
 async def update_agent(agent_id: str, req: UpdateAgentRequest, request: Request):
     """Update an agent's configuration"""
-    config_path = "agents.yaml"
+    config_path = get_config_path()
     
     try:
         # 1. Update YAML

@@ -276,13 +276,19 @@ async def lifespan(app: FastAPI):
         return [e.strip() for e in raw.split(",") if e.strip()]
 
     # 5. Initialize Agents (Phase 5: Dynamic Loading)
-    def load_agents_from_config():
+    def get_agents_config_path():
         # Search priority: /config/agents.yaml (Persistent) -> local agents.yaml
         config_paths = ["/config/agents.yaml", "agents.yaml"]
-        config_path = next((p for p in config_paths if os.path.exists(p)), None)
+        # If /config exists, we are in an add-on and should prefer it for persistence
+        if os.path.exists("/config"):
+            return "/config/agents.yaml"
+        return next((p for p in config_paths if os.path.exists(p)), "agents.yaml")
+
+    def load_agents_from_config():
+        config_path = get_agents_config_path()
         
-        if not config_path:
-            print(f"⚠️ No agent config found in {config_paths}, skipping dynamic agents.")
+        if not os.path.exists(config_path) and config_path == "agents.yaml":
+            print(f"⚠️ No agent config found, skipping dynamic agents.")
             return
         
         print(f"🔍 Loading agents from {config_path}...")
