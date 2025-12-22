@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.9.9 (Parameter Mapping & Diagnostics)
+**Current Version**: v0.9.45 (Gemini Intelligence & Multi-Provider Video)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 
@@ -17,6 +17,7 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 -   [x] **RAG Optimization**: Delta-based ingestion for instant startup. (v0.9.1)
 -   [x] **Configurable Security**: Domain blocking and hardware limits via UI. (v0.9.5)
 -   [x] **Visual Dashboard Integration**: Sidebar access and quick actions. (v0.9.5)
+-   [x] **Gemini Intelligence Provider**: Integrated Google Gemini for high-fidelity dashboards. (v0.9.43)
 -   [ ] **Voice Interface**: Real-time voice interaction via Home Assistant Assist pipeline. (v1.0)
 
 ### 2. Voice Integration (HA Assist)

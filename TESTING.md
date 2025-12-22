@@ -11,6 +11,8 @@ Comprehensive smoke tests created for validating core Phase 1 functionality.
 - ✅ `test_mcp_smoke.py` - MCP server tests (10 tests)
 - ✅ `test_agent_smoke.py` - Agent framework tests (6 tests)
 - ✅ `test_config_smoke.py` - Configuration tests (7 tests)
+- ✅ `test_gemini_smoke.py` - Gemini Integration tests
+- ✅ `test_dashboard_smoke.py` - Visual Dashboard Generation tests
 - ✅ `tests/test_hass_client_integration.py` - HASS Client Protocol tests
 - ✅ `tests/test_universal_agent_hass_integration.py` - Universal Agent Integration tests
 - ✅ `tests/__init__.py` - Package init

@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.13 (Port Sync & Stability)
+**Version**: v0.9.45 (Gemini Integration & Connectivity Robustness)
 
 ## 🌟 Key Features
 
@@ -44,12 +44,14 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
 -   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
-### 6. AI Visual Dashboard (v0.9.5) 🎨
+### 6. AI Visual Dashboard (v0.9.45) 🎨
 The system now features a real-time, LLM-driven visualization engine.
--   **Dynamic UI Generation**: Use local or cloud-based LLMs to generate bespoke, high-fidelity dashboards.
+-   **Dynamic UI Generation**: Use local (Ollama) or state-of-the-art cloud models (**Google Gemini**) to generate bespoke, high-fidelity dashboards.
+-   **Gemini Robotics Model**: Explicitly supports `gemini-robotics-er-1.5-preview` for advanced robotics-grade visualizations.
 -   **Mixergy-Style Visuals**: Features skeuomorphic designs like animated vertical water tanks, "Deep Ocean" themes, and glassmorphism.
 -   **Integrated Experience**: Access the dashboard directly via the new sidebar button or trigger it from the Chat Assistant quick actions.
 -   **Context-Aware**: The dashboard reflects live Home Assistant data and AI decision logic directly in its layout.
+-   **Runtime Settings**: Dynamically toggle between Ollama and Gemini, and update API keys directly in the **Settings Modal** without restarting.
 
 ---
 
@@ -70,6 +72,7 @@ The system now features a real-time, LLM-driven visualization engine.
     *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
     *   **Cloud AI API Key**: (Optional) Add your Google AI API key for high-fidelity "AI Visual Dashboard" generation.
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
+    *   **Direct Access Mode**: Automatically falls back to Direct Core Access (e.g., `http://homeassistant:8123`) if the Supervisor Proxy is unavailable or tokens are mismatched.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
 4.  **Start**: The first startup determines your available hardware and ingests your entities into the Knowledge Base.
     *   **First Run**: May take ~1 minute to embed all entities.

@@ -1,6 +1,6 @@
 # AI Visual Dashboard
 
-This is a standalone module for the AI Orchestrator to generate dynamic, visually rich Home Assistant dashboards using LLMs.
+This is the visualization engine for the **AI Orchestrator**, responsible for generating dynamic, visually rich Home Assistant dashboards using LLMs. While integrated into the main orchestrator, it can also be tested as a standalone module.
 
 ## Features
 - **Dynamic Visualization**: Uses LLMs (Local or Cloud) to transform raw HA entity data into a beautiful HTML/Tailwind dashboard.
