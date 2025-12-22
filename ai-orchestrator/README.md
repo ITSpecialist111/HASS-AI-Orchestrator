@@ -47,7 +47,7 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 ### 6. AI Visual Dashboard (v0.9.47) 🎨
 The system now features a real-time, LLM-driven visualization engine that builds your entire home interface using natural language.
 
-![AI Visual Dashboard](AI_Visual_Dashboard.gif)
+![AI Visual Dashboard](../AI_Visual_Dashboard.gif)
 
 -   **Dynamic UI Generation**: Use local (Ollama) or state-of-the-art cloud models (**Google Gemini**) to generate bespoke, high-fidelity dashboards.
 -   **No YAML, No Coding**: Because the system has deep access to your Home Assistant Entity Registry, it builds the dashboard autonomously. You don't need to manually configure cards or write a single line of YAML.
