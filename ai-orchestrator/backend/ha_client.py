@@ -38,6 +38,19 @@ class HAWebSocketClient:
         parsed = urlparse(self.ha_url)
         ws_scheme = "wss" if parsed.scheme == "https" else "ws"
         self.ws_url = f"{ws_scheme}://{parsed.netloc}{parsed.path}/api/websocket"
+        self._closing = False
+    
+    async def disconnect(self):
+        """Disconnect from Home Assistant"""
+        self._closing = True
+        self.connected = False
+        if self.ws:
+            try:
+                await self.ws.close()
+            except:
+                pass
+            self.ws = None
+        print("📡 HA Client disconnected")
     
     async def connect(self):
         """Connect to Home Assistant WebSocket API and authenticate"""
@@ -82,8 +95,15 @@ class HAWebSocketClient:
             asyncio.create_task(self._receive_messages())
             
         except Exception as e:
-            print(f"❌ Failed to connect to Home Assistant WebSocket at {self.ws_url}: {repr(e)}")
+            if not self._closing:
+                print(f"❌ Failed to connect to Home Assistant WebSocket at {self.ws_url}: {repr(e)}")
             self.connected = False
+            if self.ws:
+                try:
+                    await self.ws.close()
+                except:
+                    pass
+                self.ws = None
             raise
     
     async def wait_until_connected(self, timeout: float = 30.0):
@@ -130,10 +150,31 @@ class HAWebSocketClient:
         
         except websockets.exceptions.ConnectionClosed:
             self.connected = False
-            print("⚠️ WebSocket connection closed")
+            if not self._closing:
+                print("⚠️ HA WebSocket connection closed")
         except Exception as e:
             self.connected = False
-            print(f"❌ Error receiving messages: {e}")
+            if not self._closing:
+                print(f"❌ Error receiving HA messages: {e}")
+        finally:
+            self.connected = False
+    
+    async def run_reconnect_loop(self):
+        """Infinite loop to maintain connection to Home Assistant"""
+        print("🔄 HA Reconnection loop started")
+        while not self._closing:
+            if not self.connected:
+                print("📡 Reconnecting to Home Assistant...")
+                try:
+                    await self.connect()
+                    print("✅ HA Reconnected successfully")
+                except Exception as e:
+                    # Connection failed, wait and try again
+                    # Log less aggressively for retry failures
+                    pass
+            
+            # Check connection every 10 seconds or wait if we just failed
+            await asyncio.sleep(10)
     
     async def get_states(self, entity_id: Optional[str] = None, timeout: float = 60.0) -> Dict | list:
         """

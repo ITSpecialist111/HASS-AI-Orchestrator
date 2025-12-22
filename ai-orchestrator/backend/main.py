@@ -255,19 +255,19 @@ async def lifespan(app: FastAPI):
         supervisor_token=header_token
     )
     
-    # 3. Start HA Client (Short wait to catch early errors, then continue in background)
+    # 3. Start HA Client with Reconnection Loop
     try:
-        connect_task = asyncio.create_task(ha_client.connect())
+        # Start the background reconnection loop
+        asyncio.create_task(ha_client.run_reconnect_loop())
+        
         # Wait up to 5s for early feedback
-        done, pending = await asyncio.wait([connect_task], timeout=5.0)
-        if connect_task in done:
-             # If it finished early, it might have failed or succeeded
-             if not ha_client.connected:
-                 print("⚠️ HA Client did not connect within initial 5s burst. Continuing in background...")
+        connected = await ha_client.wait_until_connected(timeout=5.0)
+        if not connected:
+            print("⚠️ HA Client did not connect within initial 5s burst. Reconnection loop will continue in background...")
         else:
-             print("📡 HA Client connection in progress...")
+            print("✅ HA Client connected successfully")
     except Exception as e:
-        print(f"❌ Critical error during HA client startup: {e}")
+        print(f"❌ Error during HA client background startup initialization: {e}")
 
     print(f"✓ HA Client configured (URL: {ha_url})")
 
