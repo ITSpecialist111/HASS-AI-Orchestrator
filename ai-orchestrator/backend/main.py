@@ -187,7 +187,14 @@ async def lifespan(app: FastAPI):
                 dry_run = opts.get("dry_run_mode", True)
                 disable_telemetry = opts.get("disable_telemetry", True)
                 ha_access_token_opt = opts.get("ha_access_token", "").strip()
+                
+                # Gemini Options
+                gemini_api_key_opt = opts.get("gemini_api_key", "").strip()
+                use_gemini_dashboard_opt = opts.get("use_gemini_for_dashboard", False)
+                gemini_model_name_opt = opts.get("gemini_model_name", "gemini-1.5-pro")
+                
                 print(f"DEBUG: Read dry_run={dry_run}, disable_telemetry={disable_telemetry}, has_token={bool(ha_access_token_opt)} from options.json")
+                print(f"DEBUG: Gemini: has_key={bool(gemini_api_key_opt)}, use_for_dash={use_gemini_dashboard_opt}, model={gemini_model_name_opt}")
         except Exception as e:
             print(f"⚠️ Failed to read options.json: {e}")
             # Fallback to env var
@@ -195,6 +202,9 @@ async def lifespan(app: FastAPI):
     else:
         # Fallback to env var
         dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+        gemini_api_key_opt = os.getenv("GEMINI_API_KEY", "")
+        use_gemini_dashboard_opt = os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
+        gemini_model_name_opt = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
 
     # Diagnostics
     print(f"DEBUG: ENV - SUPERVISOR_TOKEN: {bool(os.getenv('SUPERVISOR_TOKEN'))}")
@@ -239,7 +249,21 @@ async def lifespan(app: FastAPI):
         token=ha_token,
         supervisor_token=header_token
     )
-    asyncio.create_task(ha_client.connect())
+    
+    # 3. Start HA Client (Short wait to catch early errors, then continue in background)
+    try:
+        connect_task = asyncio.create_task(ha_client.connect())
+        # Wait up to 5s for early feedback
+        done, pending = await asyncio.wait([connect_task], timeout=5.0)
+        if connect_task in done:
+             # If it finished early, it might have failed or succeeded
+             if not ha_client.connected:
+                 print("⚠️ HA Client did not connect within initial 5s burst. Continuing in background...")
+        else:
+             print("📡 HA Client connection in progress...")
+    except Exception as e:
+        print(f"❌ Critical error during HA client startup: {e}")
+
     print(f"✓ HA Client configured (URL: {ha_url})")
 
     # 3. Initialize RAG & Knowledge Base (Phase 3)
@@ -347,9 +371,9 @@ async def lifespan(app: FastAPI):
         model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         planning_interval=int(os.getenv("DECISION_INTERVAL", "120")),
         ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY"),
-        use_gemini_for_dashboard=os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true",
-        gemini_model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-robotics-er-1.5-preview")
+        gemini_api_key=gemini_api_key_opt or os.getenv("GEMINI_API_KEY"),
+        use_gemini_for_dashboard=use_gemini_dashboard_opt or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true",
+        gemini_model_name=gemini_model_name_opt or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     

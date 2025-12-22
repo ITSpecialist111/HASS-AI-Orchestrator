@@ -634,36 +634,54 @@ OUTPUT REQUIREMENTS:
             
             # Clean up markdown code blocks if present
             import re
-            html_content = re.sub(r'^```html\s*', '', html_content, flags=re.MULTILINE)
-            html_content = re.sub(r'^```\s*$', '', html_content, flags=re.MULTILINE)
+            # Improved regex to handle various markdown styles and ensure no extra noise
+            html_content = re.sub(r'```html\s*', '', html_content, flags=re.IGNORECASE)
+            html_content = re.sub(r'```\s*', '', html_content)
             html_content = html_content.strip()
             
+            # Simple validation: if it doesn't look like HTML, it might be an error message
+            if not html_content.lower().startswith("<!doctype") and not html_content.lower().startswith("<html"):
+                logger.warning(f"⚠️ Generated content does not look like HTML. Length: {len(html_content)}")
+
             # 4. Save to /data/dashboard/dynamic.html
             output_path = self.dashboard_dir / "dynamic.html"
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
             
-            logger.info(f"✅ Dynamic dashboard generated at {output_path}")
+            logger.info(f"✅ Dynamic dashboard generated at {output_path} ({len(html_content)} bytes)")
             return html_content
             
         except Exception as e:
+            # Handle Gemini specific response errors
+            error_msg = str(e)
+            if "finish_reason: SAFETY" in error_msg:
+                error_msg = "Gemini Safety Filter blocked the generation. Try a different prompt."
+            
             host_info = getattr(self.ollama_client, '_client', {}).get('base_url', 'unknown') if hasattr(self.ollama_client, '_client') else 'unknown'
-            logger.error(f"❌ Failed to generate dashboard: {e} (Host: {host_info})")
+            logger.error(f"❌ Failed to generate dashboard: {error_msg} (Host: {host_info})")
+            
             fallback_html = f"""
             <html>
-            <body style="background: #0f172a; color: #f1f5f9; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column;">
-                <h1 style="color: #ef4444;">Dashboard Generation Failed</h1>
-                <p><b>Error:</b> {str(e)}</p>
-                <div style="background: #1e293b; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 20px; border-left: 4px solid #ef4444;">
-                    <b>Diagnostics:</b><br/>
-                    - LLM Host: <code>{host_info}</code><br/>
-                    - Model: <code>{self.model_name}</code><br/>
-                    - Gemini API: <code>{'Enabled' if self.gemini_model else 'Disabled (Falling back to local)'}</code>
+            <body style="background: #0f172a; color: #f1f5f9; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; text-align: center; padding: 20px;">
+                <div style="font-size: 64px; margin-bottom: 20px;">🎨</div>
+                <h1 style="color: #ef4444; margin-bottom: 10px;">Dashboard Generation Failed</h1>
+                <p style="color: #94a3b8; max-width: 500px; margin-bottom: 30px;">{error_msg}</p>
+                
+                <div style="background: #1e293b; padding: 24px; border-radius: 12px; font-family: monospace; font-size: 13px; text-align: left; border-left: 4px solid #ef4444; max-width: 600px; width: 100%;">
+                    <b style="color: #f8fafc; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Diagnostics:</b><br/>
+                    <div style="margin-top: 12px; display: grid; grid-template-cols: 120px 1fr; gap: 8px;">
+                        <span style="color: #64748b;">LLM Host:</span> <code>{host_info}</code>
+                        <span style="color: #64748b;">Model:</span> <code>{self.model_name}</code>
+                        <span style="color: #64748b;">Gemini API:</span> <code>{'Enabled' if self.gemini_model else 'Disabled (Falling back to local)'}</code>
+                        <span style="color: #64748b;">Gemini Active:</span> <code>{self.use_gemini_for_dashboard}</code>
+                        <span style="color: #64748b;">HA Status:</span> <code>{'Connected' if self.ha_client and self.ha_client.connected else 'Disconnected'}</code>
+                    </div>
                 </div>
-                <div style="margin-top: 20px; max-width: 600px; text-align: center;">
-                    <p>If you see "No route to host" or "Connection refused", ensure your <b>Ollama Host</b> matches your LAN IP if running in Docker.</p>
+                
+                <div style="margin-top: 30px; display: flex; gap: 12px;">
+                    <button onclick="window.location.reload()" style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s;">Try Again</button>
+                    <button onclick="window.parent.postMessage('open-config', '*')" style="background: #334155; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold;">Check Config</button>
                 </div>
-                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Try Again</button>
             </body>
             </html>
             """

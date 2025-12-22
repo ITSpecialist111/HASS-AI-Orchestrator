@@ -82,7 +82,7 @@ class HAWebSocketClient:
             asyncio.create_task(self._receive_messages())
             
         except Exception as e:
-            print(f"❌ Failed to connect to Home Assistant WebSocket: {e}")
+            print(f"❌ Failed to connect to Home Assistant WebSocket at {self.ws_url}: {repr(e)}")
             self.connected = False
             raise
     
@@ -98,10 +98,9 @@ class HAWebSocketClient:
     async def _send_message(self, message: Dict) -> int:
         """Send message to HA and return message ID"""
         if not self.ws or not self.connected:
-            # Instead of raising RuntimeError which crashes the caller, 
-            # we log and return 0 (invalid ID) to signal failure safely.
-            print(f"⚠️ Cannot send message (disconnected): {message.get('type')}")
-            return 0
+            # Raising an error forces the caller to handle the disconnection immediately
+            # rather than waiting for a timeout.
+            raise RuntimeError(f"Cannot send message ({message.get('type')}): Home Assistant not connected")
         
         try:
             self.message_id += 1
