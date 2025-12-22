@@ -36,7 +36,7 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
         { id: 'stream', label: 'Decision Stream', icon: Activity },
         { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         { id: 'factory', label: 'Agent Factory', icon: Bot },
-        { id: 'visual', label: 'Visual Dashboard', icon: Server, isLink: true, url: 'api/dashboard/dynamic?refresh=true' },
+        { id: 'visual', label: 'Visual Dashboard', icon: Server },
     ];
 
     return (

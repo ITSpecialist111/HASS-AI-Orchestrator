@@ -344,9 +344,10 @@ async def lifespan(app: FastAPI):
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
-    # 7. Start Orchestrator Loop
+    # 7. Start Orchestrator Loops
     asyncio.create_task(orchestrator.run_planning_loop())
-    print("✓ Orchestration loop started")
+    asyncio.create_task(orchestrator.run_dashboard_refresh_loop())
+    print("✓ Orchestration & Dashboard loops started")
     
     # 7.5 Start Specialist Agent Loops (Autonomous Mode)
     for agent_id, agent in agents.items():
@@ -532,10 +533,8 @@ async def handle_approval(request_id: str, action: str):
 async def get_dynamic_dashboard(refresh: bool = False):
     """Serve the latest dynamic visual dashboard"""
     try:
-        path = Path("/data/dashboard/dynamic.html")
-        if not path.exists():
-            path = Path(__file__).parent.parent / "data" / "dashboard" / "dynamic.html"
-            
+        path = orchestrator.dashboard_dir / "dynamic.html"
+        
         # Force refresh or auto-retry if it's an old failure page
         should_generate = refresh or not path.exists()
         

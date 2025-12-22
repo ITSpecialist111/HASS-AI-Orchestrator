@@ -80,8 +80,14 @@ class Orchestrator:
         self.decision_log_dir.mkdir(parents=True, exist_ok=True)
         
         self.dashboard_dir = Path("/data/dashboard")
-        if not os.access("/", os.W_OK) and not self.dashboard_dir.exists():
-            self.dashboard_dir = Path(__file__).parent.parent / "data" / "dashboard"
+        # Check if we are in a HA Add-on environment (which has /data)
+        # On Windows, Path("/") resolves to C:\ which might exist but we want to stay in workspace for local dev
+        is_addon = os.path.exists("/data") and os.access("/data", os.W_OK)
+        
+        if not is_addon:
+             # Fallback to workspace-local data directory
+             self.dashboard_dir = Path(__file__).parent.parent / "data" / "dashboard"
+        
         self.dashboard_dir.mkdir(parents=True, exist_ok=True)
         
         # Gemini setup (optional)
@@ -93,6 +99,9 @@ class Orchestrator:
         else:
             self.gemini_model = None
             logger.info("No Gemini API key found - visual dashboard will fallback to Ollama.")
+            
+        self.last_dashboard_instruction = "Mixergy-style smart home dashboard"
+        self.dashboard_refresh_interval = int(os.getenv("DASHBOARD_REFRESH_INTERVAL", "300")) # 5 minutes
         
         logger.info(f"Orchestrator initialized with model: {model_name}")
         logger.info(f"Managing {len(agents)} specialist agents: {list(agents.keys())}")
@@ -128,6 +137,21 @@ class Orchestrator:
             except Exception as e:
                 logger.error(f"Error in planning loop: {e}", exc_info=True)
                 await asyncio.sleep(self.planning_interval)
+
+    async def run_dashboard_refresh_loop(self):
+        """Periodically refresh the visual dashboard with latest states"""
+        logger.info(f"Starting dashboard refresh loop (interval: {self.dashboard_refresh_interval}s)")
+        # Small delay to let system initialize
+        await asyncio.sleep(10)
+        
+        while True:
+            try:
+                # Only refresh if the file exists or if we have an instruction
+                await self.generate_visual_dashboard(user_instruction=self.last_dashboard_instruction)
+                await asyncio.sleep(self.dashboard_refresh_interval)
+            except Exception as e:
+                logger.error(f"Error in dashboard refresh loop: {e}")
+                await asyncio.sleep(self.dashboard_refresh_interval)
     
     async def execute_workflow(self):
         """Execute one complete workflow cycle"""
@@ -427,6 +451,7 @@ CURRENT HOME STATE:
 
 AVAILABLE TOOLS:
 - call_ha_service: Execute Home Assistant services. Params: domain, service, entity_id, service_data.
+- generate_visual_dashboard: Create or update the dynamic visual dashboard. Params: user_instruction (string describing the dashboard style or purpose).
 
 USER MESSAGE: "{user_message}"
 
@@ -493,6 +518,15 @@ INSTRUCTIONS:
                             execution_results.append({"tool": summary, "result": res})
                         except Exception as tool_err:
                             execution_results.append({"tool": "Failed", "error": str(tool_err)})
+                    
+                    elif tool_name == "generate_visual_dashboard" or (tool_name == "execute_tool" and params.get("tool_name") == "generate_visual_dashboard"):
+                        user_inst = params.get("user_instruction", self.last_dashboard_instruction)
+                        self.last_dashboard_instruction = user_inst
+                        try:
+                            html = await self.generate_visual_dashboard(user_instruction=user_inst)
+                            execution_results.append({"tool": "Generated Dashboard", "result": f"Length: {len(html)} bytes"})
+                        except Exception as dash_err:
+                            execution_results.append({"tool": "Dashboard Failed", "error": str(dash_err)})
 
             return {
                 "response": data.get("response", "I've processed your request."),
@@ -511,15 +545,24 @@ INSTRUCTIONS:
                 "response": f"I encountered an unexpected error: {str(e)}",
                 "actions_executed": []
             }
-    async def generate_visual_dashboard(self) -> str:
+    async def generate_visual_dashboard(self, user_instruction: str = "Mixergy-style smart home dashboard") -> str:
         """
-        Generate a high-fidelity 'Mixergy-style' dashboard based on current home state.
+        Generate a high-fidelity dashboard based on current home state and user instructions.
         Returns the generated HTML.
         """
         logger.info("🎨 Generating dynamic visual dashboard...")
         
-        # 1. Gather Context (Similar to chat but specifically for visualization)
-        states = await self.ha_client.get_states()
+        # 1. Gather Context
+        client = self.ha_client
+        if not client or not client.connected:
+            logger.warning("⚠️ Cannot generate dashboard: Home Assistant not connected.")
+            raise Exception("Home Assistant not connected. Please check your configuration.")
+
+        states = await client.get_states()
+        
+        if not states:
+            logger.warning("⚠️ No entities found in Home Assistant.")
+            raise Exception("No entities found. Check if your Home Assistant user has access to any entities.")
         
         # Filter for interesting entities (Energy, Climate, Security, etc.)
         relevant_domains = ['sensor', 'climate', 'light', 'binary_sensor', 'switch', 'lock']
@@ -529,24 +572,19 @@ INSTRUCTIONS:
         data_json = json.dumps(relevant_states[:30], indent=2)
         
         # 2. Build Prompt (The 'Mixergy' style prompt)
-        system_prompt = """
+        system_prompt = f"""
 You are a World-Class Data Visualization Expert and UI Designer.
-Your goal is to create a "Mixergy Smart Dashboard" (Dashboard View) using a standalone HTML/Tailwind CSS file.
+Your goal is to create a dynamic dashboard using a standalone HTML/Tailwind CSS file.
+
+USER REQUESTED STYLE/FUNCTION: "{user_instruction}"
 
 VISUAL & LAYOUT REQUIREMENTS (IT MUST 'POP'):
-1. STYLE: "Deep Ocean" aesthetic. Dark blue/slate backgrounds (bg-slate-900), glassmorphism (backdrop-blur-md), and neon accents.
-2. LAYOUT: A 3-column grid:
-    - LEFT (Control): "Energy Logic" flow (inputs from Grid/Battery/Solar leading to a decision) and "Quick Actions" (Buttons like Shower/Bath).
-    - CENTER (Hero): A "TankVisual" component. This is a vertical pill-shaped glass tank. 
-      - Use a CSS gradient (blue to cyan) that fills up based on the 'charge' level % or 'hot water' status.
-      - If heating is active, add animated rising bubbles (CSS animations).
-      - Add backdrop-blur to the tank glass and a ring-2 glow effect using Tailwind for active state.
-    - RIGHT (Analytics): Cost cards (comparing Electric vs Gas rates) and efficiency stats.
-3. COMPONENTS:
+1. STYLE: Match the user's request. If none specified, use "Deep Ocean" aesthetic (Dark blue/slate bg-slate-900, glassmorphism, neon accents).
+2. COMPONENTS:
     - Use Lucide Icons (via CDN) or SVG icons.
-    - Ensure smooth CSS transitions when levels change.
+    - Ensure smooth CSS transitions.
     - Give cards a ring-2 glow effect and deep shadows.
-4. DATA HANDLING: 
+3. DATA HANDLING: 
     - The HTML should be self-contained (JS/CSS/HTML).
     - Map the provided Home Assistant entity states to the UI elements.
 
@@ -554,7 +592,7 @@ OUTPUT REQUIREMENTS:
 - Provide ONLY the complete, standalone HTML/CSS/JS code.
 - No markdown wrappers, no explanations. Just the HTML.
 """
-        user_prompt = f"Generate the Mixergy Smart Dashboard for these Home Assistant entities:\n\n{data_json}"
+        user_prompt = f"Generate the following dashboard: {user_instruction}\n\nHome Assistant Data:\n\n{data_json}"
 
         # 3. Call LLM (Gemini preferred, Ollama fallback)
         html_content = ""

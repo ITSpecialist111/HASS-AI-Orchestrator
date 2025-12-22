@@ -5,6 +5,7 @@ import { AnalyticsCharts } from './components/AnalyticsCharts'
 import { AgentFactory } from './components/AgentFactory'
 import { DecisionStream } from './components/DecisionStream'
 import { ChatAssistant } from './components/ChatAssistant'
+import { VisualDashboard } from './components/VisualDashboard'
 import './index.css'
 
 function App() {
@@ -142,6 +143,8 @@ function App() {
                         setActiveTab('live') // Redirect to live view after creation
                     }}
                 />
+            case 'visual':
+                return <VisualDashboard />
             default:
                 return <AgentGrid agents={agents} />
         }

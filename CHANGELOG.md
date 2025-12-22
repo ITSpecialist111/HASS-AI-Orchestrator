@@ -1,4 +1,15 @@
 # Changelog
+<br>
+
+## [0.9.42] - 2025-12-22
+### Added
+- **AI Visual Dashboard (Dynamic)**: Fully integrated natural language dashboard generation. Users can now command the dashboard style and focus via chat or a new dedicated UI tab.
+- **Dynamic AI Prompting**: The Orchestrator now uses specific user instructions (e.g., "cyberpunk style", "security-focused") to architect the dashboard's HTML/CSS.
+- **Background Refresh**: Implemented a periodic background loop that refreshes dashboard data every 5 minutes while preserving the user's requested aesthetic.
+- **Direct UI Integration**: Dashboard is now a first-class citizen of the main UI, rendered via iframe with dedicated refresh controls.
+### Fixed
+- **Windows Pathing**: Resolved path normalization issues for `dynamic.html` on Windows, ensuring reliable dashboard file retrieval outside the Add-on environment.
+- **Connectivity Guards**: Added safeguards to ensure Home Assistant is connected before attempting dashboard generation, preventing empty "no results" views.
 
 ## [0.9.41] - 2025-12-21
 ### Fixed
