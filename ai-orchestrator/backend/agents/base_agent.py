@@ -157,12 +157,19 @@ class BaseAgent(ABC):
                 messages=[{"role": "user", "content": prompt}],
                 options={
                     "temperature": temperature,
-                    "num_predict": max_tokens
+                    "num_predict": max_tokens,
+                    "think": False  # Disable internal reasoning tags (Issue #12)
                 },
                 stream=False
             )
             
-            return response["message"]["content"]
+            content = response["message"]["content"]
+            
+            # Strip any remaining <think>...</think> blocks (Issue #12 failsafe)
+            import re
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+            
+            return content.strip()
         
         except Exception as e:
             print(f"❌ LLM call failed: {e}")
