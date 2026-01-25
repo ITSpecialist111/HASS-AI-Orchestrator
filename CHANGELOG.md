@@ -1,6 +1,17 @@
 # Changelog
 <br>
 
+## [0.9.48] - 2026-01-25
+### Added
+- **OpenAI Provider**: Provider abstraction with OpenAI support and runtime toggles.
+- **Runtime OpenAI Config**: `/api/config` PATCH fields and `/api/config/openai` status endpoint.
+- **Optional Dependencies**: Guards for missing LangGraph/ChromaDB during tests.
+### Fixed
+- **Provider Routing**: Unified LLM calls through provider interface for agents/orchestrator/RAG.
+- **Test Stability**: Updated smoke tests and async marker registration for strict marker mode.
+<br>
+<br>
+
 ## [0.9.45] - 2025-12-22
 ### Fixed
 - **HA Connectivity Robustness**: Improved error logging in `ha_client.py` with full URI and exception details. Added a startup wait period in `main.py` to prevent race conditions during early ingestion.
