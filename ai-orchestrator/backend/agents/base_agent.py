@@ -7,11 +7,12 @@ import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
+import pathlib as _pathlib
 from typing import Dict, List, Optional, Any
 
-import ollama
 from ha_client import HAWebSocketClient
 from mcp_server import MCPServer
+from providers.local_provider import LocalProvider
 
 
 class BaseAgent(ABC):
@@ -30,7 +31,8 @@ class BaseAgent(ABC):
         rag_manager: Optional[Any] = None,
         model_name: str = "mistral:7b-instruct",
         decision_interval: int = 120,
-        broadcast_func: Optional[Any] = None
+        broadcast_func: Optional[Any] = None,
+        llm_provider: Optional[Any] = None
     ):
         """
         Initialize base agent.
@@ -65,12 +67,15 @@ class BaseAgent(ABC):
         # Load skills from SKILLS.md
         self.skills = self.load_skills()
         
-        # Ollama client
-        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self.ollama_client = ollama.Client(host=ollama_host)
+        # LLM provider (local by default)
+        if llm_provider:
+            self.llm_provider = llm_provider
+        else:
+            ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            self.llm_provider = LocalProvider(ollama_host=ollama_host)
         
         # Decision storage
-        self.decision_dir = Path("/data/decisions") / agent_id
+        self.decision_dir = _pathlib.Path("/data/decisions") / agent_id
         self.decision_dir.mkdir(parents=True, exist_ok=True)
     
     def load_skills(self) -> Dict:
@@ -152,7 +157,7 @@ class BaseAgent(ABC):
             Generated text
         """
         try:
-            response = self.ollama_client.chat(
+            response = self.llm_provider.chat(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
                 options={

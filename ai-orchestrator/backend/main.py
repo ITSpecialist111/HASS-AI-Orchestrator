@@ -22,7 +22,7 @@ import json
 import asyncio
 import httpx
 import socket
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -91,6 +91,8 @@ from approval_queue import ApprovalQueue
 from orchestrator import Orchestrator
 from rag_manager import RagManager
 from knowledge_base import KnowledgeBase
+from providers.local_provider import LocalProvider
+from providers.openai_provider import OpenAIProvider
 
 # Agents
 from agents.heating_agent import HeatingAgent
@@ -114,6 +116,15 @@ rag_manager: Optional[RagManager] = None
 knowledge_base: Optional[KnowledgeBase] = None
 agents: Dict[str, object] = {}
 dashboard_clients: List[WebSocket] = []
+openai_active: bool = False
+openai_provider: Optional[Any] = None
+local_provider: Optional[Any] = None
+openai_api_key: str = ""
+openai_fast_model: str = "gpt-4o-mini"
+openai_smart_model: str = "gpt-4o"
+openai_embedding_model: str = "text-embedding-3-small"
+use_openai_for_dashboard: bool = False
+heating_agent: Optional[object] = None
 
 # Load version from config.json
 VERSION = "0.0.0"
@@ -169,7 +180,9 @@ class ApprovalRequestResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks"""
-    global ha_client, mcp_server, approval_queue, orchestrator, agents
+    global ha_client, mcp_server, approval_queue, orchestrator, agents, openai_active
+    global openai_provider, local_provider, openai_api_key, openai_fast_model
+    global openai_smart_model, openai_embedding_model, use_openai_for_dashboard
     
     print("🚀 Starting AI Orchestrator backend (Phase 2 Multi-Agent)...")
     
@@ -183,6 +196,14 @@ async def lifespan(app: FastAPI):
     gemini_api_key_opt = ""
     use_gemini_dashboard_opt = False
     gemini_model_name_opt = "gemini-1.5-pro"
+
+    # OpenAI Options
+    openai_api_key_opt = ""
+    use_openai_opt = False
+    openai_fast_model_opt = "gpt-4o-mini"
+    openai_smart_model_opt = "gpt-4o"
+    openai_embedding_model_opt = "text-embedding-3-small"
+    use_openai_for_dashboard_opt = False
     
     options_path = Path("/data/options.json")
     if options_path.exists():
@@ -197,6 +218,14 @@ async def lifespan(app: FastAPI):
                 gemini_api_key_opt = opts.get("gemini_api_key", "").strip()
                 use_gemini_dashboard_opt = opts.get("use_gemini_for_dashboard", False)
                 gemini_model_name_opt = opts.get("gemini_model_name", "gemini-1.5-pro")
+
+                # OpenAI Options
+                openai_api_key_opt = opts.get("openai_api_key", "").strip()
+                use_openai_opt = opts.get("use_openai", False)
+                openai_fast_model_opt = opts.get("openai_fast_model", "gpt-4o-mini")
+                openai_smart_model_opt = opts.get("openai_smart_model", "gpt-4o")
+                openai_embedding_model_opt = opts.get("openai_embedding_model", "text-embedding-3-small")
+                use_openai_for_dashboard_opt = opts.get("use_openai_for_dashboard", False)
                 
                 print(f"DEBUG: Read dry_run={dry_run}, disable_telemetry={disable_telemetry}, has_token={bool(ha_access_token_opt)} from options.json")
                 print(f"DEBUG: Gemini: has_key={bool(gemini_api_key_opt)}, use_for_dash={use_gemini_dashboard_opt}, model={gemini_model_name_opt}")
@@ -210,6 +239,13 @@ async def lifespan(app: FastAPI):
         gemini_api_key_opt = os.getenv("GEMINI_API_KEY", "")
         use_gemini_dashboard_opt = os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
         gemini_model_name_opt = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+
+        openai_api_key_opt = os.getenv("OPENAI_API_KEY", "")
+        use_openai_opt = os.getenv("USE_OPENAI", "false").lower() == "true"
+        openai_fast_model_opt = os.getenv("OPENAI_FAST_MODEL", "gpt-4o-mini")
+        openai_smart_model_opt = os.getenv("OPENAI_SMART_MODEL", "gpt-4o")
+        openai_embedding_model_opt = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+        use_openai_for_dashboard_opt = os.getenv("USE_OPENAI_FOR_DASHBOARD", "false").lower() == "true"
 
     # Diagnostics
     print(f"DEBUG: ENV - SUPERVISOR_TOKEN: {bool(os.getenv('SUPERVISOR_TOKEN'))}")
@@ -271,11 +307,54 @@ async def lifespan(app: FastAPI):
 
     print(f"✓ HA Client configured (URL: {ha_url})")
 
+    # Provider setup
+    try:
+        local_provider = LocalProvider(ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
+    except Exception as e:
+        print(f"⚠️ Local provider unavailable: {e}")
+
+        class _UnavailableProvider:
+            def chat(self, *args, **kwargs):
+                raise RuntimeError("Local provider unavailable")
+
+            def embeddings(self, *args, **kwargs):
+                raise RuntimeError("Local provider unavailable")
+
+            def get_base_url(self):
+                return os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+        local_provider = _UnavailableProvider()
+    openai_provider = None
+    use_openai_active = use_openai_opt and bool(openai_api_key_opt)
+    if use_openai_active:
+        try:
+            openai_provider = OpenAIProvider(api_key=openai_api_key_opt)
+            print("✓ OpenAI provider initialized")
+        except Exception as e:
+            print(f"⚠️ OpenAI provider disabled: {e}")
+            openai_provider = None
+            use_openai_active = False
+    if not use_openai_active:
+        use_openai_for_dashboard_opt = False
+    openai_active = use_openai_active
+    openai_api_key = openai_api_key_opt
+    openai_fast_model = openai_fast_model_opt
+    openai_smart_model = openai_smart_model_opt
+    openai_embedding_model = openai_embedding_model_opt
+    use_openai_for_dashboard = use_openai_for_dashboard_opt
+
     # 3. Initialize RAG & Knowledge Base (Phase 3)
     enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
     if enable_rag:
         try:
-            rag_manager = RagManager(persist_dir="/data/chroma", disable_telemetry=disable_telemetry)
+            embedding_provider = openai_provider if use_openai_active else local_provider
+            embedding_model = openai_embedding_model_opt if use_openai_active else "nomic-embed-text"
+            rag_manager = RagManager(
+                persist_dir="/data/chroma",
+                disable_telemetry=disable_telemetry,
+                embedding_provider=embedding_provider,
+                embedding_model=embedding_model
+            )
             # FIX: Pass lambda to resolve the global ha_client at runtime, not now (which is None)
             knowledge_base = KnowledgeBase(rag_manager, lambda: ha_client)
             print("✓ RAG Manager & Knowledge Base initialized")
@@ -338,6 +417,16 @@ async def lifespan(app: FastAPI):
                     entities = [e.strip() for e in raw.split(",") if e.strip()]
                 
                 # Create Universal Agent
+                # Provider/model selection
+                model_name = agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "mistral:7b-instruct"))
+                llm_provider = local_provider
+
+                if use_openai_active and openai_provider:
+                    # If agent specifies a non-OpenAI model, override to fast OpenAI model
+                    if not (model_name.startswith(("gpt-", "o", "chatgpt"))):
+                        model_name = openai_fast_model_opt
+                    llm_provider = openai_provider
+
                 agents[agent_id] = UniversalAgent(
                     agent_id=agent_id,
                     name=agent_cfg['name'],
@@ -346,10 +435,11 @@ async def lifespan(app: FastAPI):
                     ha_client=lambda: ha_client,
                     entities=entities,
                     rag_manager=rag_manager,
-                    model_name=agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "mistral:7b-instruct")),
+                    model_name=model_name,
                     decision_interval=agent_cfg.get('decision_interval', 120),
                     broadcast_func=broadcast_to_dashboard,
-                    knowledge=agent_cfg.get('knowledge', "")
+                    knowledge=agent_cfg.get('knowledge', ""),
+                    llm_provider=llm_provider
                 )
                 print(f"  ✓ Loaded agent: {agent_cfg['name']} ({agent_id})")
                 
@@ -363,22 +453,35 @@ async def lifespan(app: FastAPI):
     # If config was empty/missing, we could optionally load default hardcoded agents here
     # but for Phase 5 we assume yaml drives the system.
     
+    # Backwards-compat alias for tests/legacy usage
+    global heating_agent
+    heating_agent = agents.get("heating")
+
     print(f"✓ Initialized {len(agents)} agents: {', '.join(agents.keys())}")
     
     # 6. Initialize Orchestrator
     # Use the configured model (default: mistral:7b-instruct) for the orchestrator too,
     # since the user might only have one model available on the remote Ollama.
+    orchestrator_model = os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b")
+    llm_provider = local_provider
+    if use_openai_active and openai_provider:
+        if not orchestrator_model.startswith(("gpt-", "o", "chatgpt")):
+            orchestrator_model = openai_smart_model_opt
+        llm_provider = openai_provider
+
     orchestrator = Orchestrator(
         ha_client=lambda: ha_client,
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
-        model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
+        model_name=orchestrator_model,
         planning_interval=int(os.getenv("DECISION_INTERVAL", "120")),
         ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        llm_provider=llm_provider,
         gemini_api_key=gemini_api_key_opt or os.getenv("GEMINI_API_KEY"),
         use_gemini_for_dashboard=use_gemini_dashboard_opt or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true",
-        gemini_model_name=gemini_model_name_opt or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        gemini_model_name=gemini_model_name_opt or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro"),
+        use_openai_for_dashboard=use_openai_for_dashboard_opt or os.getenv("USE_OPENAI_FOR_DASHBOARD", "false").lower() == "true"
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
@@ -436,7 +539,7 @@ app.add_middleware(IngressMiddleware)
 async def health_check():
     """Health check endpoint"""
     return {
-        "status": "online",
+        "status": "healthy",
         "version": VERSION,
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
         "agent_count": len(orchestrator.agents) if orchestrator else 0
@@ -621,7 +724,10 @@ async def get_config():
     """Get current configuration"""
     return {
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-        "dry_run_mode": mcp_server.dry_run if mcp_server else True,
+        "dry_run_mode": bool(mcp_server.dry_run) if mcp_server else True,
+        "log_level": os.getenv("LOG_LEVEL", "info"),
+        "heating_model": os.getenv("HEATING_MODEL", os.getenv("SMART_MODEL", "deepseek-r1:8b")),
+        "decision_interval": int(os.getenv("DECISION_INTERVAL", "120")),
         "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
         "smart_model": os.getenv("SMART_MODEL", "deepseek-r1:8b"),
         "fast_model": os.getenv("FAST_MODEL", "mistral:7b-instruct"),
@@ -629,6 +735,11 @@ async def get_config():
         "gemini_active": orchestrator.gemini_model is not None if orchestrator else False,
         "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else False,
         "gemini_model_name": orchestrator.gemini_model_name if orchestrator else "gemini-1.5-pro",
+        "use_openai": openai_active,
+        "openai_fast_model": openai_fast_model,
+        "openai_smart_model": openai_smart_model,
+        "openai_embedding_model": openai_embedding_model,
+        "use_openai_for_dashboard": orchestrator.use_openai_for_dashboard if orchestrator else use_openai_for_dashboard,
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
         }
@@ -640,12 +751,20 @@ class UpdateConfigRequest(BaseModel):
     use_gemini_for_dashboard: Optional[bool] = None
     gemini_api_key: Optional[str] = None
     gemini_model_name: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    use_openai: Optional[bool] = None
+    openai_fast_model: Optional[str] = None
+    openai_smart_model: Optional[str] = None
+    openai_embedding_model: Optional[str] = None
+    use_openai_for_dashboard: Optional[bool] = None
 
 
 @app.patch("/api/config")
 async def update_config(req: UpdateConfigRequest):
     """Update runtime configuration (in-memory only)"""
-    global mcp_server
+    global mcp_server, openai_active, openai_provider, local_provider
+    global openai_api_key, openai_fast_model, openai_smart_model, openai_embedding_model
+    global use_openai_for_dashboard, rag_manager
     
     if req.dry_run_mode is not None:
         if mcp_server:
@@ -673,11 +792,99 @@ async def update_config(req: UpdateConfigRequest):
             orchestrator.gemini_model = genai.GenerativeModel(req.gemini_model_name)
             print(f"🔄 Runtime Config Update: Gemini Model set to {req.gemini_model_name}")
 
+        if req.use_openai_for_dashboard is not None:
+            use_openai_for_dashboard = req.use_openai_for_dashboard
+            orchestrator.use_openai_for_dashboard = req.use_openai_for_dashboard
+            print(f"🔄 Runtime Config Update: Use OpenAI for Dashboard set to {req.use_openai_for_dashboard}")
+
+    # OpenAI runtime updates
+    if req.openai_api_key is not None:
+        openai_api_key = req.openai_api_key.strip()
+        print("🔄 Runtime Config Update: OpenAI API Key updated")
+
+    if req.openai_fast_model is not None:
+        openai_fast_model = req.openai_fast_model
+        print(f"🔄 Runtime Config Update: OpenAI fast model set to {req.openai_fast_model}")
+
+    if req.openai_smart_model is not None:
+        openai_smart_model = req.openai_smart_model
+        print(f"🔄 Runtime Config Update: OpenAI smart model set to {req.openai_smart_model}")
+
+    if req.openai_embedding_model is not None:
+        openai_embedding_model = req.openai_embedding_model
+        print(f"🔄 Runtime Config Update: OpenAI embedding model set to {req.openai_embedding_model}")
+
+    if req.use_openai is not None:
+        if req.use_openai:
+            if not openai_api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key required to enable OpenAI")
+            try:
+                openai_provider = OpenAIProvider(api_key=openai_api_key)
+                openai_active = True
+                print("🔄 Runtime Config Update: OpenAI provider enabled")
+            except Exception as e:
+                openai_provider = None
+                openai_active = False
+                raise HTTPException(status_code=400, detail=f"OpenAI provider init failed: {e}")
+        else:
+            openai_active = False
+            openai_provider = None
+            print("🔄 Runtime Config Update: OpenAI provider disabled")
+
+        # Apply provider/model changes to orchestrator and agents
+        if orchestrator:
+            if openai_active and openai_provider:
+                orchestrator.llm_provider = openai_provider
+                orchestrator.llm_client = openai_provider
+                if not orchestrator.model_name.startswith(("gpt-", "o", "chatgpt")):
+                    orchestrator.model_name = openai_smart_model
+            else:
+                orchestrator.llm_provider = local_provider
+                orchestrator.llm_client = local_provider
+                if orchestrator.model_name.startswith(("gpt-", "o", "chatgpt")):
+                    orchestrator.model_name = os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b")
+
+        for agent in agents.values():
+            if not hasattr(agent, "llm_provider"):
+                continue
+            if openai_active and openai_provider:
+                agent.llm_provider = openai_provider
+                agent.model_name = openai_fast_model
+            else:
+                agent.llm_provider = local_provider
+                if getattr(agent, "model_name", "").startswith(("gpt-", "o", "chatgpt")):
+                    agent.model_name = os.getenv("FAST_MODEL", "mistral:7b-instruct")
+
+        if rag_manager:
+            if openai_active and openai_provider:
+                rag_manager.embedding_provider = openai_provider
+                rag_manager.embedding_model = openai_embedding_model
+            else:
+                rag_manager.embedding_provider = local_provider
+                rag_manager.embedding_model = "nomic-embed-text"
+
     return {
         "status": "success", 
         "dry_run_mode": mcp_server.dry_run if mcp_server else None,
         "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else None,
-        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else None
+        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else None,
+        "use_openai": openai_active,
+        "openai_fast_model": openai_fast_model,
+        "openai_smart_model": openai_smart_model,
+        "openai_embedding_model": openai_embedding_model,
+        "use_openai_for_dashboard": use_openai_for_dashboard
+    }
+
+
+@app.get("/api/config/openai")
+async def get_openai_config():
+    """Get current OpenAI runtime configuration (sanitized)"""
+    return {
+        "use_openai": openai_active,
+        "openai_fast_model": openai_fast_model,
+        "openai_smart_model": openai_smart_model,
+        "openai_embedding_model": openai_embedding_model,
+        "use_openai_for_dashboard": use_openai_for_dashboard
     }
 
 

@@ -51,6 +51,31 @@ ha_access_token: "YOUR_LONG_LIVED_TOKEN_HERE"
 orchestrator_model: "deepseek-r1:8b"  # The "Brain" (Planning)
 smart_model: "deepseek-r1:8b"         # Complex Agents (Reasoning)
 fast_model: "mistral:7b-instruct"     # Fast Agents (Execution)
+
+# OpenAI (Optional)
+openai_api_key: "YOUR_OPENAI_KEY"
+use_openai: false
+openai_fast_model: "gpt-4o-mini"
+openai_smart_model: "gpt-4o"
+openai_embedding_model: "text-embedding-3-small"
+use_openai_for_dashboard: false
+```
+
+### Runtime OpenAI Toggle (API)
+You can toggle OpenAI at runtime without restarting:
+- `PATCH /api/config` with `use_openai`, `openai_api_key`, and model fields.
+- `GET /api/config/openai` returns the current OpenAI runtime state (no key).
+
+Example payload:
+```json
+{
+  "use_openai": true,
+  "openai_api_key": "sk-...",
+  "openai_fast_model": "gpt-4o-mini",
+  "openai_smart_model": "gpt-4o",
+  "openai_embedding_model": "text-embedding-3-small",
+  "use_openai_for_dashboard": false
+}
 ```
 
 #### 4. Start

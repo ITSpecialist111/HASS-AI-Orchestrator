@@ -32,14 +32,16 @@ def mock_chroma_client():
     return mock_client
 
 @pytest.fixture
-def mock_ollama():
-    """Mock Ollama module"""
-    with patch('backend.rag_manager.ollama') as mock:
-        mock.embeddings.return_value = {"embedding": [0.1, 0.2, 0.3]}
+def mock_provider():
+    """Mock local provider"""
+    with patch('backend.rag_manager.LocalProvider') as mock:
+        instance = MagicMock()
+        instance.embeddings.return_value = {"embedding": [0.1, 0.2, 0.3]}
+        mock.return_value = instance
         yield mock
 
 @pytest.fixture
-def rag_manager(mock_chroma_client, mock_ollama):
+def rag_manager(mock_chroma_client, mock_provider):
     """RagManager with mocked dependencies"""
     with patch('backend.rag_manager.chromadb.PersistentClient', return_value=mock_chroma_client):
         manager = RagManager(persist_dir="/tmp/test_chroma")

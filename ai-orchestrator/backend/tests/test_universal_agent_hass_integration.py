@@ -22,7 +22,8 @@ def agent(mock_ha_client):
         mcp_server=MCPServer(mock_ha_client, dry_run=False), # False to allow HA calls
         ha_client=mock_ha_client,
         entities=["light.test_light", "sensor.light_level"],
-        model_name="test-model"
+        model_name="test-model",
+        llm_provider=MagicMock()
     )
 
 @pytest.mark.asyncio

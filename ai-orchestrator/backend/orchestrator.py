@@ -9,13 +9,13 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 
-import ollama
 import os
 import google.generativeai as genai
 from workflow_graph import (
     OrchestratorState, Task, Decision, Conflict,
     create_workflow
 )
+from providers.local_provider import LocalProvider
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,11 @@ class Orchestrator:
         model_name: str = "deepseek-r1:8b",
         planning_interval: int = 120,
         ollama_host: str = "http://localhost:11434",
+        llm_provider: Optional[Any] = None,
         gemini_api_key: Optional[str] = None,
         use_gemini_for_dashboard: bool = False,
-        gemini_model_name: str = "gemini-1.5-pro"
+        gemini_model_name: str = "gemini-1.5-pro",
+        use_openai_for_dashboard: bool = False
     ):
         """
         Initialize orchestrator.
@@ -68,9 +70,12 @@ class Orchestrator:
 
         self.compiled_workflow = self.workflow.compile()
         
-        # Ollama client for planning LLM
-        self.ollama_client = ollama.Client(host=ollama_host)
-        self.llm_client = self.ollama_client # Reference for other methods
+        # LLM provider for planning (local by default)
+        if llm_provider:
+            self.llm_provider = llm_provider
+        else:
+            self.llm_provider = LocalProvider(ollama_host=ollama_host)
+        self.llm_client = self.llm_provider
         self.ollama_host_used = ollama_host
         
         # Task and progress tracking
@@ -101,6 +106,7 @@ class Orchestrator:
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
         self.use_gemini_for_dashboard = use_gemini_for_dashboard or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
         self.gemini_model_name = gemini_model_name or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        self.use_openai_for_dashboard = use_openai_for_dashboard or os.getenv("USE_OPENAI_FOR_DASHBOARD", "false").lower() == "true"
 
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
@@ -491,7 +497,7 @@ INSTRUCTIONS:
         except Exception as e:
             logger.error(f"LLM Chat Error: {e}")
             import os
-            host = os.getenv("OLLAMA_HOST", "localhost")
+            host = self.llm_provider.get_base_url() if self.llm_provider else os.getenv("OLLAMA_HOST", "localhost")
             return {
                 "response": f"⚠️ **Communication Error**: I couldn't reach my brain ({self.model_name}).\n\nTechnical Details:\n- Host: `{host}`\n- Error: `{str(e)}`",
                 "actions_executed": []
@@ -616,7 +622,7 @@ OUTPUT REQUIREMENTS:
         # 3. Call LLM (Gemini preferred, Ollama fallback)
         html_content = ""
         try:
-            if self.gemini_model and self.use_gemini_for_dashboard:
+            if self.gemini_model and self.use_gemini_for_dashboard and not self.use_openai_for_dashboard:
                 # Use Gemini for best design results
                 logger.info(f"Generating dashboard using Gemini model: {self.gemini_model_name}")
                 response = self.gemini_model.generate_content([system_prompt, user_prompt])
@@ -657,7 +663,7 @@ OUTPUT REQUIREMENTS:
             if "finish_reason: SAFETY" in error_msg:
                 error_msg = "Gemini Safety Filter blocked the generation. Try a different prompt."
             
-            host_info = getattr(self.ollama_client, '_client', {}).get('base_url', 'unknown') if hasattr(self.ollama_client, '_client') else 'unknown'
+            host_info = self.llm_provider.get_base_url() if self.llm_provider else "unknown"
             logger.error(f"❌ Failed to generate dashboard: {error_msg} (Host: {host_info})")
             
             fallback_html = f"""

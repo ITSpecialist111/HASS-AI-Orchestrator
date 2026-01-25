@@ -42,7 +42,13 @@
         "disable_telemetry": true,
         "gemini_api_key": "",
         "use_gemini_for_dashboard": false,
-        "gemini_model_name": "gemini-robotics-er-1.5-preview"
+        "gemini_model_name": "gemini-robotics-er-1.5-preview",
+        "openai_api_key": "",
+        "use_openai": false,
+        "openai_fast_model": "gpt-4o-mini",
+        "openai_smart_model": "gpt-4o",
+        "openai_embedding_model": "text-embedding-3-small",
+        "use_openai_for_dashboard": false
     },
     "schema": {
         "ollama_host": "str",
@@ -63,6 +69,12 @@
         "disable_telemetry": "bool",
         "gemini_api_key": "str?",
         "use_gemini_for_dashboard": "bool",
-        "gemini_model_name": "str"
+        "gemini_model_name": "str",
+        "openai_api_key": "str?",
+        "use_openai": "bool",
+        "openai_fast_model": "str",
+        "openai_smart_model": "str",
+        "openai_embedding_model": "str",
+        "use_openai_for_dashboard": "bool"
     }
 }

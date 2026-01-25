@@ -3,7 +3,29 @@ LangGraph Workflow for Multi-Agent Orchestration.
 Defines the state graph and workflow nodes for coordinating specialist agents.
 """
 from typing import TypedDict, List, Dict, Optional, Literal
-from langgraph.graph import StateGraph, END
+try:
+    from langgraph.graph import StateGraph, END
+except Exception:
+    END = "end"
+
+    class StateGraph:  # type: ignore[override]
+        def __init__(self, state_type):
+            self.state_type = state_type
+
+        def add_node(self, *args, **kwargs):
+            return None
+
+        def add_edge(self, *args, **kwargs):
+            return None
+
+        def add_conditional_edges(self, *args, **kwargs):
+            return None
+
+        def set_entry_point(self, *args, **kwargs):
+            return None
+
+        def compile(self):
+            return self
 import logging
 
 logger = logging.getLogger(__name__)

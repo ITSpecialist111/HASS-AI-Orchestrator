@@ -17,3 +17,21 @@ configuration:
   enable_gpu:
     name: Enable GPU
     description: "Enable GPU support for local Ollama instance (requires hardware support)."
+  openai_api_key:
+    name: OpenAI API Key
+    description: "Secret API key for OpenAI (required to enable OpenAI features)."
+  use_openai:
+    name: Use OpenAI
+    description: "Enable OpenAI as an AI provider (opt-in)."
+  openai_fast_model:
+    name: OpenAI Fast Model
+    description: "Model used for quick responses (e.g., gpt-4o-mini)."
+  openai_smart_model:
+    name: OpenAI Smart Model
+    description: "Model used for complex reasoning (e.g., gpt-4o)."
+  openai_embedding_model:
+    name: OpenAI Embedding Model
+    description: "Model used for embeddings (e.g., text-embedding-3-small)."
+  use_openai_for_dashboard:
+    name: Use OpenAI for Dashboard
+    description: "Use OpenAI for visual dashboard generation instead of local/Gemini."

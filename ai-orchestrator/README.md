@@ -44,6 +44,13 @@ A floating AI assistant lives in your dashboard, ready to help at any time.
 -   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
 -   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
 
+### 5.1 OpenAI Provider (Optional) ☁️
+Enable OpenAI as a first-class AI provider while keeping local mode as the default.
+-   **Opt-in**: Requires `openai_api_key` and `use_openai: true`.
+-   **Model Overrides**: When enabled, agents/orchestrator use `openai_fast_model` and `openai_smart_model`.
+-   **Embeddings**: RAG can use `openai_embedding_model` when OpenAI is active.
+-   **Dashboard**: Use `use_openai_for_dashboard: true` to route visual dashboard generation to OpenAI.
+
 ### 6. AI Visual Dashboard (v0.9.47) 🎨
 The system now features a real-time, LLM-driven visualization engine that builds your entire home interface using natural language.
 
@@ -76,6 +83,8 @@ The system now features a real-time, LLM-driven visualization engine that builds
     *   **Smart Model**: The reasoning model for complex agents (default: `deepseek-r1:8b`).
     *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
     *   **Cloud AI API Key**: (Optional) Add your Google AI API key for high-fidelity "AI Visual Dashboard" generation.
+    *   **OpenAI API Key**: (Optional) Set `openai_api_key` and `use_openai: true` to enable OpenAI.
+    *   **OpenAI Models**: Override `openai_fast_model`, `openai_smart_model`, `openai_embedding_model` if desired.
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Direct Access Mode**: Automatically falls back to Direct Core Access (e.g., `http://homeassistant:8123`) if the Supervisor Proxy is unavailable or tokens are mismatched.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.

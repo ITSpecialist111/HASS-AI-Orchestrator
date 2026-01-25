@@ -23,7 +23,8 @@ class UniversalAgent(BaseAgent):
         model_name: str = "mistral:7b-instruct",
         decision_interval: int = 120,
         broadcast_func: Optional[Any] = None,
-        knowledge: str = ""
+        knowledge: str = "",
+        llm_provider: Optional[Any] = None
     ):
         # Universal agents don't use a fixed skills_path
         # We pass a dummy path or None, and override _load_skills
@@ -36,7 +37,8 @@ class UniversalAgent(BaseAgent):
             rag_manager=rag_manager,
             model_name=model_name,
             decision_interval=decision_interval,
-            broadcast_func=broadcast_func
+            broadcast_func=broadcast_func,
+            llm_provider=llm_provider
         )
         self.instruction = instruction
         self.entities = entities

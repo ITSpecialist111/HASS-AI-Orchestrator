@@ -5,13 +5,23 @@ and semantic search for agent context awareness.
 """
 import os
 import logging
-import chromadb
-from chromadb.config import Settings
+from types import SimpleNamespace
+
+try:
+    import chromadb
+    from chromadb.config import Settings
+except Exception as _chromadb_exc:
+    chromadb = SimpleNamespace(PersistentClient=None)
+    class _FallbackSettings:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+    Settings = _FallbackSettings
+    _CHROMADB_IMPORT_ERROR = _chromadb_exc
 from typing import List, Dict, Optional, Any
-import ollama
 from datetime import datetime
 import json
 from pathlib import Path
+from providers.local_provider import LocalProvider
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +35,9 @@ class RagManager:
         self, 
         persist_dir: str = "/data/chroma",
         embedding_model: str = "nomic-embed-text",
-        disable_telemetry: bool = True
+        disable_telemetry: bool = True,
+        embedding_provider: Optional[Any] = None,
+        ollama_host: Optional[str] = None
     ):
         """
         Initialize RAG Manager.
@@ -37,6 +49,14 @@ class RagManager:
         """
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
+        if embedding_provider:
+            self.embedding_provider = embedding_provider
+        else:
+            host = ollama_host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            self.embedding_provider = LocalProvider(ollama_host=host)
+
+        if getattr(chromadb, "PersistentClient", None) is None:
+            raise RuntimeError(f"ChromaDB import failed: {_CHROMADB_IMPORT_ERROR}")
         
         # Initialize ChromaDB client
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
@@ -66,7 +86,7 @@ class RagManager:
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embedding using Ollama"""
         try:
-            response = ollama.embeddings(model=self.embedding_model, prompt=text)
+            response = self.embedding_provider.embeddings(model=self.embedding_model, prompt=text)
             return response["embedding"]
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")

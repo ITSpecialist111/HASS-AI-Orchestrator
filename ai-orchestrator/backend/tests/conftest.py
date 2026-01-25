@@ -61,7 +61,7 @@ def mock_ha_client():
 
 @pytest.fixture
 def mock_ollama_client():
-    """Mock Ollama client"""
+    """Mock local provider (Ollama-backed)"""
     client = MagicMock()
     client.chat = MagicMock(return_value={
         "message": {

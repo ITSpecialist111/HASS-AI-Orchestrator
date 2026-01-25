@@ -47,8 +47,8 @@ Test scenario
     @pytest.mark.asyncio
     async def test_heating_agent_initialization(self, mock_ha_client, mock_skills_file):
         """Test Heating Agent can be initialized"""
-        with patch('agents.heating_agent.ollama.Client') as mock_ollama:
-            mock_ollama.return_value = MagicMock()
+        with patch('agents.base_agent.LocalProvider') as mock_provider:
+            mock_provider.return_value = MagicMock()
             
             with patch('agents.base_agent.Path') as mock_path:
                 mock_path.return_value = mock_skills_file
@@ -76,8 +76,8 @@ Test scenario
     @pytest.mark.asyncio
     async def test_agent_gather_context(self, mock_ha_client, mock_skills_file):
         """Test agent can gather context from HA"""
-        with patch('agents.heating_agent.ollama.Client') as mock_ollama:
-            mock_ollama.return_value = MagicMock()
+        with patch('agents.base_agent.LocalProvider') as mock_provider:
+            mock_provider.return_value = MagicMock()
             
             with patch('agents.base_agent.Path') as mock_path:
                 mock_path.return_value = mock_skills_file
@@ -105,8 +105,8 @@ Test scenario
     @pytest.mark.asyncio
     async def test_agent_decide(self, mock_ha_client, mock_ollama_client, mock_skills_file):
         """Test agent can make decisions"""
-        with patch('agents.heating_agent.ollama.Client') as mock_ollama_class:
-            mock_ollama_class.return_value = mock_ollama_client
+        with patch('agents.base_agent.LocalProvider') as mock_provider_class:
+            mock_provider_class.return_value = mock_ollama_client
             
             with patch('agents.base_agent.Path') as mock_path:
                 mock_path.return_value = mock_skills_file
@@ -133,8 +133,8 @@ Test scenario
     @pytest.mark.asyncio
     async def test_agent_execute_empty_actions(self, mock_ha_client, mock_skills_file):
         """Test agent handles empty action list"""
-        with patch('agents.heating_agent.ollama.Client') as mock_ollama:
-            mock_ollama.return_value = MagicMock()
+        with patch('agents.base_agent.LocalProvider') as mock_provider:
+            mock_provider.return_value = MagicMock()
             
             with patch('agents.base_agent.Path') as mock_path:
                 mock_path.return_value = mock_skills_file
@@ -159,8 +159,8 @@ Test scenario
     
     def test_skills_loading(self, mock_ha_client, mock_skills_file):
         """Test SKILLS.md file is loaded correctly"""
-        with patch('agents.heating_agent.ollama.Client') as mock_ollama:
-            mock_ollama.return_value = MagicMock()
+        with patch('agents.base_agent.LocalProvider') as mock_provider:
+            mock_provider.return_value = MagicMock()
             
             with patch('agents.base_agent.Path') as mock_path:
                 mock_path.return_value = mock_skills_file
