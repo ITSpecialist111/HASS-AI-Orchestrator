@@ -16,7 +16,7 @@ Parameters:
 When this command is invoked:
 
 1. **Read Current Knowledge Base**:
-   - Read `.cursor/.skills/proj-knowledge/knowledge-base.md`
+   - Read `.cursor/skills/proj-knowledge/proj-knowledge.md`
    - Understand current structure
    - Identify relevant section
    - Check for existing entries

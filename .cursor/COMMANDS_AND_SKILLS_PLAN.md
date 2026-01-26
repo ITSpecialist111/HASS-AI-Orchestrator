@@ -5,7 +5,7 @@ This document outlines the comprehensive set of commands and skills designed to 
 
 ---
 
-## Skills (`.cursor/.skills/`)
+## Skills (`.cursor/skills/`)
 
 ### 1. Project Knowledge Base (`proj-knowledge/`)
 **Purpose**: Build and maintain an evolving knowledge base of the project structure, components, functions, and architecture.

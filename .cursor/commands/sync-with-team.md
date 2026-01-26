@@ -15,7 +15,7 @@ Parameters:
 When this command is invoked:
 
 1. **Read The-plan.md**:
-   - Read `.cursor/.skills/The-plan/The-plan.md`
+   - Read `.cursor/skills/The-plan/The-plan.md`
    - Understand current project state
    - Identify active tasks
    - Note task assignments
