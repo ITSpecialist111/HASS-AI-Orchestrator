@@ -1,4 +1,8 @@
 ai_automation_suggester_ref/
+
+# Cursor IDE workspace-local config (terminals, snapshot) — keep out of version control
+.cursor/environment.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 .env
