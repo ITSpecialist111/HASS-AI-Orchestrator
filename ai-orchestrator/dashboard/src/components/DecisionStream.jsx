@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
 import { Terminal, Filter, Clock, ChevronDown, ChevronRight, Brain } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function DecisionStream({ decisions }) {
+    const { t } = useTranslation();
     const [showHeartbeats, setShowHeartbeats] = useState(false);
     const [expandedRow, setExpandedRow] = useState(null);
 
@@ -22,9 +24,9 @@ export function DecisionStream({ decisions }) {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                        <Terminal size={20} className="text-blue-400" /> Decision Stream
+                        <Terminal size={20} className="text-blue-400" /> {t('decisionStream.title')}
                     </h2>
-                    <p className="text-slate-500 text-sm">Real-time agent reasoning and execution logs</p>
+                    <p className="text-slate-500 text-sm">{t('decisionStream.subtitle')}</p>
                 </div>
 
                 <button
@@ -35,7 +37,7 @@ export function DecisionStream({ decisions }) {
                             : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-slate-300'}`}
                 >
                     <Filter size={14} />
-                    {showHeartbeats ? 'Hiding Heartbeats' : 'Showing Heartbeats'}
+                    {showHeartbeats ? t('decisionStream.hidingHeartbeats') : t('decisionStream.showingHeartbeats')}
                 </button>
             </div>
 
@@ -43,19 +45,19 @@ export function DecisionStream({ decisions }) {
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
                 {/* Table Header */}
                 <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <div className="col-span-1">Box</div> {/* Expand Toggle */}
-                    <div className="col-span-2">Time</div>
-                    <div className="col-span-2">Agent</div>
-                    <div className="col-span-3">Reasoning</div>
-                    <div className="col-span-2">Action</div>
-                    <div className="col-span-2">Result</div>
+                    <div className="col-span-1">{t('decisionStream.colBox')}</div>
+                    <div className="col-span-2">{t('decisionStream.colTime')}</div>
+                    <div className="col-span-2">{t('decisionStream.colAgent')}</div>
+                    <div className="col-span-3">{t('decisionStream.colReasoning')}</div>
+                    <div className="col-span-2">{t('decisionStream.colAction')}</div>
+                    <div className="col-span-2">{t('decisionStream.colResult')}</div>
                 </div>
 
                 {/* Table Body */}
                 <div className="divide-y divide-slate-800/50">
                     {filteredDecisions.length === 0 ? (
                         <div className="p-8 text-center text-slate-500 text-sm">
-                            No relevant decisions found. Waiting for agents...
+                            {t('decisionStream.noDecisions')}
                         </div>
                     ) : (
                         filteredDecisions.map((d, i) => {
@@ -95,7 +97,7 @@ export function DecisionStream({ decisions }) {
                                                     <span className="italic text-slate-400">{d.reasoning}</span>
                                                 </>
                                             ) : (
-                                                <span className="text-slate-600 italic">No reasoning logged</span>
+                                                <span className="text-slate-600 italic">{t('decisionStream.noReasoning')}</span>
                                             )}
                                         </div>
 
@@ -105,7 +107,7 @@ export function DecisionStream({ decisions }) {
                                                     {d.decision?.actions ? d.decision.actions.map(a => a.tool).join(', ') : d.action}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-600">Idle</span>
+                                                <span className="text-slate-600">{t('decisionStream.idle')}</span>
                                             )}
                                         </div>
 
@@ -117,7 +119,7 @@ export function DecisionStream({ decisions }) {
                                     {/* Expanded Details */}
                                     {isExpanded && (
                                         <div className="px-14 py-4 bg-slate-900/50 border-t border-slate-800 border-dashed">
-                                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Full Payload</h4>
+                                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{t('decisionStream.fullPayload')}</h4>
                                             <pre className="text-xs font-mono text-slate-400 whitespace-pre-wrap break-all bg-slate-950 p-3 rounded-lg border border-slate-800 overflow-x-auto">
                                                 {JSON.stringify(d, null, 2)}
                                             </pre>

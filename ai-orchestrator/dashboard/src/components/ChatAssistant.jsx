@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Sparkles, Zap, Command, ChevronRight, Activity } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const ChatAssistant = () => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'system', content: 'Hello! I am your AI Orchestrator. How can I help you today?' }
+        { role: 'system', content: t('chat.greeting') }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -44,7 +46,7 @@ export const ChatAssistant = () => {
             setMessages(prev => [...prev, aiMsg]);
 
         } catch (e) {
-            setMessages(prev => [...prev, { role: 'error', content: "Sorry, I couldn't reach the orchestrator." }]);
+            setMessages(prev => [...prev, { role: 'error', content: t('chat.error') }]);
         } finally {
             setLoading(false);
         }
@@ -68,7 +70,7 @@ export const ChatAssistant = () => {
 
     return (
         <>
-            {/* Floating Buttion & Quick Actions Container */}
+            {/* Floating Button & Quick Actions Container */}
             <div className="fixed bottom-24 right-8 z-50 flex flex-col items-end gap-4">
                 {/* Quick Actions Menu (Fade in on hover) */}
                 <div className={`
@@ -76,12 +78,12 @@ export const ChatAssistant = () => {
                     transition-all duration-300 origin-bottom-right
                     ${showQuickActions && !isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'}
                 `}>
-                    <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Quick Actions</div>
-                    <QuickAction icon={Zap} label="Turn off all lights" query="Turn off all lights in the house" />
-                    <QuickAction icon={Shield} label="Arm Security System" query="Arm the security system" />
-                    <QuickAction icon={Activity} label="System Status" query="What is the current status of the house?" />
-                    <QuickAction icon={Thermometer} label="Optimize Heating" query="Set heating to 20C everywhere" />
-                    <QuickAction icon={Server} label="Visual Dashboard" query="Generate a visual dashboard for my house" />
+                    <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{t('chat.quickActions')}</div>
+                    <QuickAction icon={Zap} label={t('chat.turnOffLights')} query="Turn off all lights in the house" />
+                    <QuickAction icon={Shield} label={t('chat.armSecurity')} query="Arm the security system" />
+                    <QuickAction icon={Activity} label={t('chat.systemStatus')} query="What is the current status of the house?" />
+                    <QuickAction icon={Thermometer} label={t('chat.optimizeHeating')} query="Set heating to 20C everywhere" />
+                    <QuickAction icon={Server} label={t('chat.visualDashboard')} query="Generate a visual dashboard for my house" />
                 </div>
 
                 <button
@@ -107,10 +109,10 @@ export const ChatAssistant = () => {
                             <Sparkles size={16} className="text-white" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-slate-100">AI Assistant</h3>
+                            <h3 className="font-bold text-slate-100">{t('chat.title')}</h3>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                <span className="text-xs text-slate-400">Online • Orchestrator</span>
+                                <span className="text-xs text-slate-400">{t('chat.status')}</span>
                             </div>
                         </div>
                     </div>
@@ -131,7 +133,7 @@ export const ChatAssistant = () => {
                                     {msg.actions && msg.actions.length > 0 && (
                                         <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-2">
                                             <div className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                                                <Command size={10} /> Executed Actions
+                                                <Command size={10} /> {t('chat.executedActions')}
                                             </div>
                                             {msg.actions.map((action, i) => (
                                                 <div key={i} className="bg-black/20 rounded p-2 text-xs font-mono text-green-400 border border-slate-700/50 break-all">
@@ -165,7 +167,7 @@ export const ChatAssistant = () => {
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Ask me anything..."
+                                placeholder={t('chat.placeholder')}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-4 pr-12 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"
                             />
                             <button

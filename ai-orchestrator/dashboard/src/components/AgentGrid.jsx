@@ -1,8 +1,10 @@
 
 import React from 'react';
 import { Cpu, Thermometer, Lightbulb, Shield, Zap, RefreshCw, Activity, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const AgentCard = ({ agent, onClick }) => {
+    const { t } = useTranslation();
     const getIcon = (id) => {
         switch (id) {
             case 'heating': return <Thermometer size={20} className="text-orange-400" />;
@@ -75,7 +77,7 @@ const AgentCard = ({ agent, onClick }) => {
                 {/* Last Decision Time */}
                 <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-950/30 p-2 rounded border border-slate-800/50">
                     <Clock size={12} className="text-slate-600" />
-                    <span className="font-medium">Last Action:</span>
+                    <span className="font-medium">{t('agentGrid.lastAction')}</span>
                     <span className="font-mono text-slate-300 ml-auto">
                         {agent.last_decision ? new Date(agent.last_decision).toLocaleTimeString() : '--:--:--'}
                     </span>
@@ -85,10 +87,10 @@ const AgentCard = ({ agent, onClick }) => {
                 <div className="text-xs text-slate-400 italic border-l-2 border-purple-500/20 pl-2 py-0.5">
                     {isThinking ? (
                         <span className="text-green-400 animate-pulse flex items-center gap-1">
-                            <RefreshCw size={10} className="animate-spin" /> Analyzing environment...
+                            <RefreshCw size={10} className="animate-spin" /> {t('agentGrid.analyzing')}
                         </span>
                     ) : (
-                        <span>Waiting for next cycle...</span>
+                        <span>{t('agentGrid.waiting')}</span>
                     )}
                 </div>
             </div>
@@ -104,6 +106,7 @@ const AgentCard = ({ agent, onClick }) => {
 import AgentDetails from './AgentDetails';
 
 export const AgentGrid = ({ agents, suggestions = [], onAgentCreate, onSuggestionClick }) => {
+    const { t } = useTranslation();
     const [selectedAgent, setSelectedAgent] = React.useState(null);
 
     const handleAgentClick = (agent) => {
@@ -123,7 +126,7 @@ export const AgentGrid = ({ agents, suggestions = [], onAgentCreate, onSuggestio
         return (
             <div className="text-center py-12 text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-900/30">
                 <Activity className="mx-auto mb-3 opacity-20" size={48} />
-                <p>No agents active. Check connection.</p>
+                <p>{t('agentGrid.noAgents')}</p>
             </div>
         );
     }
@@ -145,7 +148,7 @@ export const AgentGrid = ({ agents, suggestions = [], onAgentCreate, onSuggestio
                     <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
                         <span className="text-xl">+</span>
                     </div>
-                    <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200">New Agent</span>
+                    <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200">{t('agentGrid.newAgent')}</span>
                 </div>
             </div>
 

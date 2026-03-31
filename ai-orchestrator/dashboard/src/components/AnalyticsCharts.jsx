@@ -1,10 +1,12 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Activity, Clock, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const AnalyticsCharts = ({ dailyData, performanceData }) => {
+    const { t } = useTranslation();
     if (!dailyData || dailyData.length === 0) {
-        return <div className="text-gray-400">No analytics data available</div>;
+        return <div className="text-gray-400">{t('analytics.noData')}</div>;
     }
 
     return (
@@ -13,7 +15,7 @@ export const AnalyticsCharts = ({ dailyData, performanceData }) => {
             <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <h3 className="text-lg font-semibold mb-4 text-slate-200 flex items-center gap-2">
                     <Activity size={20} />
-                    Weekly Agent Activity
+                    {t('analytics.weeklyActivity')}
                 </h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -53,24 +55,24 @@ export const AnalyticsCharts = ({ dailyData, performanceData }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(performanceData || {}).map(([agent, stats]) => (
                     <div key={agent} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                        <h4 className="font-medium text-slate-300 capitalize mb-2">{agent} Agent</h4>
+                        <h4 className="font-medium text-slate-300 capitalize mb-2">{agent} {t('analytics.agentSuffix')}</h4>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="flex items-center gap-2 text-slate-400">
                                 <Clock size={14} />
-                                <span>Decisions (24h)</span>
+                                <span>{t('analytics.decisions24h')}</span>
                             </div>
                             <div className="text-right text-slate-200">{stats.decisions_24h}</div>
 
                             <div className="flex items-center gap-2 text-slate-400">
                                 <CheckCircle size={14} />
-                                <span>Error Rate</span>
+                                <span>{t('analytics.errorRate')}</span>
                             </div>
                             <div className={`text-right ${stats.error_rate > 0.05 ? 'text-red-400' : 'text-green-400'}`}>
                                 {(stats.error_rate * 100).toFixed(0)}%
                             </div>
 
                             <div className="col-span-2 mt-2 pt-2 border-t border-slate-700 flex justify-between">
-                                <span className="text-slate-500">Top Tool</span>
+                                <span className="text-slate-500">{t('analytics.topTool')}</span>
                                 <code className="text-xs bg-slate-900 px-2 py-1 rounded text-blue-300">
                                     {stats.top_tool}
                                 </code>

@@ -2,13 +2,16 @@
 import React from 'react';
 import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { SettingsModal } from './SettingsModal';
 
 export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.15" }) {
+    const { t } = useTranslation();
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
-
     const [appVersion, setAppVersion] = useState(version);
+    const [lang, setLang] = useState(localStorage.getItem('lang') || 'ru');
 
     // Load config for settings modal and version
     useEffect(() => {
@@ -31,12 +34,19 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
             .catch(e => console.error("Ver check failed", e));
     }, []);
 
+    const toggleLang = () => {
+        const next = lang === 'ru' ? 'en' : 'ru';
+        setLang(next);
+        localStorage.setItem('lang', next);
+        i18n.changeLanguage(next);
+    };
+
     const menuItems = [
-        { id: 'live', label: 'Command Centre', icon: LayoutDashboard },
-        { id: 'stream', label: 'Decision Stream', icon: Activity },
-        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        { id: 'factory', label: 'Agent Factory', icon: Bot },
-        { id: 'visual', label: 'Visual Dashboard', icon: Server },
+        { id: 'live', label: t('nav.commandCentre'), icon: LayoutDashboard },
+        { id: 'stream', label: t('nav.decisionStream'), icon: Activity },
+        { id: 'analytics', label: t('nav.analytics'), icon: BarChart3 },
+        { id: 'factory', label: t('nav.agentFactory'), icon: Bot },
+        { id: 'visual', label: t('nav.visualDashboard'), icon: Server },
     ];
 
     return (
@@ -50,7 +60,7 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                     </div>
                     <div>
                         <h1 className="font-bold text-lg tracking-tight leading-none">Orchestrator</h1>
-                        <span className="text-xs text-slate-500 font-medium">Command Node</span>
+                        <span className="text-xs text-slate-500 font-medium">{t('layout.brandSubtitle')}</span>
                     </div>
                 </div>
 
@@ -64,8 +74,6 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                                 key={item.id}
                                 onClick={() => {
                                     if (item.isLink) {
-                                        // Handle Ingress pathing: Derive absolute URL from current relative base
-                                        // Robust normalization: remove all trailing and leading slashes from parts before joining
                                         const cleanPath = window.location.pathname.replace(/\/+$/, '');
                                         const cleanItemUrl = item.url.replace(/^\/+/, '');
                                         const url = `${window.location.origin}${cleanPath}/${cleanItemUrl}`;
@@ -90,13 +98,22 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                 <div className="p-4 bg-slate-950/30 border-t border-slate-800 text-xs">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-slate-500 font-mono">{appVersion}</span>
-                        <button
-                            onClick={() => setShowSettings(true)}
-                            className="text-slate-600 hover:text-slate-400 transition-colors p-1 hover:bg-slate-800 rounded"
-                            title="Settings"
-                        >
-                            <Settings size={14} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={toggleLang}
+                                className="text-slate-600 hover:text-slate-400 transition-colors px-1.5 py-1 hover:bg-slate-800 rounded font-mono text-[11px] font-bold"
+                                title={lang === 'ru' ? 'Switch to English' : 'Переключить на русский'}
+                            >
+                                {lang === 'ru' ? 'EN' : 'RU'}
+                            </button>
+                            <button
+                                onClick={() => setShowSettings(true)}
+                                className="text-slate-600 hover:text-slate-400 transition-colors p-1 hover:bg-slate-800 rounded"
+                                title={t('layout.settings')}
+                            >
+                                <Settings size={14} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors duration-300
@@ -108,7 +125,7 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
                             <div className={`absolute w-full h-full rounded-full opacity-75 animate-ping ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             <div className={`relative w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                         </div>
-                        <span className="font-semibold tracking-wide">{connected ? 'SYSTEM ONLINE' : 'DISCONNECTED'}</span>
+                        <span className="font-semibold tracking-wide">{connected ? t('layout.systemOnline') : t('layout.disconnected')}</span>
                     </div>
                 </div>
             </aside>

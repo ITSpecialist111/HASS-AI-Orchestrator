@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Shield, Terminal, Settings, Cpu, Key, Wand2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
+    const { t } = useTranslation();
     const [config, setConfig] = useState(currentConfig || { dry_run_mode: true });
     const [loading, setLoading] = useState(false);
 
@@ -38,7 +40,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                 <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                         <Settings size={20} className="text-purple-400" />
-                        Settings
+                        {t('settings.title')}
                     </h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
                         <X size={24} />
@@ -51,11 +53,11 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
                                 <Shield size={18} className={config.dry_run_mode ? 'text-amber-400' : 'text-slate-400'} />
-                                <h3 className="font-semibold text-slate-200">Dry Run Mode</h3>
+                                <h3 className="font-semibold text-slate-200">{t('settings.dryRunMode')}</h3>
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className={`text-xs font-mono px-2 py-0.5 rounded ${config.dry_run_mode ? 'bg-amber-500/20 text-amber-300' : 'bg-green-500/20 text-green-300'}`}>
-                                    {config.dry_run_mode ? 'ENABLED' : 'DISABLED'}
+                                    {config.dry_run_mode ? t('settings.enabled') : t('settings.disabled')}
                                 </span>
                                 <button
                                     onClick={handleToggleDryRun}
@@ -69,10 +71,10 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                             </div>
                         </div>
                         <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                            When enabled, the AI will make decisions and log them but acts as a "simulated" execution - no actual changes will be made to Home Assistant entities. Great for testing prompt safety without affecting your home.
+                            {t('settings.dryRunDescription')}
                         </p>
                         <div className="text-[10px] text-slate-500 italic border-t border-slate-700/50 pt-2">
-                            Note: Toggling this here applies immediately but resets on server restart. To make it permanent, change "dry_run_mode" in the Add-on Configuration tab in Home Assistant.
+                            {t('settings.dryRunNote')}
                         </div>
                     </div>
 
@@ -81,7 +83,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                                 <Wand2 size={18} className={config.use_gemini_for_dashboard ? 'text-blue-400' : 'text-slate-400'} />
-                                <h3 className="font-semibold text-slate-200">Use Gemini for Dashboard</h3>
+                                <h3 className="font-semibold text-slate-200">{t('settings.useGemini')}</h3>
                             </div>
                             <button
                                 onClick={handleToggleGeminiDashboard}
@@ -94,40 +96,40 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
 
                         <div className="space-y-3">
                             <div>
-                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Gemini API Key</label>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">{t('settings.geminiApiKey')}</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="password"
                                         defaultValue={config.gemini_api_key || ""}
                                         onBlur={(e) => updateConfigField('gemini_api_key', e.target.value)}
                                         className="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 w-full focus:outline-none focus:border-blue-500/50"
-                                        placeholder="Paste your Google AI API Key..."
+                                        placeholder={t('settings.geminiApiKeyPlaceholder')}
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Gemini Model</label>
+                                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">{t('settings.geminiModel')}</label>
                                 <input
                                     type="text"
                                     defaultValue={config.gemini_model_name || "gemini-robotics-er-1.5-preview"}
                                     onBlur={(e) => updateConfigField('gemini_model_name', e.target.value)}
                                     className="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 w-full focus:outline-none focus:border-blue-500/50"
                                 />
-                                <p className="text-[10px] text-slate-500 mt-1">Recommended: gemini-robotics-er-1.5-preview for high-fidelity robotics/vis.</p>
+                                <p className="text-[10px] text-slate-500 mt-1">{t('settings.geminiModelHint')}</p>
                             </div>
                         </div>
                     </div>
 
                     {/* Metadata (Read Only) */}
                     <div className="space-y-2">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">System Info</h4>
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('settings.systemInfo')}</h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-slate-950 p-3 rounded border border-slate-800">
-                                <span className="block text-[10px] text-slate-500 mb-1">Ollama Host</span>
+                                <span className="block text-[10px] text-slate-500 mb-1">{t('settings.ollamaHost')}</span>
                                 <div className="text-xs text-slate-300 truncate font-mono">{config.ollama_host}</div>
                             </div>
                             <div className="bg-slate-950 p-3 rounded border border-slate-800">
-                                <span className="block text-[10px] text-slate-500 mb-1">Orchestrator Model</span>
+                                <span className="block text-[10px] text-slate-500 mb-1">{t('settings.orchestratorModel')}</span>
                                 <div className="text-xs text-slate-300 truncate font-mono">{config.orchestrator_model}</div>
                             </div>
                         </div>
@@ -139,7 +141,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                         onClick={onClose}
                         className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
                     >
-                        Close
+                        {t('settings.close')}
                     </button>
                 </div>
             </div>

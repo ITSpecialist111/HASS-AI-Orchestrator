@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './i18n'
 
 // Global Error Trap for debugging Ingress issues
 window.onerror = function (msg, source, lineno, colno, error) {

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, Trash2, Edit2, Check, ExternalLink, Activity, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const AgentDetails = ({ agent, onClose, onDelete }) => {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('overview');
     const [decisions, setDecisions] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
@@ -115,13 +117,13 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
 
                             <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">{agent.model}</span>
                         </div>
-                        <p className="text-slate-400 text-sm">ID: {agent.agent_id}</p>
+                        <p className="text-slate-400 text-sm">{t('agentDetails.idPrefix')} {agent.agent_id}</p>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={handleDeleteClick}
                             className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                            title="Delete Agent"
+                            title={t('agentDetails.deleteAgent')}
                         >
                             <Trash2 size={20} />
                         </button>
@@ -142,23 +144,23 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                 <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-4">
                                     <Trash2 size={24} />
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">Delete Agent?</h3>
+                                <h3 className="text-xl font-bold text-white mb-2">{t('agentDetails.deleteTitle')}</h3>
                                 <p className="text-slate-400 mb-6">
-                                    Are you sure you want to permanently delete <strong>{agent.name}</strong>? This action cannot be undone.
+                                    {t('agentDetails.deleteConfirm')} <strong>{agent.name}</strong>{t('agentDetails.deleteWarning')}
                                 </p>
                                 <div className="flex gap-3 w-full">
                                     <button
                                         onClick={() => setShowDeleteConfirm(false)}
                                         className="flex-1 py-2 px-4 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600 transition-colors font-medium"
                                     >
-                                        Cancel
+                                        {t('agentDetails.cancel')}
                                     </button>
                                     <button
                                         onClick={confirmDelete}
                                         disabled={loading}
                                         className="flex-1 py-2 px-4 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium flex items-center justify-center gap-2"
                                     >
-                                        {loading ? 'Deleting...' : 'Delete Forever'}
+                                        {loading ? t('agentDetails.deleting') : t('agentDetails.deleteForever')}
                                     </button>
                                 </div>
                             </div>
@@ -171,19 +173,19 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('overview')}
                     >
-                        Overview
+                        {t('agentDetails.tabs.overview')}
                     </button>
                     <button
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'history' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('history')}
                     >
-                        History
+                        {t('agentDetails.tabs.history')}
                     </button>
                     <button
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'json' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('json')}
                     >
-                        Config (JSON)
+                        {t('agentDetails.tabs.config')}
                     </button>
                 </div>
 
@@ -196,14 +198,14 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                             <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                        <Activity size={18} className="text-blue-400" /> Primary Instruction
+                                        <Activity size={18} className="text-blue-400" /> {t('agentDetails.primaryInstruction')}
                                     </h3>
                                     {!isEditing ? (
                                         <button
                                             onClick={() => setIsEditing(true)}
                                             className="text-xs flex items-center gap-1 text-slate-400 hover:text-white bg-slate-700/50 px-2 py-1 rounded transition-colors"
                                         >
-                                            <Edit2 size={12} /> Edit
+                                            <Edit2 size={12} /> {t('agentDetails.edit')}
                                         </button>
                                     ) : (
                                         <div className="flex gap-2">
@@ -211,14 +213,14 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                                 onClick={() => setIsEditing(false)}
                                                 className="text-xs text-slate-400 hover:text-white"
                                             >
-                                                Cancel
+                                                {t('agentDetails.cancel')}
                                             </button>
                                             <button
                                                 onClick={handleUpdate}
                                                 disabled={loading}
                                                 className="text-xs flex items-center gap-1 text-green-400 hover:text-green-300 bg-green-400/10 px-2 py-1 rounded transition-colors"
                                             >
-                                                <Save size={12} /> {loading ? 'Saving...' : 'Save'}
+                                                <Save size={12} /> {loading ? t('agentDetails.saving') : t('agentDetails.save')}
                                             </button>
                                         </div>
                                     )}
@@ -232,7 +234,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                             className="w-full h-48 bg-slate-900/50 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-sm leading-relaxed"
                                         />
                                         <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-lg border border-slate-700">
-                                            <div className="text-slate-200 text-sm font-medium whitespace-nowrap">Decision Interval:</div>
+                                            <div className="text-slate-200 text-sm font-medium whitespace-nowrap">{t('agentDetails.decisionInterval')}</div>
                                             <div className="text-blue-400 font-mono w-12 text-right">{interval}s</div>
                                             <input
                                                 type="range"
@@ -253,7 +255,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-slate-400 px-1">
                                             <Check size={12} className="text-blue-500" />
-                                            Updating every <span className="text-slate-200 font-bold">{agent.decision_interval || interval} seconds</span>
+                                            {t('agentDetails.updatingEvery')} <span className="text-slate-200 font-bold">{agent.decision_interval || interval}</span> {t('agentDetails.seconds')}
                                         </div>
                                     </div>
                                 )}
@@ -262,7 +264,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                             {/* Entities Section */}
                             <div>
                                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                    <ExternalLink size={18} className="text-purple-400" /> Assigned Entities
+                                    <ExternalLink size={18} className="text-purple-400" /> {t('agentDetails.assignedEntities')}
                                 </h3>
                                 {/* We don't have the entity list from GET /agents yet, only from Config or by inference. 
                              Backend update needed to return entities in AgentStatus if we want to show them here accurately.
@@ -279,7 +281,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                     </div>
                                 ) : (
                                     <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50 text-slate-400 text-sm italic text-center">
-                                        No specific entities assigned. (Agent will use Auto-Discovery)
+                                        {t('agentDetails.noEntities')}
                                     </div>
                                 )}
                             </div>
@@ -289,14 +291,14 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     {activeTab === 'history' && (
                         <div className="space-y-4">
                             {decisions.length === 0 ? (
-                                <div className="text-center text-slate-500 py-10">No recent history found.</div>
+                                <div className="text-center text-slate-500 py-10">{t('agentDetails.noHistory')}</div>
                             ) : (
                                 decisions.map((decision, idx) => (
                                     <div key={idx} className="bg-slate-800/40 p-4 rounded-lg border border-slate-700/50 text-sm">
                                         <div className="flex justify-between text-xs text-slate-500 mb-2">
                                             <span>{new Date(decision.timestamp).toLocaleTimeString()}</span>
                                             <span className={decision.dry_run ? 'text-amber-500' : 'text-slate-500'}>
-                                                {decision.dry_run ? 'DRY RUN' : 'LIVE'}
+                                                {decision.dry_run ? t('agentDetails.dryRun') : t('agentDetails.live')}
                                             </span>
                                         </div>
                                         <div className="text-slate-300 mb-2 font-medium">

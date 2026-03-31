@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Layout, Zap, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const VisualDashboard = () => {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString());
     const [error, setError] = useState(null);
@@ -41,9 +43,9 @@ export const VisualDashboard = () => {
                         <Layout className="text-blue-400" size={20} />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-white">Dynamic Visual Dashboard</h2>
+                        <h2 className="text-lg font-bold text-white">{t('visualDashboard.title')}</h2>
                         <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <Sparkles size={10} /> AI-Generated • Last updated: {lastRefresh}
+                            <Sparkles size={10} /> {t('visualDashboard.aiGenerated')} {lastRefresh}
                         </p>
                     </div>
                 </div>
@@ -55,7 +57,7 @@ export const VisualDashboard = () => {
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && refreshDashboard()}
-                            placeholder="e.g. 'Cyberpunk style' or 'Focus on Energy'"
+                            placeholder={t('visualDashboard.placeholder')}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 pl-4 pr-10 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-all"
                         />
                         <Sparkles size={14} className="absolute right-3 top-2.5 text-slate-600" />
@@ -67,7 +69,7 @@ export const VisualDashboard = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all group shrink-0"
                     >
                         <RefreshCw size={16} className={`${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                        {loading ? 'Generating...' : (prompt ? 'Update Design' : 'Refresh Data')}
+                        {loading ? t('visualDashboard.generating') : (prompt ? t('visualDashboard.updateDesign') : t('visualDashboard.refreshData'))}
                     </button>
                 </div>
             </div>
@@ -78,13 +80,13 @@ export const VisualDashboard = () => {
                     src="api/dashboard/dynamic"
                     key={lastRefresh}
                     className="w-full h-full border-none"
-                    title="AI Visual Dashboard"
+                    title={t('visualDashboard.iframeTitle')}
                 />
 
                 {/* Overlay Hint */}
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700 text-[10px] text-slate-400 flex items-center gap-2">
-                        <Zap size={10} className="text-amber-500" /> Use Chat to customize this view
+                        <Zap size={10} className="text-amber-500" /> {t('visualDashboard.overlayHint')}
                     </div>
                 </div>
             </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Wand2, Plus, Save, X, Lightbulb } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = false }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(startOpen);
     const [mode, setMode] = useState('prompt'); // prompt | review | loading
     const [prompt, setPrompt] = useState('');
@@ -63,7 +65,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
             setMode('review');
         } catch (err) {
             console.error(err);
-            setError(`Failed to generate agent: ${err.message}`);
+            setError(`${t('agentFactory.failedGenerate')} ${err.message}`);
             setMode('prompt');
         }
     };
@@ -83,14 +85,14 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                 setPrompt('');
                 setGeneratedConfig(null);
                 if (onAgentCreated) onAgentCreated();
-                alert("Agent Saved! Restart add-on to activate.");
+                alert(t('agentFactory.saved'));
             } else {
                 const d = await res.json();
                 setError(d.detail);
                 setMode('review');
             }
         } catch (err) {
-            setError('Failed to save.');
+            setError(t('agentFactory.failedSave'));
             setMode('review');
         }
     };
@@ -103,7 +105,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
             >
                 <Plus size={24} />
                 <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
-                    New Agent
+                    {t('agentFactory.newAgent')}
                 </span>
             </button>
         );
@@ -120,8 +122,8 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                             <Bot className="text-purple-400" size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">Agent Factory</h2>
-                            <p className="text-sm text-slate-400">The Architect will design your agent.</p>
+                            <h2 className="text-xl font-bold text-white">{t('agentFactory.title')}</h2>
+                            <p className="text-sm text-slate-400">{t('agentFactory.subtitle')}</p>
                         </div>
                     </div>
                     <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-white">
@@ -142,13 +144,13 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                             {/* Manual Input */}
                             <form onSubmit={handleGenerate} className="space-y-3">
                                 <label className="block text-sm font-medium text-slate-300">
-                                    What should this agent do?
+                                    {t('agentFactory.whatShouldDo')}
                                 </label>
                                 <div className="relative">
                                     <textarea
                                         value={prompt}
                                         onChange={(e) => setPrompt(e.target.value)}
-                                        placeholder="e.g., 'Create a Movie Night Manager that dims the living room lights when the TV is playing.'"
+                                        placeholder={t('agentFactory.placeholder')}
                                         className="w-full h-32 bg-slate-800 border-slate-700 rounded-lg p-4 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                                     />
                                     <div className="absolute bottom-3 right-3">
@@ -157,7 +159,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                             disabled={!prompt.trim()}
                                             className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                         >
-                                            <Wand2 size={16} /> Generate Plan
+                                            <Wand2 size={16} /> {t('agentFactory.generatePlan')}
                                         </button>
                                     </div>
                                 </div>
@@ -168,7 +170,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                 <div className="space-y-3">
                                     <h3 className="text-sm font-medium text-slate-400 flex items-center gap-2 pb-2 border-b border-slate-700/50">
                                         <Lightbulb size={16} className="text-amber-400" />
-                                        Recommended Agents
+                                        {t('agentFactory.recommendedAgents')}
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {suggestions.map((s, i) => (
@@ -192,7 +194,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                                     </span>
                                                     {s.blueprint && (
                                                         <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
-                                                            READY
+                                                            {t('agentFactory.ready')}
                                                         </span>
                                                     )}
                                                 </div>
@@ -208,17 +210,17 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                     {mode === 'loading' && (
                         <div className="flex flex-col items-center justify-center py-12 space-y-4">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-                            <p className="text-slate-400 animate-pulse">Architect is drafting blueprint...</p>
+                            <p className="text-slate-400 animate-pulse">{t('agentFactory.drafting')}</p>
                         </div>
                     )}
 
                     {mode === 'review' && generatedConfig && (
                         <div className="space-y-4">
                             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                                <h3 className="font-medium text-slate-300 mb-2">Blueprint Review</h3>
+                                <h3 className="font-medium text-slate-300 mb-2">{t('agentFactory.blueprintReview')}</h3>
                                 <div className="space-y-3 text-sm">
                                     <div className="grid grid-cols-3 gap-2 items-center">
-                                        <div className="text-slate-500">Name</div>
+                                        <div className="text-slate-500">{t('agentFactory.name')}</div>
                                         <div className="col-span-2">
                                             <input
                                                 type="text"
@@ -233,7 +235,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                             />
                                         </div>
 
-                                        <div className="text-slate-500">ID <span className="text-[10px] opacity-50">(Auto)</span></div>
+                                        <div className="text-slate-500">{t('agentFactory.idAuto')} <span className="text-[10px] opacity-50">{t('agentFactory.idAutoHint')}</span></div>
                                         <div className="col-span-2">
                                             <input
                                                 type="text"
@@ -244,7 +246,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                             />
                                         </div>
 
-                                        <div className="text-slate-500 self-start pt-1">Entities</div>
+                                        <div className="text-slate-500 self-start pt-1">{t('agentFactory.entities')}</div>
                                         <div className="col-span-2 flex flex-wrap gap-1">
                                             {generatedConfig.entities.map(e => (
                                                 <span key={e} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
@@ -255,23 +257,23 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                     </div>
 
                                     <div className="pt-3 border-t border-slate-700">
-                                        <div className="text-slate-500 mb-1">Instructions</div>
+                                        <div className="text-slate-500 mb-1">{t('agentFactory.instructions')}</div>
                                         <textarea
                                             value={generatedConfig.instruction}
                                             onChange={(e) => setGeneratedConfig({ ...generatedConfig, instruction: e.target.value })}
                                             className="w-full h-24 bg-slate-950 border border-slate-800 rounded p-3 text-slate-300 font-mono text-xs whitespace-pre-wrap outline-none focus:border-purple-500 resize-none mb-3"
-                                            placeholder="Primary goal and behavioral rules..."
+                                            placeholder={t('agentFactory.instructionsPlaceholder')}
                                         />
 
                                         <div className="text-slate-500 mb-1 flex items-center gap-2">
-                                            Knowledge / Documentation
-                                            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 rounded border border-slate-700">Optional</span>
+                                            {t('agentFactory.knowledge')}
+                                            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 rounded border border-slate-700">{t('agentFactory.optional')}</span>
                                         </div>
                                         <textarea
                                             value={generatedConfig.knowledge || ''}
                                             onChange={(e) => setGeneratedConfig({ ...generatedConfig, knowledge: e.target.value })}
                                             className="w-full h-24 bg-slate-950 border border-slate-800 rounded p-3 text-slate-300 font-mono text-xs whitespace-pre-wrap outline-none focus:border-purple-500 resize-none"
-                                            placeholder="Paste device manuals, API docs, or specific facts provided by the manufacturer here..."
+                                            placeholder={t('agentFactory.knowledgePlaceholder')}
                                         />
                                     </div>
                                 </div>
@@ -282,13 +284,13 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                                     onClick={() => setMode('prompt')}
                                     className="px-4 py-2 text-slate-400 hover:text-white"
                                 >
-                                    Back
+                                    {t('agentFactory.back')}
                                 </button>
                                 <button
                                     onClick={handleSave}
                                     className="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"
                                 >
-                                    <Save size={18} /> Approve & Deploy
+                                    <Save size={18} /> {t('agentFactory.approveAndDeploy')}
                                 </button>
                             </div>
                         </div>

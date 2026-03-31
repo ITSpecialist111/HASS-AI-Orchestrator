@@ -1,0 +1,19 @@
+configuration:
+  dry_run_mode:
+    name: Режим тестирования
+    description: "Если включён, ИИ будет принимать решения и записывать их, но выполняет «симуляцию» — реальные изменения в объектах Home Assistant не производятся. Отлично подходит для проверки безопасности."
+  ollama_host:
+    name: Хост Ollama
+    description: "URL вашего экземпляра Ollama (например, http://localhost:11434)."
+  log_level:
+    name: Уровень логирования
+    description: "Подробность логов бэкенда."
+  ha_access_token:
+    name: Токен доступа HA
+    description: "Долгосрочный токен доступа для прямого обращения к API Home Assistant (обходит прокси Supervisor)."
+  decision_interval:
+    name: Интервал решений
+    description: "Время в секундах между циклами принятия решений ИИ."
+  enable_gpu:
+    name: Включить GPU
+    description: "Включить поддержку GPU для локального экземпляра Ollama (требует соответствующего оборудования)."
