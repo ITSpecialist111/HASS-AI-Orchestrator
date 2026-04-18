@@ -38,7 +38,12 @@ class RagManager:
         """
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
-        
+        # Set to True after a confirmed successful embedding call so we
+        # only attempt to ``ollama.pull`` the model once per process when
+        # it's missing (issue #2).
+        self._embedding_model_ready: bool = False
+        self._embedding_pull_attempted: bool = False
+
         # Initialize ChromaDB client
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(
@@ -65,11 +70,48 @@ class RagManager:
         logger.info(f"RAG Manager initialized at {persist_dir} using {embedding_model}")
 
     def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding using Ollama (sync, safe for thread executor)"""
+        """Generate embedding using Ollama (sync, safe for thread executor).
+
+        On the first ``model not found`` failure we attempt a one-shot
+        ``ollama.pull`` of the configured embedding model and retry,
+        so the add-on is usable out of the box without operators
+        having to remember ``ollama pull nomic-embed-text`` (issue #2).
+        """
         try:
             response = ollama.embeddings(model=self.embedding_model, prompt=text)
+            self._embedding_model_ready = True
             return response["embedding"]
         except Exception as e:
+            msg = str(e).lower()
+            missing = (
+                "not found" in msg
+                or "no such model" in msg
+                or "try pulling it" in msg
+            )
+            if missing and not self._embedding_pull_attempted:
+                self._embedding_pull_attempted = True
+                logger.warning(
+                    "Embedding model %r not present locally; attempting "
+                    "one-shot ollama.pull...", self.embedding_model,
+                )
+                try:
+                    ollama.pull(self.embedding_model)
+                    response = ollama.embeddings(
+                        model=self.embedding_model, prompt=text
+                    )
+                    self._embedding_model_ready = True
+                    logger.info(
+                        "Embedding model %r pulled and ready.",
+                        self.embedding_model,
+                    )
+                    return response["embedding"]
+                except Exception as pull_err:
+                    logger.error(
+                        "Auto-pull of %r failed: %s. Run "
+                        "'ollama pull %s' on the Ollama host to enable RAG.",
+                        self.embedding_model, pull_err, self.embedding_model,
+                    )
+                    raise
             logger.error(f"Error generating embedding: {e}")
             raise
 

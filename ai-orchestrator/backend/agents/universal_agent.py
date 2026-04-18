@@ -1,9 +1,12 @@
 from typing import List, Dict, Any, Optional
 import json
+import logging
 from datetime import datetime
 from .base_agent import BaseAgent
 from mcp_server import MCPServer
 from ha_client import HAWebSocketClient
+
+logger = logging.getLogger(__name__)
 
 class UniversalAgent(BaseAgent):
     """
@@ -174,12 +177,19 @@ class UniversalAgent(BaseAgent):
         # Static entities mode: fetch state for each assigned entity
         for entity_id in self.entities:
             try:
-                s = await self.ha_client.get_state(entity_id)
+                # NOTE: HAWebSocketClient exposes get_states(entity_id=...),
+                # not get_state(...) — using the wrong name silently
+                # returned an AttributeError caught below, leaving every
+                # entity reported as "unavailable" (issue #6).
+                s = await self.ha_client.get_states(entity_id=entity_id)
                 if s:
                     friendly = s.get('attributes', {}).get('friendly_name', entity_id)
                     val = s.get('state', 'unknown')
                     states.append(f"{friendly} ({entity_id}): {val}")
-            except Exception:
+                else:
+                    states.append(f"{entity_id}: unavailable")
+            except Exception as exc:
+                logger.debug("get_states(%s) failed: %s", entity_id, exc)
                 states.append(f"{entity_id}: unavailable")
 
         return "\n".join(states) if states else "No entity states available."

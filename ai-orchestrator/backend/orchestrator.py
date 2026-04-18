@@ -160,14 +160,33 @@ class Orchestrator:
                 await asyncio.sleep(self.planning_interval)
 
     async def run_dashboard_refresh_loop(self):
-        """Periodically refresh the visual dashboard with latest states"""
+        """Periodically refresh the visual dashboard with latest states.
+
+        Skips a cycle (and applies a backoff) when Home Assistant is not
+        connected, so a disconnected HA does not produce an endless
+        stream of generation errors (issue #11).
+        """
         logger.info(f"Starting dashboard refresh loop (interval: {self.dashboard_refresh_interval}s)")
         # Small delay to let system initialize
         await asyncio.sleep(10)
-        
+
+        disconnected_logged = False
+        backoff = max(self.dashboard_refresh_interval, 30)
         while True:
             try:
-                # Only refresh if the file exists or if we have an instruction
+                client = self.ha_client
+                if not client or not getattr(client, "connected", False):
+                    if not disconnected_logged:
+                        logger.warning(
+                            "Dashboard refresh paused: Home Assistant not connected; "
+                            "will retry every %ss until reconnected.", backoff,
+                        )
+                        disconnected_logged = True
+                    await asyncio.sleep(backoff)
+                    continue
+                if disconnected_logged:
+                    logger.info("Home Assistant reconnected; resuming dashboard refresh.")
+                    disconnected_logged = False
                 await self.generate_visual_dashboard(user_instruction=self.last_dashboard_instruction)
                 await asyncio.sleep(self.dashboard_refresh_interval)
             except Exception as e:
@@ -690,7 +709,7 @@ OUTPUT REQUIREMENTS:
             if "finish_reason: SAFETY" in error_msg:
                 error_msg = "Gemini Safety Filter blocked the generation. Try a different prompt."
             
-            host_info = getattr(self.ollama_client, '_client', {}).get('base_url', 'unknown') if hasattr(self.ollama_client, '_client') else 'unknown'
+            host_info = getattr(self, "ollama_host_used", None) or "unknown"
             logger.error(f"❌ Failed to generate dashboard: {error_msg} (Host: {host_info})")
             
             fallback_html = f"""

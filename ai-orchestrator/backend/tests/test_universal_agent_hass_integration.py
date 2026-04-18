@@ -7,7 +7,8 @@ from mcp_server import MCPServer
 @pytest.fixture
 def mock_ha_client():
     client = NonCallableMagicMock()
-    client.get_state = AsyncMock()
+    client.connected = True
+    client.get_states = AsyncMock()
     client.call_service = AsyncMock()
     # Ensure success response for call_service to avoid "executed" check failures
     client.call_service.return_value = {"success": True}
@@ -27,19 +28,19 @@ def agent(mock_ha_client):
 
 @pytest.mark.asyncio
 async def test_agent_fetches_initial_state(agent, mock_ha_client):
-    """Verify gather_context calls get_state for entities"""
-    mock_ha_client.get_state.side_effect = [
+    """Verify gather_context calls get_states for entities (issue #6 fix)."""
+    mock_ha_client.get_states.side_effect = [
         {"entity_id": "light.test_light", "state": "off", "attributes": {"friendly_name": "Test Light"}},
         {"entity_id": "sensor.light_level", "state": "10", "attributes": {"friendly_name": "Light Level"}}
     ]
-    
+
     context = await agent.gather_context()
-    
+
     assert "timestamp" in context
     assert "state_description" in context
     assert "Test Light (light.test_light): off" in context["state_description"]
     assert "Light Level (sensor.light_level): 10" in context["state_description"]
-    assert mock_ha_client.get_state.call_count == 2
+    assert mock_ha_client.get_states.call_count == 2
 
 @pytest.mark.asyncio
 async def test_agent_decide_and_execute(agent, mock_ha_client):
