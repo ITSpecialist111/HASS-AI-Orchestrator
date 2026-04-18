@@ -226,6 +226,248 @@ class AnthropicBackend:
         return LLMResponse(content="\n".join(text_chunks).strip(), tool_calls=calls, raw=resp)
 
 
+class OpenAIToolBackend:
+    """OpenAI Chat Completions tool-calling backend.
+
+    Speaks the OpenAI ``tools=[{type: "function", function: {...}}]``
+    schema. This backend is also reused for GitHub Models (which exposes
+    the same wire format at ``https://models.github.ai/inference``);
+    :class:`GitHubModelsBackend` is a thin subclass.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        *,
+        name: str = "openai",
+        temperature: float = 0.2,
+        max_tokens: int = 1500,
+        default_headers: Optional[Dict[str, str]] = None,
+    ) -> None:
+        try:
+            from openai import AsyncOpenAI  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("openai package is required for OpenAIToolBackend") from exc
+
+        key = api_key or os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError(f"{name}: api_key is required")
+        self.name = name
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self._client = AsyncOpenAI(
+            api_key=key,
+            base_url=base_url or os.getenv("OPENAI_BASE_URL"),
+            default_headers=default_headers or None,
+        )
+
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+    ) -> LLMResponse:
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+        if tools:
+            kwargs["tools"] = tools
+        resp = await self._client.chat.completions.create(**kwargs)
+        if not resp.choices:
+            return LLMResponse(content="", tool_calls=[], raw=resp)
+        msg = resp.choices[0].message
+        content = (msg.content or "").strip()
+        calls: List[ToolCall] = []
+        for tc in (msg.tool_calls or []):
+            fn = getattr(tc, "function", None)
+            if fn is None:
+                continue
+            args_raw = getattr(fn, "arguments", "") or "{}"
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            except json.JSONDecodeError:
+                args = {"_raw": args_raw}
+            calls.append(ToolCall(id=tc.id, name=fn.name, arguments=args or {}))
+        return LLMResponse(content=content, tool_calls=calls, raw=resp)
+
+
+class GitHubModelsBackend(OpenAIToolBackend):
+    """GitHub Models tool-calling backend.
+
+    GitHub Models exposes an OpenAI-compatible API at
+    ``https://models.github.ai/inference``. Authentication uses a GitHub
+    PAT or fine-grained token with the ``models:read`` scope, sent as
+    ``Authorization: Bearer <token>``.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        token: Optional[str] = None,
+        base_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        gh_token = token or os.getenv("GITHUB_TOKEN") or os.getenv("GITHUB_MODELS_TOKEN")
+        if not gh_token:
+            raise RuntimeError("github: GITHUB_TOKEN (or GITHUB_MODELS_TOKEN) is required")
+        super().__init__(
+            model=model,
+            api_key=gh_token,
+            base_url=base_url or "https://models.github.ai/inference",
+            name="github",
+            **kwargs,
+        )
+
+
+class FoundryAgentBackend:
+    """Microsoft Foundry backend (chat-completions or hosted agent).
+
+    Two modes:
+
+    * **Model-deployment mode** (default): treats ``endpoint`` as an
+      Azure AI Inference / Foundry chat-completions endpoint and posts
+      tool calls in the OpenAI schema. Use this when you have deployed
+      a model (e.g. ``gpt-4o``) into a Foundry project.
+    * **Hosted-agent mode** (when ``agent_id`` is set): posts to the
+      Foundry Agents REST API. Hosted agents manage their own tool
+      calls server-side, so the local tool registry is informational
+      only — the backend returns the agent's text reply with no
+      ``tool_calls`` and the harness terminates after one turn.
+    """
+
+    name = "foundry"
+
+    def __init__(
+        self,
+        endpoint: str,
+        *,
+        api_key: Optional[str] = None,
+        bearer_token: Optional[str] = None,
+        model: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        api_version: Optional[str] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 1500,
+    ) -> None:
+        if not endpoint:
+            raise RuntimeError("foundry: endpoint URL is required")
+        if not api_key and not bearer_token:
+            raise RuntimeError("foundry: either api_key or bearer_token is required")
+        try:
+            import httpx  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("foundry: 'httpx' is required") from exc
+        self._httpx = httpx
+        self._endpoint = endpoint.rstrip("/")
+        self._model = model or ""
+        self._agent_id = agent_id or ""
+        self._api_version = api_version or os.getenv("FOUNDRY_API_VERSION", "2024-08-01-preview")
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self._headers: Dict[str, str] = {"Content-Type": "application/json"}
+        if api_key:
+            self._headers["api-key"] = api_key
+        if bearer_token:
+            self._headers["Authorization"] = f"Bearer {bearer_token}"
+
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+    ) -> LLMResponse:
+        if self._agent_id:
+            return await self._chat_hosted_agent(messages)
+        return await self._chat_model_deployment(messages, tools)
+
+    async def _chat_model_deployment(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+    ) -> LLMResponse:
+        if "/deployments/" in self._endpoint:
+            url = f"{self._endpoint}/chat/completions?api-version={self._api_version}"
+        elif self._model:
+            url = f"{self._endpoint}/openai/deployments/{self._model}/chat/completions?api-version={self._api_version}"
+        else:
+            url = f"{self._endpoint}/chat/completions?api-version={self._api_version}"
+
+        body: Dict[str, Any] = {
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+        if self._model and "/deployments/" not in url:
+            body["model"] = self._model
+        if tools:
+            body["tools"] = tools
+
+        async with self._httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, headers=self._headers, json=body)
+            resp.raise_for_status()
+            data = resp.json()
+
+        choices = data.get("choices") or []
+        if not choices:
+            return LLMResponse(content="", tool_calls=[], raw=data)
+        msg = choices[0].get("message") or {}
+        content = (msg.get("content") or "").strip()
+        calls: List[ToolCall] = []
+        for tc in (msg.get("tool_calls") or []):
+            fn = tc.get("function") or {}
+            args_raw = fn.get("arguments") or "{}"
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            except json.JSONDecodeError:
+                args = {"_raw": args_raw}
+            name = fn.get("name")
+            if not name:
+                continue
+            calls.append(ToolCall(id=tc.get("id") or str(uuid.uuid4()), name=name, arguments=args or {}))
+        return LLMResponse(content=content, tool_calls=calls, raw=data)
+
+    async def _chat_hosted_agent(self, messages: List[Dict[str, Any]]) -> LLMResponse:
+        # Hosted Foundry agents own their tool/runtime stack. We send the
+        # latest user message as a thread message and read the agent's
+        # text reply. Tool execution happens server-side.
+        last_user = next(
+            (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+            "",
+        )
+        url = f"{self._endpoint}/agents/{self._agent_id}/runs?api-version={self._api_version}"
+        body = {"messages": [{"role": "user", "content": last_user}]}
+
+        async with self._httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(url, headers=self._headers, json=body)
+            resp.raise_for_status()
+            data = resp.json()
+
+        # Foundry response shapes vary by API version; handle the common
+        # cases pragmatically.
+        text = ""
+        if isinstance(data, dict):
+            if isinstance(data.get("output"), str):
+                text = data["output"]
+            elif isinstance(data.get("messages"), list) and data["messages"]:
+                last = data["messages"][-1]
+                if isinstance(last, dict):
+                    text = (last.get("content") or last.get("text") or "") if isinstance(last.get("content"), str) else ""
+                    if not text and isinstance(last.get("content"), list):
+                        text = "\n".join(
+                            blk.get("text", "")
+                            for blk in last["content"]
+                            if isinstance(blk, dict) and blk.get("type") in ("text", "output_text")
+                        )
+            elif isinstance(data.get("choices"), list) and data["choices"]:
+                msg = (data["choices"][0] or {}).get("message") or {}
+                text = msg.get("content") or ""
+        return LLMResponse(content=(text or "").strip(), tool_calls=[], raw=data)
+
+
 # ---------------------------------------------------------------------------
 # Tool routing
 # ---------------------------------------------------------------------------

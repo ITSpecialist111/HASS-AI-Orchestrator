@@ -49,6 +49,17 @@
         "deep_reasoning_max_iterations": 12,
         "anthropic_api_key": "",
         "anthropic_model": "claude-opus-4-7",
+        "llm_provider": "ollama",
+        "openai_api_key": "",
+        "openai_base_url": "",
+        "openai_model": "gpt-4o-mini",
+        "github_token": "",
+        "github_model": "gpt-4o-mini",
+        "foundry_endpoint": "",
+        "foundry_api_key": "",
+        "foundry_bearer_token": "",
+        "foundry_model": "",
+        "foundry_agent_id": "",
         "api_token": ""
     },
     "schema": {
@@ -77,6 +88,17 @@
         "deep_reasoning_max_iterations": "int(1,40)",
         "anthropic_api_key": "str?",
         "anthropic_model": "str",
+        "llm_provider": "list(ollama|openai|github|foundry)?",
+        "openai_api_key": "str?",
+        "openai_base_url": "str?",
+        "openai_model": "str?",
+        "github_token": "str?",
+        "github_model": "str?",
+        "foundry_endpoint": "str?",
+        "foundry_api_key": "str?",
+        "foundry_bearer_token": "str?",
+        "foundry_model": "str?",
+        "foundry_agent_id": "str?",
         "api_token": "str?"
     }
 }

@@ -261,6 +261,19 @@ async def lifespan(app: FastAPI):
                 anthropic_model_opt = opts.get("anthropic_model", "claude-opus-4-7").strip()
                 deep_reasoning_max_iter_opt = int(opts.get("deep_reasoning_max_iterations", 12) or 12)
 
+                # Phase 9 — multi-provider LLM options
+                llm_provider_opt = opts.get("llm_provider", "").strip()
+                openai_api_key_opt = opts.get("openai_api_key", "").strip()
+                openai_base_url_opt = opts.get("openai_base_url", "").strip()
+                openai_model_opt = opts.get("openai_model", "gpt-4o-mini").strip()
+                github_token_opt = opts.get("github_token", "").strip()
+                github_model_opt = opts.get("github_model", "gpt-4o-mini").strip()
+                foundry_endpoint_opt = opts.get("foundry_endpoint", "").strip()
+                foundry_api_key_opt = opts.get("foundry_api_key", "").strip()
+                foundry_bearer_token_opt = opts.get("foundry_bearer_token", "").strip()
+                foundry_model_opt = opts.get("foundry_model", "").strip()
+                foundry_agent_id_opt = opts.get("foundry_agent_id", "").strip()
+
                 # API auth token (Phase 7 Milestone B)
                 global _api_token
                 _api_token_opt = opts.get("api_token", "").strip()
@@ -368,6 +381,29 @@ async def lifespan(app: FastAPI):
     # Register callback for dashboard notifications
     approval_queue.register_callback(broadcast_approval_request)
     print("✓ Approval Queue initialized")
+
+    # 4.5 Phase 9 — export multi-provider LLM credentials into the
+    # process environment so every downstream factory (BaseAgent,
+    # Orchestrator, RAG, DeepReasoningAgent) sees the same provider
+    # selection and credentials regardless of construction order.
+    _llm_env_map = {
+        "LLM_PROVIDER": locals().get("llm_provider_opt", ""),
+        "OPENAI_API_KEY": locals().get("openai_api_key_opt", ""),
+        "OPENAI_BASE_URL": locals().get("openai_base_url_opt", ""),
+        "OPENAI_MODEL": locals().get("openai_model_opt", ""),
+        "GITHUB_TOKEN": locals().get("github_token_opt", ""),
+        "GITHUB_MODEL": locals().get("github_model_opt", ""),
+        "FOUNDRY_ENDPOINT": locals().get("foundry_endpoint_opt", ""),
+        "FOUNDRY_API_KEY": locals().get("foundry_api_key_opt", ""),
+        "FOUNDRY_BEARER_TOKEN": locals().get("foundry_bearer_token_opt", ""),
+        "FOUNDRY_MODEL": locals().get("foundry_model_opt", ""),
+        "FOUNDRY_AGENT_ID": locals().get("foundry_agent_id_opt", ""),
+    }
+    for _env_key, _env_val in _llm_env_map.items():
+        if _env_val:
+            os.environ[_env_key] = _env_val
+    if _llm_env_map.get("LLM_PROVIDER"):
+        print(f"✓ LLM provider: {_llm_env_map['LLM_PROVIDER']}")
     
     # 5. Initialize Agents
     # Helper to parse entity lists
@@ -478,6 +514,21 @@ async def lifespan(app: FastAPI):
     anthropic_model = locals().get("anthropic_model_opt", "") or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-7")
     max_iter = int(locals().get("deep_reasoning_max_iter_opt", 12) or 12)
 
+    # Phase 9 — re-read provider locals (env was already exported in
+    # step 4.5 so other components see the same credentials; we capture
+    # them here to pass explicitly to DeepReasoningAgent).
+    llm_provider = locals().get("llm_provider_opt", "") or os.getenv("LLM_PROVIDER", "")
+    openai_api_key = locals().get("openai_api_key_opt", "") or os.getenv("OPENAI_API_KEY", "")
+    openai_base_url = locals().get("openai_base_url_opt", "") or os.getenv("OPENAI_BASE_URL", "")
+    openai_model = locals().get("openai_model_opt", "") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    github_token = locals().get("github_token_opt", "") or os.getenv("GITHUB_TOKEN", "")
+    github_model = locals().get("github_model_opt", "") or os.getenv("GITHUB_MODEL", "gpt-4o-mini")
+    foundry_endpoint = locals().get("foundry_endpoint_opt", "") or os.getenv("FOUNDRY_ENDPOINT", "")
+    foundry_api_key = locals().get("foundry_api_key_opt", "") or os.getenv("FOUNDRY_API_KEY", "")
+    foundry_bearer_token = locals().get("foundry_bearer_token_opt", "") or os.getenv("FOUNDRY_BEARER_TOKEN", "")
+    foundry_model = locals().get("foundry_model_opt", "") or os.getenv("FOUNDRY_MODEL", "")
+    foundry_agent_id = locals().get("foundry_agent_id_opt", "") or os.getenv("FOUNDRY_AGENT_ID", "")
+
     if mcp_url:
         external_mcp = ExternalMCPClient(url=mcp_url, token=mcp_token or None, name="external_mcp")
         ok = await external_mcp.connect()
@@ -503,6 +554,17 @@ async def lifespan(app: FastAPI):
             ollama_host=os.getenv("OLLAMA_HOST"),
             anthropic_api_key=anthropic_key or None,
             anthropic_model=anthropic_model,
+            provider=llm_provider or None,
+            openai_api_key=openai_api_key or None,
+            openai_base_url=openai_base_url or None,
+            openai_model=openai_model or None,
+            github_token=github_token or None,
+            github_model=github_model or None,
+            foundry_endpoint=foundry_endpoint or None,
+            foundry_api_key=foundry_api_key or None,
+            foundry_bearer_token=foundry_bearer_token or None,
+            foundry_model=foundry_model or None,
+            foundry_agent_id=foundry_agent_id or None,
             max_iterations=max_iter,
             broadcast_func=broadcast_to_dashboard,
             memory_store=memory_store,

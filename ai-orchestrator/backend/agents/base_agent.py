@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Any
 
 import ollama
 from ha_client import HAWebSocketClient
+from llm_providers import make_chat_provider
 from mcp_server import MCPServer
 
 
@@ -65,9 +66,11 @@ class BaseAgent(ABC):
         # Load skills from SKILLS.md
         self.skills = self.load_skills()
         
-        # Ollama client
+        # Ollama client (legacy attribute kept for back-compat) plus the
+        # provider-aware chat façade introduced in Phase 9.
         ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.ollama_client = ollama.Client(host=ollama_host)
+        self.llm_provider = make_chat_provider(ollama_host=ollama_host)
         
         # Decision storage
         self.decision_dir = Path("/data/decisions") / agent_id
@@ -141,36 +144,32 @@ class BaseAgent(ABC):
         max_tokens: int = 1000
     ) -> str:
         """
-        Call Ollama LLM with streaming.
-        
+        Call the configured LLM provider (Ollama / OpenAI / GitHub
+        Models / Foundry) and return the assistant text.
+
         Args:
             prompt: Prompt text
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
-        
+
         Returns:
             Generated text
         """
         try:
-            response = self.ollama_client.chat(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                options={
-                    "temperature": temperature,
-                    "num_predict": max_tokens,
-                    "think": False  # Disable internal reasoning tags (Issue #12)
-                },
-                stream=False
+            content = await asyncio.to_thread(
+                self.llm_provider.chat,
+                self.model_name,
+                [{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
-            
-            content = response["message"]["content"]
-            
+
             # Strip any remaining <think>...</think> blocks (Issue #12 failsafe)
             import re
             content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
-            
+
             return content.strip()
-        
+
         except Exception as e:
             print(f"❌ LLM call failed: {e}")
             return f"ERROR: {str(e)}"

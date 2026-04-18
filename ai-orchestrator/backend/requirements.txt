@@ -23,3 +23,7 @@ pyyaml==6.0.2
 mcp>=1.0.0
 anthropic>=0.40.0
 
+# Phase 9: Multi-provider LLM (OpenAI / GitHub Models / Microsoft Foundry)
+# OpenAI SDK is OpenAI-compatible; we reuse it for GitHub Models too.
+openai>=1.50.0
+

@@ -26,6 +26,11 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from external_mcp import ExternalMCPClient
+from llm_providers import (
+    PROVIDER_OLLAMA,
+    make_tool_backend,
+    resolve_provider_name,
+)
 from memory_store import MemoryStore, RecalledEpisode, ReasoningEpisode
 from native_ha_tools import NativeHATools
 from plan_executor import (
@@ -119,6 +124,17 @@ class DeepReasoningAgent:
         ollama_host: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
         anthropic_model: str = "claude-opus-4-7",
+        provider: Optional[str] = None,
+        openai_api_key: Optional[str] = None,
+        openai_base_url: Optional[str] = None,
+        openai_model: Optional[str] = None,
+        github_token: Optional[str] = None,
+        github_model: Optional[str] = None,
+        foundry_endpoint: Optional[str] = None,
+        foundry_api_key: Optional[str] = None,
+        foundry_bearer_token: Optional[str] = None,
+        foundry_model: Optional[str] = None,
+        foundry_agent_id: Optional[str] = None,
         max_iterations: int = 12,
         max_tool_calls_per_turn: int = 5,
         broadcast_func: Optional[Any] = None,
@@ -162,6 +178,10 @@ class DeepReasoningAgent:
         self.log_dir = base / "deep_reasoner"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
+        # Provider precedence:
+        #   1. explicit anthropic_api_key (legacy fast-path)
+        #   2. provider arg / LLM_PROVIDER env (new, multi-provider)
+        #   3. Ollama default
         self.llm: LLMBackend
         if anthropic_api_key:
             try:
@@ -171,8 +191,38 @@ class DeepReasoningAgent:
                 logger.warning("Anthropic backend unavailable, falling back to Ollama: %s", exc)
                 self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
         else:
-            self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
-            logger.info("DeepReasoningAgent using Ollama backend (%s)", ollama_model)
+            resolved = resolve_provider_name(provider)
+            if resolved == PROVIDER_OLLAMA:
+                self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
+                logger.info("DeepReasoningAgent using Ollama backend (%s)", ollama_model)
+            else:
+                # Pick the per-provider model; fall back to ollama_model
+                # as a last-resort string (some providers will reject it,
+                # but we surface that as a runtime error rather than a
+                # silent default that hides misconfiguration).
+                model_for_provider = (
+                    openai_model if resolved == "openai"
+                    else github_model if resolved == "github"
+                    else foundry_model if resolved == "foundry"
+                    else ollama_model
+                ) or ollama_model
+                self.llm = make_tool_backend(
+                    resolved,
+                    model=model_for_provider,
+                    ollama_host=ollama_host,
+                    openai_api_key=openai_api_key,
+                    openai_base_url=openai_base_url,
+                    github_token=github_token,
+                    foundry_endpoint=foundry_endpoint,
+                    foundry_api_key=foundry_api_key,
+                    foundry_bearer_token=foundry_bearer_token,
+                    foundry_agent_id=foundry_agent_id,
+                )
+                logger.info(
+                    "DeepReasoningAgent using %s backend (%s)",
+                    getattr(self.llm, "name", resolved),
+                    model_for_provider,
+                )
 
         self.registry = ToolRegistry()
         self._register_tools()

@@ -18,6 +18,7 @@ try:
 except ImportError:
     _genai_module = None
     _GENAI_AVAILABLE = False
+from llm_providers import make_chat_provider
 from workflow_graph import (
     OrchestratorState, Task, Decision, Conflict,
     create_workflow
@@ -75,10 +76,15 @@ class Orchestrator:
 
         self.compiled_workflow = self.workflow.compile()
 
-        # Ollama client for planning LLM
+        # Ollama client for planning LLM (kept for back-compat; some
+        # planning paths still use Ollama-specific ``format="json"``).
+        # The ``llm_provider`` façade routes through the configured
+        # provider (Ollama / OpenAI / GitHub Models / Foundry) for
+        # callers that don't need Ollama-only options.
         self.ollama_client = ollama.Client(host=ollama_host)
         self.llm_client = self.ollama_client # Reference for other methods
         self.ollama_host_used = ollama_host
+        self.llm_provider = make_chat_provider(ollama_host=ollama_host)
 
         # Task and progress tracking (bounded to prevent memory leaks)
         self.task_ledger: collections.deque = collections.deque(maxlen=500)
