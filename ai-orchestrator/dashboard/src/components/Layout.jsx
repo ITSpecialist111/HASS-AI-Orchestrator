@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart } from 'lucide-react';
+import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart, Brain, Sparkles, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { SettingsModal } from './SettingsModal';
 
@@ -37,6 +37,9 @@ export function Layout({ children, activeTab, onTabChange, connected, version = 
         { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         { id: 'factory', label: 'Agent Factory', icon: Bot },
         { id: 'visual', label: 'Visual Dashboard', icon: Server },
+        { id: 'reasoning', label: 'Deep Reasoning', icon: Brain },
+        { id: 'prompts', label: 'Prompt Library', icon: Sparkles },
+        { id: 'triggers', label: 'Triggers', icon: Zap },
     ];
 
     return (

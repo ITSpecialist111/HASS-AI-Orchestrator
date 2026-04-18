@@ -6,6 +6,9 @@ import { AgentFactory } from './components/AgentFactory'
 import { DecisionStream } from './components/DecisionStream'
 import { ChatAssistant } from './components/ChatAssistant'
 import { VisualDashboard } from './components/VisualDashboard'
+import { ReasoningPanel } from './components/ReasoningPanel'
+import { PromptLibrary } from './components/PromptLibrary'
+import { TriggersPanel } from './components/TriggersPanel'
 import './index.css'
 
 function App() {
@@ -14,7 +17,8 @@ function App() {
     const [dailyStats, setDailyStats] = useState([])
     const [performance, setPerformance] = useState({})
     const [connected, setConnected] = useState(false)
-    const [activeTab, setActiveTab] = useState('live') // 'live' | 'stream' | 'analytics' | 'factory'
+    const [activeTab, setActiveTab] = useState('live') // 'live' | 'stream' | 'analytics' | 'factory' | 'reasoning'
+    const [reasoningEvents, setReasoningEvents] = useState([])
 
     const [suggestions, setSuggestions] = useState([])
     const [pendingBlueprint, setPendingBlueprint] = useState(null)
@@ -53,6 +57,8 @@ function App() {
                     // Add new decision to top of list
                     setDecisions(prev => [msg.data, ...prev].slice(0, 50)) // Keep last 50
                     fetchAgents() // Update agent status/last action
+                } else if (msg.type === 'reasoning_event') {
+                    setReasoningEvents(prev => [...prev, msg.data])
                 }
             } catch (e) {
                 console.error("WS Parse Error", e)
@@ -145,6 +151,12 @@ function App() {
                 />
             case 'visual':
                 return <VisualDashboard />
+            case 'reasoning':
+                return <ReasoningPanel reasoningEvents={reasoningEvents} />
+            case 'prompts':
+                return <PromptLibrary />
+            case 'triggers':
+                return <TriggersPanel />
             default:
                 return <AgentGrid agents={agents} />
         }
