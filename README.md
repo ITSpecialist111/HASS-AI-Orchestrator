@@ -1,10 +1,10 @@
 # 🏠 Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.9.47-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.10.0-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
 
 **The Autonomous Multi-Agent Brain for your Smart Home.**
 
-> 🚀 **Alpha Release (v0.9.47)**: Now seeking testers!
+> 🚀 **Alpha Release (v0.10.0)**: Now seeking testers!
 
 The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
 

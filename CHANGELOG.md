@@ -1,6 +1,45 @@
 # Changelog
 <br>
 
+## [0.10.0] - 2026-04-19
+### Added — Phase 9: Multi-Provider LLM
+- **OpenAI / GitHub Models / Microsoft Foundry** support alongside the existing local Ollama default.
+  Pick a provider via the `llm_provider` add-on option (`ollama` | `openai` | `github` | `foundry`)
+  and supply the matching credentials. Misconfiguration silently falls back to Ollama so the add-on
+  always boots and never leaks conversations to a misconfigured cloud endpoint.
+- **OpenAI** — `openai_api_key` (+ optional `openai_base_url` for any OpenAI-compatible endpoint).
+- **GitHub Models** — `github_token` (PAT with `models:read`); reuses OpenAI wire format at
+  `https://models.github.ai/inference`.
+- **Microsoft Foundry** — `foundry_endpoint` + `foundry_api_key` *or* `foundry_bearer_token`.
+  Two modes: model deployment (Azure AI Inference / Foundry chat completions, full tool calling) and
+  hosted Foundry agent (when `foundry_agent_id` is set; tools execute server-side in Foundry).
+- New `backend/llm_providers.py` façade plus `OpenAIToolBackend`, `GitHubModelsBackend`, and
+  `FoundryAgentBackend` in `reasoning_harness.py` for the deep-reasoning agent's tool loop.
+- 15 new isolated provider tests (no real network calls); suite now 229 passed / 4 skipped.
+
+### Added — Phases 7 / 8 / 8.5 (recap)
+- **Phase 7**: Deep Reasoning Agent built on `ReasoningHarness` with native HA tool surface
+  (`native_ha_tools.py`) — entity discovery, state queries, services, area summaries — plus
+  optional external MCP servers, Anthropic Claude backend, memory store, and plan/approve/execute mode.
+- **Phase 8.D**: Triggers panel — proactive trigger registry (`trigger_registry.py`) and dashboard UI.
+- **Phase 8.E**: Streaming reasoning trace via SSE (`/reasoning/stream`).
+- **Phase 8.F**: Plan-mode UX — review and approve multi-step plans before execution.
+- **Phase 8.G**: Reasoning panel + prompt library wiring in the dashboard.
+- **Phase 8.5**: Native prompt library (`native_prompts.py`) loading built-in and user-defined
+  workflow prompts from `backend/prompts/` and `/data/prompts/`.
+
+### Fixed
+- **#17** — `getattr(self.ollama_client, '_client', {}).get(...)` `TypeError` in dashboard generation;
+  now uses the cached `self.ollama_host_used` string.
+- **#11** — Dashboard refresh loop spammed logs when Home Assistant was unreachable; now pre-flight
+  checks `ha_client.connected` with a 30 s back-off and logs the disconnect once.
+- **#6** — `get_state(entity_id)` was a non-existent helper in the universal agent path; replaced
+  with `get_states(entity_id=entity_id)`.
+- **#2** — `nomic-embed-text` model not found errors on first boot are now self-healing: the RAG
+  manager performs a one-shot `ollama.pull` and retries automatically.
+
+<br>
+
 ## [0.9.45] - 2025-12-22
 ### Fixed
 - **HA Connectivity Robustness**: Improved error logging in `ha_client.py` with full URI and exception details. Added a startup wait period in `main.py` to prevent race conditions during early ingestion.

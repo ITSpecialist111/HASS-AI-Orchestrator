@@ -4,7 +4,7 @@
 
 AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
 
-**Version**: v0.9.47 (Gemini Integration & Connectivity Robustness)
+**Version**: v0.10.0 (Multi-Provider LLM, Deep Reasoning, Triggers & Prompt Library)
 
 ## 🌟 Key Features
 
@@ -76,6 +76,12 @@ The system now features a real-time, LLM-driven visualization engine that builds
     *   **Smart Model**: The reasoning model for complex agents (default: `deepseek-r1:8b`).
     *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
     *   **Cloud AI API Key**: (Optional) Add your Google AI API key for high-fidelity "AI Visual Dashboard" generation.
+    *   **LLM Provider** (v0.10.0+, optional): Switch every agent and the orchestrator over to a remote provider by setting `llm_provider` to one of:
+        *   `ollama` *(default — local, private, free)*
+        *   `openai` — set `openai_api_key` (and optionally `openai_base_url` for any OpenAI-compatible endpoint) and `openai_model` (e.g. `gpt-4o-mini`).
+        *   `github` — set `github_token` (a GitHub PAT with the `models:read` scope) and `github_model` (e.g. `gpt-4o-mini`). Uses [GitHub Models](https://models.github.ai/).
+        *   `foundry` — set `foundry_endpoint` (your Microsoft Foundry / Azure AI Inference URL) plus either `foundry_api_key` *or* `foundry_bearer_token`, and `foundry_model` (e.g. `gpt-4o`). Set `foundry_agent_id` to call a hosted Foundry Agent instead of a model deployment (tools then run server-side in Foundry).
+        *   On any misconfiguration the add-on silently falls back to Ollama, so a wrong key never leaks conversations to a cloud provider.
     *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
     *   **Direct Access Mode**: Automatically falls back to Direct Core Access (e.g., `http://homeassistant:8123`) if the Supervisor Proxy is unavailable or tokens are mismatched.
     *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
