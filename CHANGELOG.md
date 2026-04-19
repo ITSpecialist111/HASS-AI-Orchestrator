@@ -1,6 +1,47 @@
 # Changelog
 <br>
 
+## [0.10.1] - 2026-04-19
+### Added — Phase 10A: Dashboard Studio (generative dashboards)
+- **Prompt-to-dashboard with a saved gallery.** Every generation is now persisted with full
+  metadata (prompt, provider, model, timestamp, parent / variation lineage) at
+  `/data/dashboard_studio/<id>.html` + sidecar `.meta.json`. The Studio replaces the
+  one-shot "refresh and overwrite" workflow with something closer to AI image generators:
+  iterate, branch, compare, pin.
+- **Iterate.** Refine an existing dashboard with a new instruction ("make it darker", "add a
+  battery gauge"). The previous HTML is sent back to the model so the structure is preserved
+  and only the requested change is applied. Iterations link to their parent so you can always
+  walk back the history.
+- **Variations.** Generate N alternates from the same prompt in parallel (2–6), each tagged
+  with a different style hint ("bold and dense", "minimal and airy", "data-rich with
+  sparklines", etc). Switch between them in the gallery to pick a favourite.
+- **Live data binding without re-running the LLM.** The system prompt requires every dynamic
+  value to be wrapped in `<span data-entity="sensor.foo" data-attr="state">…</span>`
+  placeholders. The Studio injects a tiny polling shim into every saved dashboard that
+  fetches `api/studio/dashboards/<id>/state` every 15 s and patches the DOM in place. Layouts
+  stay frozen, values stay fresh.
+- **Multi-provider.** Built on the Phase 9 `make_chat_provider` factory, so Ollama, OpenAI,
+  GitHub Models and Microsoft Foundry all work; a per-call `provider` / `model` override
+  lets you A/B test without touching settings.
+- **Better grounding.** Instead of dumping 30 random entities as raw JSON, the context is
+  grouped by domain with per-domain samples — the model sees the *shape* of the home
+  ("8 lights, 14 temperature sensors, 2 locks") before any specifics.
+- **Pin / unpin / delete.** Pinned dashboards are protected from accidental deletion and
+  always sort to the top of the gallery.
+- **REST API:** `GET /api/studio/dashboards`, `POST /api/studio/generate`,
+  `POST /api/studio/dashboards/{id}/iterate`, `POST /api/studio/variations`,
+  `GET /api/studio/dashboards/{id}` (HTML), `…/meta`, `…/state`,
+  `POST …/pin`, `POST …/unpin`, `DELETE …/dashboards/{id}`.
+- **UI:** new "Dashboard Studio" tab with a gallery sidebar, prompt bar, iterate bar, variation
+  switcher, provider picker and one-click pin/copy/open-standalone. The legacy "Visual
+  Dashboard" tab is left intact for back-compat.
+- **Tests:** 17 new smoke tests covering helpers, persistence, iteration parent links,
+  variation anchoring, pinned-delete protection, live-state filtering, provider routing
+  and graceful fallback when the LLM returns non-HTML. Suite is now **246 passed, 4 skipped**
+  (was 229).
+
+<br>
+
 ## [0.10.0] - 2026-04-19
 ### Added — Phase 9: Multi-Provider LLM
 - **OpenAI / GitHub Models / Microsoft Foundry** support alongside the existing local Ollama default.

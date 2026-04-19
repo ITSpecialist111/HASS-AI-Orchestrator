@@ -6,6 +6,7 @@ import { AgentFactory } from './components/AgentFactory'
 import { DecisionStream } from './components/DecisionStream'
 import { ChatAssistant } from './components/ChatAssistant'
 import { VisualDashboard } from './components/VisualDashboard'
+import { DashboardStudio } from './components/DashboardStudio'
 import { ReasoningPanel } from './components/ReasoningPanel'
 import { PromptLibrary } from './components/PromptLibrary'
 import { TriggersPanel } from './components/TriggersPanel'
@@ -151,6 +152,8 @@ function App() {
                 />
             case 'visual':
                 return <VisualDashboard />
+            case 'studio':
+                return <DashboardStudio />
             case 'reasoning':
                 return <ReasoningPanel reasoningEvents={reasoningEvents} />
             case 'prompts':

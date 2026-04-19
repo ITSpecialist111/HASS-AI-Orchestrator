@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.10.0",
+    "version": "0.10.1",
     "slug": "ai-orchestrator",
     "description": "Phase 8: Self-contained reasoning + memory + plan-approve-execute + triggers + streaming + native prompt library (no external MCP prerequisite)",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",

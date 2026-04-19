@@ -110,6 +110,7 @@ from memory_store import MemoryStore
 from native_prompts import NativePromptLibrary
 from plan_executor import PlanStore
 from triggers import TriggerRegistry, TriggerSpec, TriggerStore, CronExpr
+from dashboard_studio import DashboardStudio, DashboardMeta
 import yaml
 
 import logging
@@ -167,6 +168,7 @@ external_mcp: Optional[ExternalMCPClient] = None
 deep_reasoner: Optional[DeepReasoningAgent] = None
 trigger_registry: Optional[TriggerRegistry] = None
 native_prompts: Optional[NativePromptLibrary] = None
+dashboard_studio: Optional[DashboardStudio] = None
 agents: Dict[str, object] = {}
 dashboard_clients: List[WebSocket] = []
 
@@ -576,6 +578,31 @@ async def lifespan(app: FastAPI):
         print(f"✓ Deep Reasoning Agent initialized (backend={deep_reasoner.llm.name}, tools={len(deep_reasoner.registry.names())}, memory={'on' if memory_store and memory_store.enabled else 'off'}, plans={'on' if plan_store else 'off'}, mode={deep_reasoner.default_mode})")
     except Exception as e:
         print(f"⚠️ Failed to initialize Deep Reasoning Agent: {e}")
+
+    # ----------------------------------------------------------------
+    # Phase 10A — Dashboard Studio (generative dashboards)
+    # ----------------------------------------------------------------
+    global dashboard_studio
+    try:
+        studio_dir_str = os.getenv("DASHBOARD_STUDIO_DIR", "")
+        if not studio_dir_str:
+            studio_dir = (
+                Path("/data/dashboard_studio")
+                if os.path.exists("/data") and os.access("/data", os.W_OK)
+                else Path(__file__).parent.parent / "data" / "dashboard_studio"
+            )
+        else:
+            studio_dir = Path(studio_dir_str)
+        dashboard_studio = DashboardStudio(
+            ha_client_provider=lambda: ha_client,
+            store_dir=studio_dir,
+            default_provider=os.getenv("LLM_PROVIDER") or None,
+        )
+        app.state.dashboard_studio = dashboard_studio
+        print(f"✓ Dashboard Studio ready ({len(dashboard_studio.list_dashboards())} saved at {studio_dir})")
+    except Exception as e:
+        print(f"⚠️ Failed to initialise Dashboard Studio: {e}")
+        dashboard_studio = None
 
     # ----------------------------------------------------------------
     # Phase 8.5 — native prompt library (always-available workflows)
@@ -1284,6 +1311,143 @@ async def handle_approval(request_id: str, action: str):
         raise HTTPException(status_code=404, detail="Request not found or not pending")
         
     return {"status": "success", "action": action, "request_id": request_id}
+
+
+# ---------------------------------------------------------------------------
+# Dashboard Studio (Phase 10A) — generative dashboards with iterate/variations
+# ---------------------------------------------------------------------------
+class _StudioGenerateBody(BaseModel):
+    prompt: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+class _StudioIterateBody(BaseModel):
+    instruction: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+class _StudioVariationsBody(BaseModel):
+    prompt: str
+    n: int = 3
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+def _require_studio() -> DashboardStudio:
+    if dashboard_studio is None:
+        raise HTTPException(status_code=503, detail="Dashboard Studio not initialised")
+    return dashboard_studio
+
+
+@app.get("/api/studio/dashboards")
+async def studio_list_dashboards():
+    """List every saved generative dashboard, pinned-first then newest."""
+    studio = _require_studio()
+    return [m.to_dict() for m in studio.list_dashboards()]
+
+
+@app.post("/api/studio/generate")
+async def studio_generate(body: _StudioGenerateBody):
+    """Generate a brand-new dashboard from a prompt."""
+    studio = _require_studio()
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+    meta = await studio.generate(
+        prompt=body.prompt,
+        provider=body.provider,
+        model=body.model,
+    )
+    return meta.to_dict()
+
+
+@app.post("/api/studio/dashboards/{dashboard_id}/iterate")
+async def studio_iterate(dashboard_id: str, body: _StudioIterateBody):
+    """Refine an existing dashboard with a new instruction (creates a child)."""
+    studio = _require_studio()
+    if not body.instruction.strip():
+        raise HTTPException(status_code=400, detail="instruction is required")
+    meta = await studio.iterate(
+        base_id=dashboard_id,
+        instruction=body.instruction,
+        provider=body.provider,
+        model=body.model,
+    )
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Base dashboard not found")
+    return meta.to_dict()
+
+
+@app.post("/api/studio/variations")
+async def studio_variations(body: _StudioVariationsBody):
+    """Generate N variations from the same prompt in parallel."""
+    studio = _require_studio()
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+    metas = await studio.variations(
+        prompt=body.prompt,
+        n=body.n,
+        provider=body.provider,
+        model=body.model,
+    )
+    return [m.to_dict() for m in metas]
+
+
+@app.get("/api/studio/dashboards/{dashboard_id}")
+async def studio_get_dashboard(dashboard_id: str):
+    """Serve the rendered HTML for a dashboard (suitable for iframe src)."""
+    studio = _require_studio()
+    html = studio.get_html(dashboard_id)
+    if html is None:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/studio/dashboards/{dashboard_id}/meta")
+async def studio_get_meta(dashboard_id: str):
+    studio = _require_studio()
+    meta = studio.get_meta(dashboard_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return meta.to_dict()
+
+
+@app.get("/api/studio/dashboards/{dashboard_id}/state")
+async def studio_get_state(dashboard_id: str):
+    """Live state map for every entity referenced by the dashboard.
+
+    Polled by the shim injected at save time so dashboards stay fresh
+    without re-running the LLM.
+    """
+    studio = _require_studio()
+    return await studio.live_state_for(dashboard_id)
+
+
+@app.post("/api/studio/dashboards/{dashboard_id}/pin")
+async def studio_pin(dashboard_id: str):
+    studio = _require_studio()
+    meta = studio.set_pinned(dashboard_id, True)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return meta.to_dict()
+
+
+@app.post("/api/studio/dashboards/{dashboard_id}/unpin")
+async def studio_unpin(dashboard_id: str):
+    studio = _require_studio()
+    meta = studio.set_pinned(dashboard_id, False)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return meta.to_dict()
+
+
+@app.delete("/api/studio/dashboards/{dashboard_id}")
+async def studio_delete(dashboard_id: str):
+    studio = _require_studio()
+    if not studio.delete_dashboard(dashboard_id):
+        raise HTTPException(status_code=409, detail="Cannot delete (not found or pinned)")
+    return {"status": "deleted", "id": dashboard_id}
 
 
 @app.get("/api/dashboard/dynamic")
