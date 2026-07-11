@@ -34,8 +34,37 @@ The long-term goal is not another voice-controlled remote and not a chatbot bolt
 - **Next:** native Assist/voice integration, post-action state verification, filtered real-time events, and a temporal model of the home.
 - **Latest test release:** [v0.13.4 — Read-Only Plan Lifecycle](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.4).
 
+## Live screenshots
+
+These are captured from the working Home Assistant add-on on version 0.13.4. The connectivity and reasoning examples are real, read-only runs against Home Assistant; no device state was changed.
+
+### Home operations
+
+![Home Orchestrator operational overview showing a live Home Assistant connection, agent status, reasoning profile, and guarded goal entry](docs/images/home-operations.png)
+
+The Defender-inspired portal keeps connection health, pending approvals, the selected local model profile, and natural-language goal entry in one operational view.
+
+### Select reasoning depth
+
+![Ask and Run workspace showing Rapid, Balanced, and Deep Gemma reasoning profiles with Plan-only policy selected](docs/images/reasoning-profiles.png)
+
+Every run can use Rapid, Balanced, or Deep while the same deterministic schemas, tool policy, ordering, and approval controls remain authoritative.
+
+### Live guarded result
+
+![Completed read-only Ollama reasoning run showing successful guarded tool use, timing, token usage, and a deterministic no-action plan](docs/images/live-reasoning-result.png)
+
+This live Rapid run queried Home Assistant through `ha_summarise_area`, completed successfully, and recorded a read-only plan with no actions to execute.
+
+### Exact plan review
+
+![Action center showing an expanded simulated lighting plan with risk summary, deterministic tool intent, and approve or reject controls](docs/images/action-center.png)
+
+Mutation requests are captured as exact tool calls and arguments. The screenshot used a simulated Plan-only run and the plan was rejected immediately after capture; it never changed the home.
+
 ### Contents
 
+- [Live screenshots](#live-screenshots)
 - [The problem we are trying to solve](#the-problem-we-are-trying-to-solve)
 - [What the system can do today](#what-the-system-can-do-today)
 - [How a goal moves through the system](#how-a-goal-moves-through-the-system)
