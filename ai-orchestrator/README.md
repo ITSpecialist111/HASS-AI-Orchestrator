@@ -2,6 +2,8 @@
 
 A local-first, deterministic AI control plane for Home Assistant.
 
+> This page focuses on installation, configuration, and runtime policy. For the full product vision, use cases, architecture, safety story, Hermes positioning, privacy model, and road to 1.0, read the [main project README](../README.md).
+
 AI Orchestrator observes the real home, reasons with local or cloud models, and turns model requests into validated, reviewable Home Assistant operations. The model proposes; application code enforces schemas, policy, budgets, ordering, approval, and replay.
 
 ## What is authoritative in 0.12
