@@ -4,6 +4,8 @@ import {
     Layers, GitBranch, Download, Copy, AlertCircle, X, Loader2
 } from 'lucide-react';
 
+const GENERATION_TIMEOUT_MS = 195_000;
+
 /**
  * DashboardStudio (Phase 10A UI)
  *
@@ -29,6 +31,7 @@ export const DashboardStudio = () => {
     const [iframeNonce, setIframeNonce] = useState(0);
     const promptRef = useRef(null);
     const iframeRef = useRef(null);
+    const requestRef = useRef(null);
 
     const refreshList = async () => {
         try {
@@ -49,6 +52,8 @@ export const DashboardStudio = () => {
     };
 
     useEffect(() => { refreshList(); /* eslint-disable-next-line */ }, []);
+
+    useEffect(() => () => requestRef.current?.abort(), []);
 
     const pushLiveState = async (dashboardId) => {
         if (!dashboardId || !iframeRef.current?.contentWindow) return;
@@ -83,16 +88,38 @@ export const DashboardStudio = () => {
     }, [selected, iframeNonce]);
 
     const callJson = async (url, opts = {}) => {
-        const res = await fetch(url, {
-            ...opts,
-            headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-        });
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`${res.status}: ${text || res.statusText}`);
+        const controller = new AbortController();
+        let timedOut = false;
+        requestRef.current = controller;
+        const timeout = window.setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, GENERATION_TIMEOUT_MS);
+        try {
+            const res = await fetch(url, {
+                ...opts,
+                signal: controller.signal,
+                headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`${res.status}: ${text || res.statusText}`);
+            }
+            return res.json();
+        } catch (requestError) {
+            if (requestError.name === 'AbortError') {
+                throw new Error(timedOut
+                    ? 'Dashboard generation timed out. Try a faster model or a simpler prompt.'
+                    : 'Dashboard generation was cancelled.');
+            }
+            throw requestError;
+        } finally {
+            window.clearTimeout(timeout);
+            if (requestRef.current === controller) requestRef.current = null;
         }
-        return res.json();
     };
+
+    const cancelGeneration = () => requestRef.current?.abort();
 
     const buildBody = (extra) => ({
         ...extra,
@@ -188,9 +215,9 @@ export const DashboardStudio = () => {
     }, [dashboards, selectedMeta]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-160px)] gap-4">
+        <div className="flex min-w-0 flex-col gap-4 lg:h-[calc(100vh-160px)]">
             {/* Header */}
-            <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
+            <div className="flex flex-col gap-3 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-500/20 rounded-lg">
                         <Wand2 className="text-purple-400" size={20} />
@@ -202,11 +229,12 @@ export const DashboardStudio = () => {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
                     <ProviderSelector provider={provider} onProvider={setProvider} model={model} onModel={setModel} />
                     <button
+                        type="button"
                         onClick={refreshList}
-                        className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                        className="shrink-0 p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
                         title="Refresh gallery"
                     >
                         <RefreshCw size={16} />
@@ -216,11 +244,12 @@ export const DashboardStudio = () => {
 
             {/* Prompt bar */}
             <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-3">
-                <div className="flex items-stretch gap-2">
-                    <div className="relative flex-1">
+                <div className="flex flex-col items-stretch gap-2 md:flex-row">
+                    <div className="relative min-w-0 flex-1">
                         <input
                             ref={promptRef}
                             type="text"
+                            aria-label="Dashboard description"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onGenerate(); } }}
@@ -230,9 +259,10 @@ export const DashboardStudio = () => {
                         <Sparkles size={14} className="absolute left-3 top-3 text-slate-500" />
                     </div>
                     <button
+                        type="button"
                         onClick={onGenerate}
                         disabled={busy || !prompt.trim()}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-all shrink-0"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-all shrink-0"
                     >
                         {busyKind === 'generate' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                         Generate
@@ -247,6 +277,7 @@ export const DashboardStudio = () => {
                             {[2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}×</option>)}
                         </select>
                         <button
+                            type="button"
                             onClick={onVariations}
                             disabled={busy || !prompt.trim()}
                             className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-600 text-slate-200 text-sm font-medium transition-all"
@@ -255,6 +286,11 @@ export const DashboardStudio = () => {
                             Variations
                         </button>
                     </div>
+                    {busy && (
+                        <button type="button" onClick={cancelGeneration} className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-500/30 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/10">
+                            <X size={14} /> Cancel
+                        </button>
+                    )}
                 </div>
                 {error && (
                     <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
@@ -266,9 +302,9 @@ export const DashboardStudio = () => {
             </div>
 
             {/* Main content: gallery + preview */}
-            <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
                 {/* Gallery sidebar */}
-                <aside className="col-span-3 bg-slate-900 border border-slate-800 rounded-xl shadow-lg flex flex-col min-h-0">
+                <aside className="col-span-1 flex max-h-64 min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-lg lg:col-span-3 lg:max-h-none">
                     <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-slate-200">Gallery</h3>
                         <span className="text-xs text-slate-500">{dashboards.length}</span>
@@ -310,11 +346,11 @@ export const DashboardStudio = () => {
                 </aside>
 
                 {/* Preview + tools */}
-                <section className="col-span-9 flex flex-col min-h-0 gap-3">
+                <section className="col-span-1 flex min-h-[420px] min-w-0 flex-col gap-3 lg:col-span-9 lg:min-h-0">
                     {selectedMeta ? (
                         <>
                             {/* Selected meta + actions */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 shadow-lg flex items-center justify-between gap-3">
+                            <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 shadow-lg sm:flex-row sm:items-center sm:justify-between">
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-sm font-semibold text-white truncate">{selectedMeta.title}</h3>
@@ -328,7 +364,7 @@ export const DashboardStudio = () => {
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => onCopyPrompt(selectedMeta.prompt)} title="Copy prompt"
+                                    <button type="button" onClick={() => onCopyPrompt(selectedMeta.prompt)} title="Copy prompt"
                                         className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg">
                                         <Copy size={14} />
                                     </button>
@@ -336,12 +372,12 @@ export const DashboardStudio = () => {
                                         className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg">
                                         <Download size={14} />
                                     </a>
-                                    <button onClick={() => onPinToggle(selectedMeta.id, selectedMeta.pinned)}
+                                    <button type="button" onClick={() => onPinToggle(selectedMeta.id, selectedMeta.pinned)}
                                         title={selectedMeta.pinned ? 'Unpin' : 'Pin'}
                                         className={`p-2 rounded-lg ${selectedMeta.pinned ? 'text-amber-400 hover:bg-amber-500/10' : 'text-slate-400 hover:text-amber-300 hover:bg-slate-800'}`}>
                                         {selectedMeta.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                                     </button>
-                                    <button onClick={() => onDelete(selectedMeta.id)} title="Delete"
+                                    <button type="button" onClick={() => onDelete(selectedMeta.id)} title="Delete"
                                         disabled={selectedMeta.pinned}
                                         className="p-2 text-slate-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed">
                                         <Trash2 size={14} />
@@ -365,10 +401,11 @@ export const DashboardStudio = () => {
 
                             {/* Iterate bar */}
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg">
-                                <div className="flex items-stretch gap-2">
-                                    <div className="relative flex-1">
+                                <div className="flex flex-col items-stretch gap-2 sm:flex-row">
+                                    <div className="relative min-w-0 flex-1">
                                         <input
                                             type="text"
+                                            aria-label="Dashboard refinement instruction"
                                             value={iterateText}
                                             onChange={(e) => setIterateText(e.target.value)}
                                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onIterate(); } }}
@@ -378,6 +415,7 @@ export const DashboardStudio = () => {
                                         <GitBranch size={14} className="absolute left-3 top-2.5 text-slate-500" />
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={onIterate}
                                         disabled={busy || !iterateText.trim()}
                                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-all shrink-0"
@@ -421,11 +459,11 @@ export const DashboardStudio = () => {
 };
 
 const ProviderSelector = ({ provider, onProvider, model, onModel }) => (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
         <select
             value={provider}
             onChange={(e) => onProvider(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-purple-500"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-purple-500 sm:w-auto"
             title="LLM provider (defaults to backend setting)"
         >
             <option value="">Default provider</option>
@@ -439,7 +477,8 @@ const ProviderSelector = ({ provider, onProvider, model, onModel }) => (
             value={model}
             onChange={(e) => onModel(e.target.value)}
             placeholder="model (optional)"
-            className="bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-300 px-2 py-1.5 w-36 focus:outline-none focus:border-purple-500 placeholder:text-slate-600"
+            aria-label="Dashboard model override"
+            className="min-w-0 w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-300 px-2 py-1.5 focus:outline-none focus:border-purple-500 placeholder:text-slate-600 sm:w-36"
         />
     </div>
 );

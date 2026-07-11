@@ -1,41 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCw, Layout, Zap, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { RefreshCw, Layout, Zap, Sparkles, X } from 'lucide-react';
+
+const GENERATION_TIMEOUT_MS = 195_000;
 
 export const VisualDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString());
     const [error, setError] = useState(null);
     const [prompt, setPrompt] = useState("");
+    const requestRef = useRef(null);
+
+    useEffect(() => () => requestRef.current?.abort(), []);
 
     const refreshDashboard = async () => {
+        if (loading) {
+            requestRef.current?.abort();
+            return;
+        }
+        const controller = new AbortController();
+        let timedOut = false;
+        requestRef.current = controller;
+        const timeout = window.setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, GENERATION_TIMEOUT_MS);
         setLoading(true);
         setError(null);
         try {
+            let res;
             if (prompt.trim()) {
-                await fetch('api/chat', {
+                res = await fetch('api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Generate a visual dashboard with this instruction: ${prompt}` })
+                    body: JSON.stringify({ message: `Generate a visual dashboard with this instruction: ${prompt}` }),
+                    signal: controller.signal,
                 });
             } else {
-                const res = await fetch('api/dashboard/refresh', { method: 'POST' });
-                if (!res.ok) throw new Error("Failed to refresh dashboard");
+                res = await fetch('api/dashboard/refresh', { method: 'POST', signal: controller.signal });
             }
+            if (!res.ok) throw new Error(`${res.status}: ${await res.text() || res.statusText}`);
 
             // Reload iframe by updating key
             setLastRefresh(new Date().toLocaleTimeString());
             setPrompt("");
         } catch (err) {
-            setError(err.message);
+            setError(err.name === 'AbortError'
+                ? (timedOut ? 'Dashboard generation timed out. Try a faster model or simpler request.' : 'Dashboard generation was cancelled.')
+                : err.message);
         } finally {
+            window.clearTimeout(timeout);
+            if (requestRef.current === controller) requestRef.current = null;
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-160px)] space-y-4">
+        <div className="flex min-w-0 flex-col space-y-4 lg:h-[calc(100vh-160px)]">
             {/* Header / Controls */}
-            <div className="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
+            <div className="flex flex-col gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-500/20 rounded-lg">
                         <Layout className="text-blue-400" size={20} />
@@ -48,10 +70,11 @@ export const VisualDashboard = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4 flex-1 max-w-2xl ml-8">
-                    <div className="relative flex-1">
+                <div className="flex w-full min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center lg:ml-8 lg:max-w-2xl">
+                    <div className="relative min-w-0 flex-1">
                         <input
                             type="text"
+                            aria-label="Dashboard design instruction"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && refreshDashboard()}
@@ -62,21 +85,23 @@ export const VisualDashboard = () => {
                     </div>
                     {error && <span className="text-xs text-red-400 font-medium">⚠️ {error}</span>}
                     <button
+                        type="button"
                         onClick={refreshDashboard}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all group shrink-0"
+                        className={`flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-all group ${loading ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'}`}
                     >
-                        <RefreshCw size={16} className={`${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                        {loading ? 'Generating...' : (prompt ? 'Update Design' : 'Refresh Data')}
+                        {loading ? <X size={16} /> : <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />}
+                        {loading ? 'Cancel generation' : (prompt ? 'Update Design' : 'Refresh Data')}
                     </button>
                 </div>
             </div>
 
             {/* Iframe Container */}
-            <div className="flex-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden group">
+            <div className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl group lg:min-h-0">
                 <iframe
                     src="api/dashboard/dynamic"
                     key={lastRefresh}
+                    sandbox="allow-scripts"
+                    referrerPolicy="no-referrer"
                     className="w-full h-full border-none"
                     title="AI Visual Dashboard"
                 />

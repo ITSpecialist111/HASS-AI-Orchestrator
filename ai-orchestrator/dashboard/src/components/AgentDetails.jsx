@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Play, Trash2, Edit2, Check, ExternalLink, Activity, Save } from 'lucide-react';
+import { useDialogFocus } from './useDialogFocus';
 
 const AgentDetails = ({ agent, onClose, onDelete }) => {
     const [activeTab, setActiveTab] = useState('overview');
@@ -9,6 +10,8 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
     const [name, setName] = useState(agent?.name || "");
     const [interval, setIntervalValue] = useState(agent?.decision_interval || 120);
     const [loading, setLoading] = useState(false);
+    const closeRef = useRef(null);
+    const dialogRef = useDialogFocus(onClose, closeRef, !!agent);
 
     useEffect(() => {
         if (agent?.agent_id) {
@@ -95,7 +98,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
         <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transform transition-transform duration-300" role="dialog" aria-modal="true" aria-label={`${agent.name} details`}>
+            <div ref={dialogRef} className="absolute inset-y-0 right-0 w-full max-w-2xl bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transform transition-transform duration-300" role="dialog" aria-modal="true" aria-label={`${agent.name} details`} tabIndex={-1}>
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/50">
@@ -126,6 +129,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                             <Trash2 size={20} />
                         </button>
                         <button
+                            ref={closeRef}
                             onClick={onClose}
                             className="p-2 text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors"
                             aria-label="Close agent details"
@@ -167,20 +171,35 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     </div>
                 )}
                 {/* Tabs */}
-                <div className="flex border-b border-slate-700 px-6">
+                <div className="flex border-b border-slate-700 px-6" role="tablist" aria-label="Agent detail sections">
                     <button
+                        id="agent-tab-overview"
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === 'overview'}
+                        aria-controls="agent-panel"
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('overview')}
                     >
                         Overview
                     </button>
                     <button
+                        id="agent-tab-history"
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === 'history'}
+                        aria-controls="agent-panel"
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'history' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('history')}
                     >
                         History
                     </button>
                     <button
+                        id="agent-tab-json"
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === 'json'}
+                        aria-controls="agent-panel"
                         className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'json' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         onClick={() => setActiveTab('json')}
                     >
@@ -192,7 +211,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                 <div className="flex-1 overflow-y-auto p-6">
 
                     {activeTab === 'overview' && (
-                        <div className="space-y-8">
+                        <div id="agent-panel" className="space-y-8" role="tabpanel" aria-labelledby="agent-tab-overview">
                             {/* Instructions Section */}
                             <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
                                 <div className="flex justify-between items-center mb-4">
@@ -288,7 +307,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     )}
 
                     {activeTab === 'history' && (
-                        <div className="space-y-4">
+                        <div id="agent-panel" className="space-y-4" role="tabpanel" aria-labelledby="agent-tab-history">
                             {decisions.length === 0 ? (
                                 <div className="text-center text-slate-500 py-10">No recent history found.</div>
                             ) : (
@@ -315,7 +334,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                     )}
 
                     {activeTab === 'json' && (
-                        <pre className="text-xs font-mono text-slate-400 bg-black/30 p-4 rounded-lg overflow-x-auto">
+                        <pre id="agent-panel" className="text-xs font-mono text-slate-400 bg-black/30 p-4 rounded-lg overflow-x-auto" role="tabpanel" aria-labelledby="agent-tab-json">
                             {JSON.stringify(agent, null, 2)}
                         </pre>
                     )}

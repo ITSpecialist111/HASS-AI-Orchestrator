@@ -108,7 +108,14 @@ class _OllamaChatProvider(ChatProvider):
         import ollama
 
         self._host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self._client = ollama.Client(host=self._host)
+        try:
+            timeout = float(os.getenv(
+                "OLLAMA_CHAT_TIMEOUT_SECONDS",
+                os.getenv("DASHBOARD_GENERATION_TIMEOUT_SECONDS", "180"),
+            ))
+        except ValueError:
+            timeout = 180.0
+        self._client = ollama.Client(host=self._host, timeout=max(5.0, timeout))
 
     def chat(
         self,

@@ -249,6 +249,7 @@ class DashboardStudio:
         chat_provider_factory: Callable[..., ChatProvider] = make_chat_provider,
         default_provider: Optional[str] = None,
         default_model: Optional[str] = None,
+        generation_timeout_seconds: Optional[float] = None,
     ) -> None:
         self._ha_provider = ha_client_provider
         self.store_dir = Path(store_dir)
@@ -256,6 +257,14 @@ class DashboardStudio:
         self._chat_provider_factory = chat_provider_factory
         self._default_provider = default_provider
         self._default_model = default_model
+        if generation_timeout_seconds is None:
+            try:
+                generation_timeout_seconds = float(
+                    os.getenv("DASHBOARD_GENERATION_TIMEOUT_SECONDS", "180")
+                )
+            except ValueError:
+                generation_timeout_seconds = 180.0
+        self._generation_timeout_seconds = max(0.01, float(generation_timeout_seconds))
 
     # ------------------------------------------------------------------
     # Provider/model resolution
@@ -265,12 +274,17 @@ class DashboardStudio:
             return override
         if self._default_model:
             return self._default_model
+        local_dashboard_model = (
+            os.getenv("DASHBOARD_MODEL")
+            or os.getenv("DEEP_REASONING_MODEL")
+            or os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b")
+        )
         return {
             "openai": os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
             "anthropic": os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8"),
             "github": os.getenv("GITHUB_MODEL", "gpt-4o-mini"),
             "foundry": os.getenv("FOUNDRY_MODEL", "gpt-4o"),
-            "ollama": os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b"),
+            "ollama": local_dashboard_model,
         }.get(provider_name, "gemma4:e4b")
 
     # ------------------------------------------------------------------
@@ -432,10 +446,18 @@ class DashboardStudio:
         messages = self._build_messages(prompt, context, instruction, base_html)
 
         loop = asyncio.get_running_loop()
-        raw = await loop.run_in_executor(
-            None,
-            lambda: chat.chat(model_name, messages, temperature=0.4, max_tokens=4096),
-        )
+        try:
+            raw = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: chat.chat(model_name, messages, temperature=0.4, max_tokens=4096),
+                ),
+                timeout=self._generation_timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise TimeoutError(
+                f"Dashboard generation timed out after {self._generation_timeout_seconds:g} seconds"
+            ) from exc
         html = _strip_markdown_fences(raw)
         if not html.lower().startswith("<!doctype") and not html.lower().startswith("<html"):
             # Pad with a minimal frame so iframes still render *something*.

@@ -16,16 +16,18 @@ export function InsightsHub({ decisions, dailyStats, performance }) {
                 </div>
             </header>
             <div className="cp-segmented" role="tablist" aria-label="Insight sections">
-                <button type="button" role="tab" aria-selected={tab === 'activity'} className={tab === 'activity' ? 'is-active' : ''} onClick={() => setTab('activity')}>
+                <button id="insights-tab-activity" type="button" role="tab" aria-selected={tab === 'activity'} aria-controls="insights-panel" className={tab === 'activity' ? 'is-active' : ''} onClick={() => setTab('activity')}>
                     <Activity size={15} /> Activity
                 </button>
-                <button type="button" role="tab" aria-selected={tab === 'performance'} className={tab === 'performance' ? 'is-active' : ''} onClick={() => setTab('performance')}>
+                <button id="insights-tab-performance" type="button" role="tab" aria-selected={tab === 'performance'} aria-controls="insights-panel" className={tab === 'performance' ? 'is-active' : ''} onClick={() => setTab('performance')}>
                     <BarChart3 size={15} /> Performance
                 </button>
             </div>
-            {tab === 'activity'
-                ? <DecisionStream decisions={decisions} />
-                : <AnalyticsCharts dailyData={dailyStats} performanceData={performance} />}
+            <div id="insights-panel" role="tabpanel" aria-labelledby={`insights-tab-${tab}`}>
+                {tab === 'activity'
+                    ? <DecisionStream decisions={decisions} />
+                    : <AnalyticsCharts dailyData={dailyStats} performanceData={performance} />}
+            </div>
         </div>
     );
 }

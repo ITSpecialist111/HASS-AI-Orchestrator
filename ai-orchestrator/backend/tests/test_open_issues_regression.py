@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, NonCallableMagicMock, patch
 
@@ -237,3 +238,43 @@ async def test_issue_17_dashboard_error_path_uses_recorded_host(monkeypatch, tmp
     out = await inst.generate_visual_dashboard(user_instruction="x")
     assert "Dashboard Generation Failed" in out
     assert "test-host" in out  # host info now correctly recorded
+
+
+def test_retired_gemini_dashboard_models_are_migrated():
+    from orchestrator import DEFAULT_GEMINI_DASHBOARD_MODEL, normalize_gemini_dashboard_model
+
+    assert normalize_gemini_dashboard_model("gemini-1.5-pro") == DEFAULT_GEMINI_DASHBOARD_MODEL
+    assert normalize_gemini_dashboard_model("gemini-robotics-er-1.5-preview") == DEFAULT_GEMINI_DASHBOARD_MODEL
+    assert normalize_gemini_dashboard_model("gemini-3.1-pro-preview") == "gemini-3.1-pro-preview"
+
+
+@pytest.mark.asyncio
+async def test_legacy_dashboard_generation_does_not_block_event_loop(tmp_path):
+    from orchestrator import Orchestrator
+
+    inst = Orchestrator.__new__(Orchestrator)
+    inst._ha_provider = SimpleNamespace(connected=True, get_states=AsyncMock(return_value=[
+        {"entity_id": "light.x", "state": "on", "attributes": {}},
+    ]))
+    inst.ollama_host_used = "http://test-host:11434"
+    inst._genai_client = None
+    inst.use_gemini_for_dashboard = False
+    inst.gemini_model_name = "gemini-3.5-flash"
+    inst.model_name = "deepseek-r1:8b"
+    inst.dashboard_model_name = "gemma4:e4b"
+    inst.dashboard_generation_timeout = 0.02
+    inst.dashboard_dir = tmp_path
+
+    def slow_chat(**_kwargs):
+        time.sleep(0.1)
+        return {"message": {"content": "<html><body>late</body></html>"}}
+
+    inst.llm_client = SimpleNamespace(chat=slow_chat)
+    task = asyncio.create_task(inst.generate_visual_dashboard(user_instruction="x"))
+    started = time.monotonic()
+    await asyncio.sleep(0.005)
+    assert time.monotonic() - started < 0.05
+
+    out = await task
+    assert "Dashboard Generation Failed" in out
+    assert "timed out after 0 seconds" in out

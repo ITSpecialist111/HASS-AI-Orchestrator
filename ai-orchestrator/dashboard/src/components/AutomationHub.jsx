@@ -30,22 +30,24 @@ export function AutomationHub({ agents, suggestions, onAgentsChanged }) {
             </header>
 
             <div className="cp-segmented" role="tablist" aria-label="Automation sections">
-                <button type="button" role="tab" aria-selected={tab === 'agents'} className={tab === 'agents' ? 'is-active' : ''} onClick={() => setTab('agents')}>
+                <button id="automation-tab-agents" type="button" role="tab" aria-selected={tab === 'agents'} aria-controls="automation-panel" className={tab === 'agents' ? 'is-active' : ''} onClick={() => setTab('agents')}>
                     <Bot size={15} /> Agents
                 </button>
-                <button type="button" role="tab" aria-selected={tab === 'triggers'} className={tab === 'triggers' ? 'is-active' : ''} onClick={() => setTab('triggers')}>
+                <button id="automation-tab-triggers" type="button" role="tab" aria-selected={tab === 'triggers'} aria-controls="automation-panel" className={tab === 'triggers' ? 'is-active' : ''} onClick={() => setTab('triggers')}>
                     <Zap size={15} /> Triggers
                 </button>
             </div>
 
-            {tab === 'agents' ? (
-                <AgentGrid
-                    agents={agents}
-                    suggestions={suggestions}
-                    onAgentCreate={openFactory}
-                    onSuggestionClick={openFactory}
-                />
-            ) : <TriggersPanel />}
+            <div id="automation-panel" role="tabpanel" aria-labelledby={`automation-tab-${tab}`}>
+                {tab === 'agents' ? (
+                    <AgentGrid
+                        agents={agents}
+                        suggestions={suggestions}
+                        onAgentCreate={openFactory}
+                        onSuggestionClick={openFactory}
+                    />
+                ) : <TriggersPanel />}
+            </div>
 
             {factoryOpen && (
                 <AgentFactory

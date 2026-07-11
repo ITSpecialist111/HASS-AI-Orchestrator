@@ -47,7 +47,7 @@ export MAX_TEMP=$(jq -r '.max_temp // 30.0' $CONFIG_PATH)
 export MAX_TEMP_CHANGE=$(jq -r '.max_temp_change // 3.0' $CONFIG_PATH)
 export GEMINI_API_KEY=$(jq -r '.gemini_api_key // ""' $CONFIG_PATH)
 export USE_GEMINI_FOR_DASHBOARD=$(jq -r '.use_gemini_for_dashboard // false' $CONFIG_PATH)
-export GEMINI_MODEL_NAME=$(jq -r '.gemini_model_name // "gemini-1.5-pro"' $CONFIG_PATH)
+export GEMINI_MODEL_NAME=$(jq -r '.gemini_model_name // "gemini-3.5-flash"' $CONFIG_PATH)
 
 # Home Assistant API configuration
 # Home Assistant API configuration

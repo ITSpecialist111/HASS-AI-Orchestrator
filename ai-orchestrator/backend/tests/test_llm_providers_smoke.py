@@ -57,8 +57,9 @@ def test_ollama_gemma_chat_uses_documented_thinking_and_sampling(monkeypatch):
     captured: dict = {}
 
     class _FakeClient:
-        def __init__(self, host):
+        def __init__(self, host, **kwargs):
             captured["host"] = host
+            captured["client"] = kwargs
 
         def chat(self, **kwargs):
             captured["chat"] = kwargs
@@ -74,6 +75,7 @@ def test_ollama_gemma_chat_uses_documented_thinking_and_sampling(monkeypatch):
     )
 
     assert output == "hello from gemma"
+    assert captured["client"]["timeout"] == 180.0
     assert captured["chat"]["think"] is False
     assert "think" not in captured["chat"]["options"]
     assert captured["chat"]["options"] == {

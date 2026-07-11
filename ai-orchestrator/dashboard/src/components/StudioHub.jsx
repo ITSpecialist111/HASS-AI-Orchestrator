@@ -17,16 +17,18 @@ export function StudioHub() {
                 </div>
             </header>
             <div className="cp-segmented" role="tablist" aria-label="Studio sections">
-                <button type="button" role="tab" aria-selected={tab === 'studio'} className={tab === 'studio' ? 'is-active' : ''} onClick={() => setTab('studio')}>
+                <button id="studio-tab-studio" type="button" role="tab" aria-selected={tab === 'studio'} aria-controls="studio-panel" className={tab === 'studio' ? 'is-active' : ''} onClick={() => setTab('studio')}>
                     <Wand2 size={15} /> Saved studio
                 </button>
-                <button type="button" role="tab" aria-selected={tab === 'legacy'} className={tab === 'legacy' ? 'is-active' : ''} onClick={() => setTab('legacy')}>
+                <button id="studio-tab-legacy" type="button" role="tab" aria-selected={tab === 'legacy'} aria-controls="studio-panel" className={tab === 'legacy' ? 'is-active' : ''} onClick={() => setTab('legacy')}>
                     <LayoutDashboard size={15} /> Live generated view
                 </button>
             </div>
-            <Suspense fallback={<div className="cp-empty-state">Loading studio…</div>}>
-                {tab === 'studio' ? <DashboardStudio /> : <VisualDashboard />}
-            </Suspense>
+            <div id="studio-panel" role="tabpanel" aria-labelledby={`studio-tab-${tab}`}>
+                <Suspense fallback={<div className="cp-empty-state">Loading studio…</div>}>
+                    {tab === 'studio' ? <DashboardStudio /> : <VisualDashboard />}
+                </Suspense>
+            </div>
         </div>
     );
 }

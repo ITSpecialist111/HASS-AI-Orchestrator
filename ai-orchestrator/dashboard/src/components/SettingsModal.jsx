@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Cpu, Key, Loader2, Settings, ShieldCheck, Wand2, X } from 'lucide-react';
+import { useDialogFocus } from './useDialogFocus';
+
+const DEFAULT_GEMINI_DASHBOARD_MODEL = 'gemini-3.5-flash';
 
 export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
     const [config, setConfig] = useState(currentConfig || { dry_run_mode: true });
     const [loading, setLoading] = useState(null);
     const [error, setError] = useState(null);
     const closeRef = useRef(null);
+    const dialogRef = useDialogFocus(onClose, closeRef);
 
     useEffect(() => {
         if (currentConfig) setConfig(currentConfig);
     }, [currentConfig]);
-
-    useEffect(() => {
-        closeRef.current?.focus();
-        const escape = event => { if (event.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', escape);
-        return () => window.removeEventListener('keydown', escape);
-    }, [onClose]);
 
     const updateConfigField = async (field, value) => {
         setLoading(field);
@@ -41,7 +38,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
 
     return (
         <div className="cp-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-            <section className="cp-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <section ref={dialogRef} className="cp-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1}>
                 <header className="cp-modal-header">
                     <span className="cp-icon-tile"><Settings size={18} /></span>
                     <div><h2 id="settings-title">Runtime settings</h2><p>Immediate controls for this session. Persistent defaults remain in the add-on configuration.</p></div>
@@ -49,7 +46,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                 </header>
 
                 <div className="cp-modal-body">
-                    {error && <div className="cp-alert is-danger">{error}</div>}
+                    {error && <div className="cp-alert is-danger" role="alert">{error}</div>}
                     <article className="cp-setting-card">
                         <span className={`cp-setting-icon ${config.dry_run_mode ? 'is-warning' : 'is-success'}`}><ShieldCheck size={19} /></span>
                         <div><strong>Global simulation mode</strong><p>When on, Home Assistant mutations are simulated. Per-run plan approval remains active regardless of this setting.</p></div>
@@ -89,7 +86,7 @@ export const SettingsModal = ({ onClose, currentConfig, onUpdate }) => {
                         </label>
                         <label className="cp-field">
                             <span><Wand2 size={13} /> Dashboard model</span>
-                            <input defaultValue={config.gemini_model_name || 'gemini-robotics-er-1.5-preview'} onBlur={event => updateConfigField('gemini_model_name', event.target.value)} />
+                            <input defaultValue={config.gemini_model_name || DEFAULT_GEMINI_DASHBOARD_MODEL} onBlur={event => updateConfigField('gemini_model_name', event.target.value)} />
                         </label>
                     </div>
 

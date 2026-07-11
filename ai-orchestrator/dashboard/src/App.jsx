@@ -3,6 +3,7 @@ import { CircleAlert, X } from 'lucide-react'
 import { Layout } from './components/Layout'
 import { ChatAssistant } from './components/ChatAssistant'
 import { HomeOverview } from './components/HomeOverview'
+import { WorkspaceErrorBoundary } from './components/WorkspaceErrorBoundary'
 import './index.css'
 
 const AutomationHub = lazy(() => import('./components/AutomationHub').then(m => ({ default: m.AutomationHub })))
@@ -252,11 +253,13 @@ function App() {
                     <button type="button" onClick={() => setGlobalError(null)} aria-label="Dismiss alert"><X size={15} /></button>
                 </div>
             )}
-            <Suspense fallback={(
-                <div className="cp-empty-state">Loading workspace…</div>
-            )}>
-                {renderContent()}
-            </Suspense>
+            <WorkspaceErrorBoundary resetKey={activeView}>
+                <Suspense fallback={(
+                    <div className="cp-empty-state">Loading workspace…</div>
+                )}>
+                    {renderContent()}
+                </Suspense>
+            </WorkspaceErrorBoundary>
             <ChatAssistant onOpenPlans={() => navigate('review')} />
         </Layout>
     )

@@ -73,9 +73,11 @@ export function PlansPanel({ plans = [], loading, error, onRefresh, onPlanUpdate
                 ].map(([value, label]) => (
                     <button
                         key={value}
+                        id={`plan-filter-${value}`}
                         type="button"
                         role="tab"
                         aria-selected={filter === value}
+                        aria-controls="plan-filter-panel"
                         className={filter === value ? 'is-active' : ''}
                         onClick={() => setFilter(value)}
                     >
@@ -86,7 +88,7 @@ export function PlansPanel({ plans = [], loading, error, onRefresh, onPlanUpdate
 
             {(error || actionError) && <div className="cp-alert is-danger" role="alert"><XCircle size={16} /> {actionError || error}</div>}
 
-            <section className="cp-plan-list" aria-live="polite">
+            <section id="plan-filter-panel" className="cp-plan-list" role="tabpanel" aria-labelledby={`plan-filter-${filter}`} aria-live="polite">
                 {loading && plans.length === 0 ? (
                     <div className="cp-empty-state"><Loader2 className="cp-spin" size={24} /><div><strong>Loading plans</strong><span>Reading the durable review queue.</span></div></div>
                 ) : visiblePlans.length === 0 ? (

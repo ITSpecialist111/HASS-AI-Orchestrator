@@ -1,6 +1,34 @@
 # Changelog
 <br>
 
+## [0.13.5] - 2026-07-11
+### Fixed — UI reliability and dashboard recovery
+- Completed a live acceptance pass across Home, Ask & Run, Action center, Automation,
+  Advanced insights, Dashboard Studio, Quick Ask, settings, nested tabs, and mobile navigation.
+- Dashboard Studio and the legacy generated view now use bounded, cancellable requests instead
+  of leaving the interface permanently busy when a model stalls.
+- Legacy Gemini and Ollama dashboard calls now run outside the asyncio event loop, so health,
+  plans, and every other API remain responsive while generation is in progress.
+- Added transport-level model timeouts and useful 502/504 failures; local dashboard generation
+  now prefers the configured `deep_reasoning_model` (`gemma4:e4b`) over a stale legacy model.
+- Migrated retired `gemini-1.5-pro` and `gemini-robotics-er-1.5-preview` dashboard settings to
+  the current stable `gemini-3.5-flash` model.
+- Fixed horizontal overflow in both Dashboard Studio views at a 390 px phone viewport.
+- Trapped keyboard focus inside modal dialogs, restored focus to the launcher on close, connected
+  segmented tabs to ARIA tab panels, and labelled Studio form controls.
+- Added a recoverable route error boundary instead of allowing a failed lazy chunk to blank the
+  whole portal.
+- Sandboxed the legacy generated-dashboard iframe and applied the same restrictive CSP,
+  no-referrer policy, no-sniff, and no-store headers used by the saved Studio.
+
+### Verification
+- Live read-only Rapid and Quick Ask runs both read `sun.sun` successfully with no HA mutation.
+- Native Home Audit workflow completed; trigger create/delete and WebSocket status contracts passed.
+- All six top-level workspaces and their nested filters/tabs loaded without application alerts.
+- Desktop and 390 px mobile routing passed; both Studio views now report zero horizontal overflow.
+- Full backend suite: 290 passing tests and 4 opt-in live MCP tests skipped.
+- React 19 / Vite 8 production build passes; npm audit reports 0 vulnerabilities.
+
 ## [0.13.4] - 2026-07-11
 ### Fixed — Read-only plan lifecycle
 - A second live test confirmed trusted tool semantics and real Home Assistant data, then found

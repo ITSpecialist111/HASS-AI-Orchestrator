@@ -54,6 +54,22 @@ class _FakeChat(ChatProvider):
         return self._html
 
 
+class _SlowChat(_FakeChat):
+    def __init__(self, html: str, delay: float) -> None:
+        super().__init__(html)
+        self._delay = delay
+
+    def chat(self, model, messages, *, temperature=0.7, max_tokens=1000, extra_options=None):
+        time.sleep(self._delay)
+        return super().chat(
+            model,
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            extra_options=extra_options,
+        )
+
+
 def _factory(chat: ChatProvider):
     """Wrap a ChatProvider in a factory matching make_chat_provider's signature."""
     return lambda **kwargs: chat
@@ -196,6 +212,34 @@ async def test_generate_falls_back_when_llm_returns_non_html(tmp_path):
     saved = (tmp_path / f"{meta.id}.html").read_text(encoding="utf-8")
     assert saved.lower().startswith("<!doctype")
     assert "Sorry, I can&#39;t help" in saved  # text was escaped
+
+
+@pytest.mark.asyncio
+async def test_generate_times_out_instead_of_hanging_request(tmp_path):
+    chat = _SlowChat("<!doctype html><html><body>x</body></html>", delay=0.1)
+    studio = DashboardStudio(
+        ha_client_provider=lambda: _make_ha_client(),
+        store_dir=tmp_path,
+        chat_provider_factory=_factory(chat),
+        generation_timeout_seconds=0.01,
+    )
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutError, match="timed out after 0.01 seconds"):
+        await studio.generate("bounded")
+    assert time.monotonic() - started < 0.08
+
+
+def test_ollama_dashboard_model_prefers_deep_reasoning_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b")
+    monkeypatch.setenv("DEEP_REASONING_MODEL", "gemma4:e4b")
+    studio = DashboardStudio(
+        ha_client_provider=lambda: _make_ha_client(),
+        store_dir=tmp_path,
+        chat_provider_factory=_factory(_FakeChat("<html/>")),
+    )
+
+    assert studio._resolve_model("ollama", None) == "gemma4:e4b"
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ prompts, and triggers. Fixed-cadence planning in this module is opt-in.
 """
 import asyncio
 import collections
+import html as html_lib
 import logging
 import json
 from datetime import datetime
@@ -60,6 +61,26 @@ class OrchestratorState(TypedDict):
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_GEMINI_DASHBOARD_MODEL = "gemini-3.5-flash"
+RETIRED_GEMINI_DASHBOARD_MODELS = {
+    "gemini-1.5-pro",
+    "gemini-robotics-er-1.5-preview",
+}
+
+
+def normalize_gemini_dashboard_model(model_name: Optional[str]) -> str:
+    selected = (model_name or "").strip()
+    if not selected:
+        return DEFAULT_GEMINI_DASHBOARD_MODEL
+    if selected in RETIRED_GEMINI_DASHBOARD_MODELS:
+        logger.warning(
+            "Gemini dashboard model %s is retired; migrating to %s",
+            selected,
+            DEFAULT_GEMINI_DASHBOARD_MODEL,
+        )
+        return DEFAULT_GEMINI_DASHBOARD_MODEL
+    return selected
+
 
 class Orchestrator:
     """
@@ -78,7 +99,7 @@ class Orchestrator:
         ollama_host: str = "http://localhost:11434",
         gemini_api_key: Optional[str] = None,
         use_gemini_for_dashboard: bool = False,
-        gemini_model_name: str = "gemini-1.5-pro"
+        gemini_model_name: str = DEFAULT_GEMINI_DASHBOARD_MODEL,
     ):
         """
         Initialize orchestrator.
@@ -93,7 +114,7 @@ class Orchestrator:
             ollama_host: Host URL for Ollama API
             gemini_api_key: Optional Google AI API Key
             use_gemini_for_dashboard: Whether to prioritize Gemini for visual dashboard
-            gemini_model_name: Gemini model to use (default: gemini-1.5-pro)
+            gemini_model_name: Gemini model to use for dashboard HTML generation
         """
         self._ha_provider = ha_client
         self.mcp_server = mcp_server
@@ -101,6 +122,18 @@ class Orchestrator:
         
         self.agents = agents
         self.model_name = model_name
+        self.dashboard_model_name = (
+            os.getenv("DASHBOARD_MODEL")
+            or os.getenv("DEEP_REASONING_MODEL")
+            or model_name
+        )
+        try:
+            self.dashboard_generation_timeout = max(
+                5.0,
+                min(600.0, float(os.getenv("DASHBOARD_GENERATION_TIMEOUT_SECONDS", "180"))),
+            )
+        except ValueError:
+            self.dashboard_generation_timeout = 180.0
         self.planning_interval = planning_interval
         self.deep_reasoner = None  # Set externally after init
 
@@ -109,7 +142,10 @@ class Orchestrator:
         # The ``llm_provider`` façade routes through the configured
         # provider (Ollama / OpenAI / GitHub Models / Foundry) for
         # callers that don't need Ollama-only options.
-        self.ollama_client = ollama.Client(host=ollama_host)
+        self.ollama_client = ollama.Client(
+            host=ollama_host,
+            timeout=self.dashboard_generation_timeout,
+        )
         self.llm_client = self.ollama_client # Reference for other methods
         self.ollama_host_used = ollama_host
         self.llm_provider = make_chat_provider(ollama_host=ollama_host)
@@ -141,10 +177,15 @@ class Orchestrator:
         # Gemini setup (optional)
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
         self.use_gemini_for_dashboard = use_gemini_for_dashboard or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
-        self.gemini_model_name = gemini_model_name or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        self.gemini_model_name = normalize_gemini_dashboard_model(
+            gemini_model_name or os.getenv("GEMINI_MODEL_NAME", DEFAULT_GEMINI_DASHBOARD_MODEL)
+        )
 
         if self.gemini_api_key and _GENAI_AVAILABLE:
-            self._genai_client = _genai_module.Client(api_key=self.gemini_api_key)
+            self._genai_client = _genai_module.Client(
+                api_key=self.gemini_api_key,
+                http_options={"timeout": int(self.dashboard_generation_timeout * 1000)},
+            )
             self.gemini_model = True  # flag indicating Gemini is configured
             logger.info(f"Gemini API detected - visual dashboard configured to use {self.gemini_model_name} (Active: {self.use_gemini_for_dashboard}).")
         else:
@@ -704,22 +745,32 @@ OUTPUT REQUIREMENTS:
         # 3. Call LLM (Gemini preferred, Ollama fallback)
         html_content = ""
         try:
+            generation_timeout = float(getattr(self, "dashboard_generation_timeout", 180.0))
             if self._genai_client and self.use_gemini_for_dashboard:
                 # Use Gemini for best design results
                 logger.info(f"Generating dashboard using Gemini model: {self.gemini_model_name}")
-                response = self._genai_client.models.generate_content(
-                    model=self.gemini_model_name,
-                    contents=[system_prompt, user_prompt],
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self._genai_client.models.generate_content,
+                        model=self.gemini_model_name,
+                        contents=[system_prompt, user_prompt],
+                    ),
+                    timeout=generation_timeout,
                 )
                 html_content = response.text
             else:
                 # Fallback to local Ollama (might be less 'poppy' but functional)
-                response = self.llm_client.chat(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ]
+                dashboard_model = getattr(self, "dashboard_model_name", self.model_name)
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.llm_client.chat,
+                        model=dashboard_model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                    ),
+                    timeout=generation_timeout,
                 )
                 html_content = response["message"]["content"]
             
@@ -745,24 +796,29 @@ OUTPUT REQUIREMENTS:
         except Exception as e:
             # Handle Gemini specific response errors
             error_msg = str(e)
+            if isinstance(e, TimeoutError):
+                error_msg = f"Dashboard generation timed out after {generation_timeout:.0f} seconds."
             if "finish_reason: SAFETY" in error_msg:
                 error_msg = "Gemini Safety Filter blocked the generation. Try a different prompt."
             
             host_info = getattr(self, "ollama_host_used", None) or "unknown"
             logger.error(f"❌ Failed to generate dashboard: {error_msg} (Host: {host_info})")
+            safe_error = html_lib.escape(error_msg)
+            safe_host = html_lib.escape(str(host_info))
+            safe_model = html_lib.escape(str(getattr(self, "dashboard_model_name", self.model_name)))
             
             fallback_html = f"""
             <html>
             <body style="background: #0f172a; color: #f1f5f9; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; text-align: center; padding: 20px;">
                 <div style="font-size: 64px; margin-bottom: 20px;">🎨</div>
                 <h1 style="color: #ef4444; margin-bottom: 10px;">Dashboard Generation Failed</h1>
-                <p style="color: #94a3b8; max-width: 500px; margin-bottom: 30px;">{error_msg}</p>
+                <p style="color: #94a3b8; max-width: 500px; margin-bottom: 30px;">{safe_error}</p>
                 
                 <div style="background: #1e293b; padding: 24px; border-radius: 12px; font-family: monospace; font-size: 13px; text-align: left; border-left: 4px solid #ef4444; max-width: 600px; width: 100%;">
                     <b style="color: #f8fafc; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Diagnostics:</b><br/>
                     <div style="margin-top: 12px; display: grid; grid-template-cols: 120px 1fr; gap: 8px;">
-                        <span style="color: #64748b;">LLM Host:</span> <code>{host_info}</code>
-                        <span style="color: #64748b;">Model:</span> <code>{self.model_name}</code>
+                        <span style="color: #64748b;">LLM Host:</span> <code>{safe_host}</code>
+                        <span style="color: #64748b;">Model:</span> <code>{safe_model}</code>
                         <span style="color: #64748b;">Gemini API:</span> <code>{'Enabled' if self._genai_client else 'Disabled (Falling back to local)'}</code>
                         <span style="color: #64748b;">Gemini Active:</span> <code>{self.use_gemini_for_dashboard}</code>
                         <span style="color: #64748b;">HA Status:</span> <code>{'Connected' if self.ha_client and self.ha_client.connected else 'Disconnected'}</code>

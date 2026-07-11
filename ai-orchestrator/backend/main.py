@@ -91,7 +91,11 @@ async def check_ollama_connectivity(host: str):
 from ha_client import HAWebSocketClient
 from mcp_server import MCPServer
 from approval_queue import ApprovalQueue
-from orchestrator import Orchestrator
+from orchestrator import (
+    DEFAULT_GEMINI_DASHBOARD_MODEL,
+    Orchestrator,
+    normalize_gemini_dashboard_model,
+)
 from rag_manager import RagManager
 from knowledge_base import KnowledgeBase
 
@@ -314,7 +318,7 @@ async def lifespan(app: FastAPI):
     # Gemini Options (Initialize to avoid NameError on failure)
     gemini_api_key_opt = ""
     use_gemini_dashboard_opt = False
-    gemini_model_name_opt = "gemini-1.5-pro"
+    gemini_model_name_opt = DEFAULT_GEMINI_DASHBOARD_MODEL
 
     # Agent-kernel and provider defaults. Keep local Ollama as the private
     # default; current cloud models are selected only when their provider is.
@@ -360,7 +364,9 @@ async def lifespan(app: FastAPI):
                 # Gemini Options
                 gemini_api_key_opt = opts.get("gemini_api_key", "").strip()
                 use_gemini_dashboard_opt = opts.get("use_gemini_for_dashboard", False)
-                gemini_model_name_opt = opts.get("gemini_model_name", "gemini-1.5-pro")
+                gemini_model_name_opt = normalize_gemini_dashboard_model(
+                    opts.get("gemini_model_name", DEFAULT_GEMINI_DASHBOARD_MODEL)
+                )
 
                 # Deep reasoning / external MCP options (Phase 7)
                 mcp_server_url_opt = opts.get("mcp_server_url", "").strip()
@@ -413,7 +419,9 @@ async def lifespan(app: FastAPI):
         ha_url_opt = os.getenv("HA_URL", "").strip()
         gemini_api_key_opt = os.getenv("GEMINI_API_KEY", "")
         use_gemini_dashboard_opt = os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
-        gemini_model_name_opt = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        gemini_model_name_opt = normalize_gemini_dashboard_model(
+            os.getenv("GEMINI_MODEL_NAME", DEFAULT_GEMINI_DASHBOARD_MODEL)
+        )
         llm_provider_opt = os.getenv("LLM_PROVIDER", "ollama")
         anthropic_api_key_opt = os.getenv("ANTHROPIC_API_KEY", "")
         anthropic_model_opt = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
@@ -632,7 +640,9 @@ async def lifespan(app: FastAPI):
         ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         gemini_api_key=gemini_api_key_opt or os.getenv("GEMINI_API_KEY"),
         use_gemini_for_dashboard=use_gemini_dashboard_opt or os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true",
-        gemini_model_name=gemini_model_name_opt or os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        gemini_model_name=normalize_gemini_dashboard_model(
+            gemini_model_name_opt or os.getenv("GEMINI_MODEL_NAME", DEFAULT_GEMINI_DASHBOARD_MODEL)
+        )
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
@@ -1572,6 +1582,21 @@ async def handle_approval(request_id: str, action: str):
 # ---------------------------------------------------------------------------
 # Dashboard Studio (Phase 10A) — generative dashboards with iterate/variations
 # ---------------------------------------------------------------------------
+GENERATED_DASHBOARD_HEADERS = {
+    "Content-Security-Policy": (
+        "sandbox allow-scripts; default-src 'none'; "
+        "script-src 'unsafe-inline' https://cdn.tailwindcss.com/ "
+        "https://unpkg.com/lucide@latest; "
+        "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+        "connect-src 'none'; form-action 'none'; base-uri 'none'; "
+        "frame-ancestors 'self'"
+    ),
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store",
+}
+
+
 class _StudioGenerateBody(BaseModel):
     prompt: str
     provider: Optional[str] = None
@@ -1610,11 +1635,14 @@ async def studio_generate(body: _StudioGenerateBody):
     studio = _require_studio()
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="prompt is required")
-    meta = await studio.generate(
-        prompt=body.prompt,
-        provider=body.provider,
-        model=body.model,
-    )
+    try:
+        meta = await studio.generate(
+            prompt=body.prompt,
+            provider=body.provider,
+            model=body.model,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     return meta.to_dict()
 
 
@@ -1624,12 +1652,15 @@ async def studio_iterate(dashboard_id: str, body: _StudioIterateBody):
     studio = _require_studio()
     if not body.instruction.strip():
         raise HTTPException(status_code=400, detail="instruction is required")
-    meta = await studio.iterate(
-        base_id=dashboard_id,
-        instruction=body.instruction,
-        provider=body.provider,
-        model=body.model,
-    )
+    try:
+        meta = await studio.iterate(
+            base_id=dashboard_id,
+            instruction=body.instruction,
+            provider=body.provider,
+            model=body.model,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     if meta is None:
         raise HTTPException(status_code=404, detail="Base dashboard not found")
     return meta.to_dict()
@@ -1641,12 +1672,15 @@ async def studio_variations(body: _StudioVariationsBody):
     studio = _require_studio()
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="prompt is required")
-    metas = await studio.variations(
-        prompt=body.prompt,
-        n=body.n,
-        provider=body.provider,
-        model=body.model,
-    )
+    try:
+        metas = await studio.variations(
+            prompt=body.prompt,
+            n=body.n,
+            provider=body.provider,
+            model=body.model,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     return [m.to_dict() for m in metas]
 
 
@@ -1659,19 +1693,7 @@ async def studio_get_dashboard(dashboard_id: str):
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return HTMLResponse(
         content=html,
-        headers={
-            "Content-Security-Policy": (
-                "sandbox allow-scripts; default-src 'none'; "
-                "script-src 'unsafe-inline' https://cdn.tailwindcss.com/ "
-                "https://unpkg.com/lucide@latest; "
-                "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
-                "connect-src 'none'; form-action 'none'; base-uri 'none'; "
-                "frame-ancestors 'self'"
-            ),
-            "Referrer-Policy": "no-referrer",
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-store",
-        },
+        headers=GENERATED_DASHBOARD_HEADERS,
     )
 
 
@@ -1750,7 +1772,7 @@ async def get_dynamic_dashboard(refresh: bool = False):
         if not path.exists():
             raise HTTPException(status_code=404, detail="Dashboard file could not be generated")
             
-        return FileResponse(path)
+        return FileResponse(path, headers=GENERATED_DASHBOARD_HEADERS)
     except HTTPException:
         raise
     except Exception as e:
@@ -1767,6 +1789,11 @@ async def refresh_dashboard():
         raise HTTPException(status_code=503, detail="Orchestrator not ready")
     
     html = await orchestrator.generate_visual_dashboard()
+    if "Dashboard Generation Failed" in html:
+        raise HTTPException(
+            status_code=502,
+            detail="Dashboard generation failed. Check the selected model and provider configuration.",
+        )
     return {"status": "success", "length": len(html)}
 
 
@@ -1793,7 +1820,7 @@ async def get_config():
         "version": VERSION,
         "gemini_active": orchestrator._genai_client is not None if orchestrator else False,
         "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else False,
-        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else "gemini-1.5-pro",
+        "gemini_model_name": orchestrator.gemini_model_name if orchestrator else DEFAULT_GEMINI_DASHBOARD_MODEL,
         "agents": {
             k: getattr(v, "model_name", "unknown") for k, v in agents.items()
         }
@@ -1837,8 +1864,8 @@ async def update_config(req: UpdateConfigRequest):
             print(f"🔄 Runtime Config Update: Gemini API Key updated")
 
         if req.gemini_model_name is not None:
-            orchestrator.gemini_model_name = req.gemini_model_name
-            print(f"🔄 Runtime Config Update: Gemini Model set to {req.gemini_model_name}")
+            orchestrator.gemini_model_name = normalize_gemini_dashboard_model(req.gemini_model_name)
+            print(f"🔄 Runtime Config Update: Gemini Model set to {orchestrator.gemini_model_name}")
 
     return {
         "status": "success", 

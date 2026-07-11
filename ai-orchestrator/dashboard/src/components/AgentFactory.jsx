@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Wand2, Plus, Save, X, Lightbulb } from 'lucide-react';
+import { useDialogFocus } from './useDialogFocus';
 
 export const AgentFactory = ({
     onAgentCreated,
@@ -14,6 +15,8 @@ export const AgentFactory = ({
     const [suggestions, setSuggestions] = useState([]);
     const [generatedConfig, setGeneratedConfig] = useState(null);
     const [error, setError] = useState(null);
+    const closeRef = useRef(null);
+    const dialogRef = useDialogFocus(closeFactory, closeRef, isOpen);
 
     // Load suggestions on open
     useEffect(() => {
@@ -102,10 +105,10 @@ export const AgentFactory = ({
         }
     };
 
-    const closeFactory = () => {
+    function closeFactory() {
         setIsOpen(false);
         if (onDismiss) onDismiss();
-    };
+    }
 
     if (!isOpen) {
         if (!launcher) return null;
@@ -123,8 +126,8 @@ export const AgentFactory = ({
     }
 
     return (
-        <div className="cp-modal-backdrop">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]" role="dialog" aria-modal="true" aria-labelledby="agent-factory-title">
+        <div className="cp-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeFactory(); }}>
+            <div ref={dialogRef} className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]" role="dialog" aria-modal="true" aria-labelledby="agent-factory-title" tabIndex={-1}>
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900 rounded-t-xl">
@@ -137,7 +140,7 @@ export const AgentFactory = ({
                             <p className="text-sm text-slate-400">The Architect will design your agent.</p>
                         </div>
                     </div>
-                    <button onClick={closeFactory} className="text-slate-500 hover:text-white" aria-label="Close agent factory">
+                    <button ref={closeRef} onClick={closeFactory} className="text-slate-500 hover:text-white" aria-label="Close agent factory">
                         <X size={24} />
                     </button>
                 </div>
@@ -145,7 +148,7 @@ export const AgentFactory = ({
                 {/* Content */}
                 <div className="p-6 overflow-y-auto flex-1">
                     {error && (
-                        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm">
+                        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm" role="alert">
                             {error}
                         </div>
                     )}
