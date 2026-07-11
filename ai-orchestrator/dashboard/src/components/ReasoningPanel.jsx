@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Brain, Play, Loader2, Clock, Wrench, Info, Zap } from 'lucide-react';
+import { Brain, Play, Loader2, Clock, Wrench, Info, Zap, ShieldCheck, XCircle, Coins } from 'lucide-react';
 import { ReasoningTrace } from './ReasoningTrace';
 
 export function ReasoningPanel({ reasoningEvents = [] }) {
@@ -9,6 +9,8 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
     const [info, setInfo] = useState(null);
+    const [mode, setMode] = useState('auto');
+    const [planAction, setPlanAction] = useState(null);
 
     // Fetch reasoning agent info on mount
     useEffect(() => {
@@ -32,7 +34,7 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
             const res = await fetch('api/reasoning/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ goal: goal.trim() }),
+                body: JSON.stringify({ goal: goal.trim(), mode }),
             });
 
             if (!res.ok) {
@@ -46,6 +48,27 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
             setError(e.message);
         } finally {
             setRunning(false);
+        }
+    };
+
+    const handlePlanAction = async (action) => {
+        const planId = result?.plan?.id;
+        if (!planId || planAction) return;
+        setPlanAction(action);
+        setError(null);
+        try {
+            const res = await fetch(`api/reasoning/plans/${planId}/${action}`, { method: 'POST' });
+            if (!res.ok) throw new Error(`Plan ${action} failed: ${res.status} ${await res.text()}`);
+            const data = await res.json();
+            setResult(prev => ({
+                ...prev,
+                plan: { ...prev.plan, status: data.status },
+                execution_results: data.execution_results ?? prev.execution_results,
+            }));
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setPlanAction(null);
         }
     };
 
@@ -76,7 +99,9 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                     <div className="w-px h-4 bg-slate-800" />
                     <div className="flex items-center gap-1.5 text-slate-500">
                         <Zap size={12} />
-                        <span className="font-mono text-xs">{info.backend || 'unknown'}</span>
+                        <span className="font-mono text-xs">
+                            {info.backend || 'unknown'}{info.model ? ` / ${info.model}` : ''}{info.reasoning_effort ? ` · ${info.reasoning_effort}` : ''}
+                        </span>
                     </div>
                     <div className="w-px h-4 bg-slate-800" />
                     <div className="flex items-center gap-1.5 text-slate-500">
@@ -93,7 +118,7 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                     )}
                     <div className="ml-auto">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border
-                            ${info.status === 'ready' || info.status === 'active'
+                            ${info.status === 'ready' || info.status === 'active' || info.status === 'idle'
                                 ? 'bg-green-500/10 text-green-400 border-green-500/20'
                                 : 'bg-slate-700/30 text-slate-400 border-slate-700'
                             }`}>
@@ -109,6 +134,29 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         Goal
                     </label>
+                    <div className="flex items-center gap-2" role="group" aria-label="Reasoning mode">
+                        {[
+                            ['auto', 'Auto', 'Reads first; executes routine actions and pauses risky plans.'],
+                            ['plan', 'Plan only', 'Observe and prepare a reviewable plan without changing the home.'],
+                        ].map(([value, label, title]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                title={title}
+                                onClick={() => setMode(value)}
+                                disabled={running}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${mode === value
+                                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/40'
+                                    : 'bg-slate-950 text-slate-500 border-slate-800 hover:text-slate-300'
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                        <span className="text-xs text-slate-600 ml-1">
+                            Direct execution is intentionally unavailable.
+                        </span>
+                    </div>
                     <textarea
                         value={goal}
                         onChange={(e) => setGoal(e.target.value)}
@@ -158,7 +206,7 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                     <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 flex items-center gap-2">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Result</span>
                         <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border
-                            ${result.stopped_reason === 'complete' || result.stopped_reason === 'solved'
+                            ${result.stopped_reason === 'final'
                                 ? 'bg-green-500/10 text-green-400 border-green-500/20'
                                 : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                             }`}>
@@ -172,6 +220,22 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                             <Brain size={14} className="text-purple-400" />
                             <span className="font-mono text-xs">{result.iterations ?? '?'} iterations</span>
                         </div>
+                        {(result.successful_tool_calls != null || result.failed_tool_calls != null) && (
+                            <div className="flex items-center gap-1.5 text-slate-400">
+                                <ShieldCheck size={14} className="text-emerald-400" />
+                                <span className="font-mono text-xs">
+                                    {result.successful_tool_calls ?? 0} ok / {result.failed_tool_calls ?? 0} failed
+                                </span>
+                            </div>
+                        )}
+                        {(result.usage?.input_tokens || result.usage?.output_tokens) && (
+                            <div className="flex items-center gap-1.5 text-slate-400">
+                                <Coins size={14} className="text-amber-400" />
+                                <span className="font-mono text-xs">
+                                    {(result.usage.input_tokens ?? 0).toLocaleString()} in / {(result.usage.output_tokens ?? 0).toLocaleString()} out
+                                </span>
+                            </div>
+                        )}
                         <div className="flex items-center gap-1.5 text-slate-400">
                             <Wrench size={14} className="text-blue-400" />
                             <span className="font-mono text-xs">{result.tool_calls ?? '?'} tool calls</span>
@@ -196,6 +260,42 @@ export function ReasoningPanel({ reasoningEvents = [] }) {
                             {result.answer || 'No answer returned.'}
                         </div>
                     </div>
+
+                    {result.plan && (
+                        <div className="p-4 pt-0">
+                            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <ShieldCheck size={18} className="text-purple-400 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-slate-200">Deterministic plan</h4>
+                                        <p className="text-xs text-slate-500 mt-1">{result.plan.risk_summary}</p>
+                                    </div>
+                                    <span className="ml-auto px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                        {result.plan.status}
+                                    </span>
+                                </div>
+                                {result.plan.status === 'pending' && result.plan.mutating_count > 0 && (
+                                    <div className="flex gap-2 pt-1">
+                                        <button
+                                            onClick={() => handlePlanAction('execute')}
+                                            disabled={!!planAction}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-600/30 disabled:opacity-50"
+                                        >
+                                            {planAction === 'execute' ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                                            Approve & execute exact plan
+                                        </button>
+                                        <button
+                                            onClick={() => handlePlanAction('reject')}
+                                            disabled={!!planAction}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-300 border border-red-500/20 text-xs font-semibold hover:bg-red-500/20 disabled:opacity-50"
+                                        >
+                                            <XCircle size={13} /> Reject
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

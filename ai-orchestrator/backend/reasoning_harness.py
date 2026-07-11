@@ -2,7 +2,7 @@
 Reasoning harness — a proper agentic loop for the orchestrator's
 "deep thinking" agent.
 
-Design (Anthropic "Building effective agents", April 2026):
+Design (2026 provider-neutral deterministic kernel):
 
     while not done and budget_remaining:
         response = LLM.chat(messages, tools=tool_schemas)
@@ -31,17 +31,29 @@ Key properties
   decision log.
 * **Approval gating** — high-impact tools route through the existing
   :class:`ApprovalQueue` rather than executing directly.
+* **Deterministic execution** — schema validation, ordered mutations,
+    read-only parallelism, bounded retries, deduplication, and hard budgets.
+* **Provider-native continuity** — GPT-5.6 Responses reasoning state and
+    Claude adaptive-thinking/tool blocks are preserved across turns.
 """
 from __future__ import annotations
 
 import asyncio
+import copy
+import hashlib
+import inspect
 import json
 import logging
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
+from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Protocol, Union
+
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:  # pragma: no cover - dependency is declared, guard keeps imports fail-soft
+    Draft202012Validator = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +75,13 @@ class LLMResponse:
     content: str
     tool_calls: List[ToolCall] = field(default_factory=list)
     raw: Any = None
+    # Provider-native assistant content that must be round-tripped unchanged
+    # (for example Claude adaptive-thinking signatures).
+    provider_payload: Any = None
+    # Opaque state used by stateful APIs such as OpenAI Responses.
+    continuation: Any = None
+    usage: Dict[str, int] = field(default_factory=dict)
+    stop_reason: Optional[str] = None
 
     @property
     def is_final(self) -> bool:
@@ -86,6 +105,40 @@ class HarnessResult:
     tool_calls: int = 0
     stopped_reason: str = "final"
     duration_ms: int = 0
+    run_id: Optional[str] = None
+    requested_tool_calls: int = 0
+    rejected_tool_calls: int = 0
+    successful_tool_calls: int = 0
+    failed_tool_calls: int = 0
+    cached_tool_calls: int = 0
+    usage: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ToolSemantics:
+    """Execution properties used by the deterministic tool scheduler.
+
+    These properties are application policy, not model hints. Remote MCP
+    annotations are never trusted automatically.
+    """
+
+    read_only: bool = False
+    destructive: bool = True
+    idempotent: bool = False
+    parallel_safe: bool = False
+    impact_level: str = "high"
+    timeout_seconds: float = 30.0
+    max_retries: int = 0
+
+
+@dataclass(frozen=True)
+class ToolExecutionContext:
+    """Trusted context supplied by the application, never by the model."""
+
+    run_id: Optional[str] = None
+    mode: str = "execute"
+    approved: bool = False
+    plan_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +151,8 @@ class LLMBackend(Protocol):
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
     ) -> LLMResponse: ...
 
 
@@ -128,6 +183,8 @@ class OllamaToolBackend:
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
     ) -> LLMResponse:
         kwargs: Dict[str, Any] = {
             "model": self.model,
@@ -156,7 +213,17 @@ class OllamaToolBackend:
                 continue
             calls.append(ToolCall(id=str(uuid.uuid4()), name=name, arguments=args or {}))
 
-        return LLMResponse(content=content.strip(), tool_calls=calls, raw=resp)
+        usage = _normalise_usage({
+            "input_tokens": _get_value(resp, "prompt_eval_count", 0),
+            "output_tokens": _get_value(resp, "eval_count", 0),
+        })
+        return LLMResponse(
+            content=content.strip(),
+            tool_calls=calls,
+            raw=resp,
+            usage=usage,
+            stop_reason=_get_value(msg, "done_reason", None),
+        )
 
 
 class AnthropicBackend:
@@ -171,10 +238,12 @@ class AnthropicBackend:
 
     def __init__(
         self,
-        model: str = "claude-opus-4-7",
+        model: str = "claude-opus-4-8",
         api_key: Optional[str] = None,
-        max_tokens: int = 2048,
-        temperature: float = 0.2,
+        max_tokens: int = 8192,
+        effort: str = "medium",
+        adaptive_thinking: bool = True,
+        strict_tools: bool = True,
     ) -> None:
         import anthropic  # local import
 
@@ -184,46 +253,91 @@ class AnthropicBackend:
         self._client = anthropic.AsyncAnthropic(api_key=key)
         self.model = model
         self.max_tokens = max_tokens
-        self.temperature = temperature
+        self.effort = _validate_effort(effort)
+        self.adaptive_thinking = adaptive_thinking
+        self.strict_tools = strict_tools
 
     async def chat(
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
     ) -> LLMResponse:
         # Convert OpenAI-style tools → Anthropic tool schema.
         anthropic_tools = []
         for t in tools:
             fn = t.get("function", {})
-            anthropic_tools.append({
+            input_schema = copy.deepcopy(
+                fn.get("parameters") or {"type": "object", "properties": {}}
+            )
+            if input_schema.get("type") == "object":
+                input_schema.setdefault("additionalProperties", False)
+            converted = {
                 "name": fn.get("name"),
                 "description": fn.get("description", ""),
-                "input_schema": fn.get("parameters") or {"type": "object", "properties": {}},
-            })
+                "input_schema": input_schema,
+            }
+            if self.strict_tools and _strict_schema_eligible(input_schema):
+                converted["strict"] = True
+            anthropic_tools.append(converted)
 
         # Pull system prompt out of messages.
         system_msgs = [m["content"] for m in messages if m.get("role") == "system"]
-        convo = [m for m in messages if m.get("role") != "system"]
+        convo = _to_anthropic_messages(messages)
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "messages": convo,
+        }
+        if system_msgs:
+            kwargs["system"] = "\n\n".join(system_msgs)
+        if anthropic_tools:
+            kwargs["tools"] = anthropic_tools
+        if _supports_adaptive_thinking(self.model):
+            kwargs["output_config"] = {"effort": self.effort}
+            if self.adaptive_thinking:
+                # Omitted summaries reduce latency while signed thinking blocks
+                # are still round-tripped for interleaved tool reasoning.
+                kwargs["thinking"] = {"type": "adaptive", "display": "omitted"}
 
         resp = await self._client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            system="\n\n".join(system_msgs) if system_msgs else None,
-            messages=convo,
-            tools=anthropic_tools or None,
+            **kwargs,
         )
 
         text_chunks: List[str] = []
         calls: List[ToolCall] = []
+        provider_payload: List[Dict[str, Any]] = []
         for block in resp.content:
             btype = getattr(block, "type", None)
+            provider_payload.append(_model_dump(block))
             if btype == "text":
                 text_chunks.append(block.text)
             elif btype == "tool_use":
                 calls.append(ToolCall(id=block.id, name=block.name, arguments=dict(block.input or {})))
 
-        return LLMResponse(content="\n".join(text_chunks).strip(), tool_calls=calls, raw=resp)
+        usage_obj = getattr(resp, "usage", None)
+        output_details = getattr(usage_obj, "output_tokens_details", None)
+        usage = _normalise_usage({
+            "input_tokens": _get_value(usage_obj, "input_tokens", 0),
+            "output_tokens": _get_value(usage_obj, "output_tokens", 0),
+            "cached_input_tokens": (
+                _get_value(usage_obj, "cache_read_input_tokens", 0)
+            ),
+            "cache_write_tokens": (
+                _get_value(usage_obj, "cache_creation_input_tokens", 0)
+            ),
+            "reasoning_tokens": _get_value(output_details, "thinking_tokens", 0),
+        })
+        return LLMResponse(
+            content="\n".join(text_chunks).strip(),
+            tool_calls=calls,
+            raw=resp,
+            provider_payload=provider_payload,
+            usage=usage,
+            stop_reason=getattr(resp, "stop_reason", None),
+        )
 
 
 class OpenAIToolBackend:
@@ -268,6 +382,8 @@ class OpenAIToolBackend:
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
     ) -> LLMResponse:
         kwargs: Dict[str, Any] = {
             "model": self.model,
@@ -293,7 +409,18 @@ class OpenAIToolBackend:
             except json.JSONDecodeError:
                 args = {"_raw": args_raw}
             calls.append(ToolCall(id=tc.id, name=fn.name, arguments=args or {}))
-        return LLMResponse(content=content, tool_calls=calls, raw=resp)
+        usage_obj = getattr(resp, "usage", None)
+        usage = _normalise_usage({
+            "input_tokens": _get_value(usage_obj, "prompt_tokens", 0),
+            "output_tokens": _get_value(usage_obj, "completion_tokens", 0),
+        })
+        return LLMResponse(
+            content=content,
+            tool_calls=calls,
+            raw=resp,
+            usage=usage,
+            stop_reason=getattr(resp.choices[0], "finish_reason", None),
+        )
 
 
 class GitHubModelsBackend(OpenAIToolBackend):
@@ -321,6 +448,147 @@ class GitHubModelsBackend(OpenAIToolBackend):
             base_url=base_url or "https://models.github.ai/inference",
             name="github",
             **kwargs,
+        )
+
+
+class OpenAIResponsesBackend:
+    """OpenAI Responses API backend for GPT-5.6-class reasoning models.
+
+    The Responses API preserves model reasoning between tool turns via
+    ``previous_response_id``. Only newly-produced tool outputs are sent on
+    continuation calls, avoiding duplicated history and retaining reasoning
+    items that Chat Completions cannot represent.
+    """
+
+    name = "openai"
+
+    def __init__(
+        self,
+        model: str = "gpt-5.6-terra",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        *,
+        effort: str = "medium",
+        max_output_tokens: int = 8192,
+        store: bool = False,
+    ) -> None:
+        try:
+            from openai import AsyncOpenAI  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("openai package is required for OpenAIResponsesBackend") from exc
+        key = api_key or os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError("openai: api_key is required")
+        self.model = model
+        self.effort = _validate_effort(effort)
+        self.max_output_tokens = max_output_tokens
+        self.store = store
+        self._client = AsyncOpenAI(
+            api_key=key,
+            base_url=base_url or os.getenv("OPENAI_BASE_URL") or None,
+        )
+
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
+    ) -> LLMResponse:
+        state = continuation if isinstance(continuation, Mapping) else {}
+        consumed = int(state.get("consumed_messages", 0) or 0)
+        previous_response_id = state.get("previous_response_id")
+        history_items = list(state.get("history_items") or [])
+        continuing = bool(previous_response_id or history_items)
+        new_messages = messages[consumed:] if continuing else messages
+
+        instructions = "\n\n".join(
+            str(m.get("content") or "")
+            for m in messages
+            if m.get("role") == "system"
+        )
+        new_items = _to_openai_response_input(new_messages, continuing=continuing)
+        input_items = history_items + new_items if history_items else new_items
+        response_tools = []
+        for tool in tools:
+            fn = tool.get("function") or {}
+            parameters = copy.deepcopy(
+                fn.get("parameters") or {"type": "object", "properties": {}}
+            )
+            response_tools.append({
+                "type": "function",
+                "name": fn.get("name"),
+                "description": fn.get("description", ""),
+                "parameters": parameters,
+                # Application-side JSON Schema validation remains authoritative.
+                # Enable API strict mode only for schemas that meet its stricter
+                # all-properties-required contract.
+                "strict": _openai_strict_schema_eligible(parameters),
+            })
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "input": input_items,
+            "tools": response_tools,
+            "max_output_tokens": self.max_output_tokens,
+            "reasoning": {"effort": self.effort, "context": "all_turns"},
+            "store": self.store,
+        }
+        if instructions and not previous_response_id:
+            kwargs["instructions"] = instructions
+        if previous_response_id:
+            kwargs["previous_response_id"] = previous_response_id
+        if not self.store:
+            kwargs["include"] = ["reasoning.encrypted_content"]
+
+        resp = await self._client.responses.create(**kwargs)
+        calls: List[ToolCall] = []
+        text_chunks: List[str] = []
+        for item in getattr(resp, "output", []) or []:
+            item_type = _get_value(item, "type", None)
+            if item_type == "function_call":
+                args_raw = _get_value(item, "arguments", "{}") or "{}"
+                try:
+                    args = json.loads(args_raw) if isinstance(args_raw, str) else dict(args_raw)
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    args = {"_raw": args_raw}
+                calls.append(ToolCall(
+                    id=str(_get_value(item, "call_id", None) or _get_value(item, "id", None) or uuid.uuid4()),
+                    name=str(_get_value(item, "name", "")),
+                    arguments=args or {},
+                ))
+            elif item_type == "message":
+                for block in _get_value(item, "content", []) or []:
+                    if _get_value(block, "type", None) in ("output_text", "text"):
+                        text_chunks.append(str(_get_value(block, "text", "") or ""))
+
+        if not text_chunks:
+            output_text = getattr(resp, "output_text", "") or ""
+            if output_text:
+                text_chunks.append(output_text)
+
+        usage_obj = getattr(resp, "usage", None)
+        output_details = _get_value(usage_obj, "output_tokens_details", None)
+        input_details = _get_value(usage_obj, "input_tokens_details", None)
+        usage = _normalise_usage({
+            "input_tokens": _get_value(usage_obj, "input_tokens", 0),
+            "output_tokens": _get_value(usage_obj, "output_tokens", 0),
+            "cached_input_tokens": _get_value(input_details, "cached_tokens", 0),
+            "reasoning_tokens": _get_value(output_details, "reasoning_tokens", 0),
+        })
+        output_items = [_model_dump(item) for item in (getattr(resp, "output", []) or [])]
+        next_continuation: Dict[str, Any] = {"consumed_messages": len(messages)}
+        if self.store:
+            next_continuation["previous_response_id"] = getattr(resp, "id", None)
+        else:
+            next_continuation["history_items"] = input_items + output_items
+        return LLMResponse(
+            content="\n".join(c for c in text_chunks if c).strip(),
+            tool_calls=[c for c in calls if c.name],
+            raw=resp,
+            continuation=next_continuation,
+            usage=usage,
+            stop_reason=getattr(resp, "status", None),
         )
 
 
@@ -379,6 +647,8 @@ class FoundryAgentBackend:
         self,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
+        *,
+        continuation: Any = None,
     ) -> LLMResponse:
         if self._agent_id:
             return await self._chat_hosted_agent(messages)
@@ -428,7 +698,18 @@ class FoundryAgentBackend:
             if not name:
                 continue
             calls.append(ToolCall(id=tc.get("id") or str(uuid.uuid4()), name=name, arguments=args or {}))
-        return LLMResponse(content=content, tool_calls=calls, raw=data)
+        usage_data = data.get("usage") or {}
+        usage = _normalise_usage({
+            "input_tokens": usage_data.get("prompt_tokens", 0),
+            "output_tokens": usage_data.get("completion_tokens", 0),
+        })
+        return LLMResponse(
+            content=content,
+            tool_calls=calls,
+            raw=data,
+            usage=usage,
+            stop_reason=choices[0].get("finish_reason"),
+        )
 
     async def _chat_hosted_agent(self, messages: List[Dict[str, Any]]) -> LLMResponse:
         # Hosted Foundry agents own their tool/runtime stack. We send the
@@ -471,7 +752,9 @@ class FoundryAgentBackend:
 # ---------------------------------------------------------------------------
 # Tool routing
 # ---------------------------------------------------------------------------
-ToolExecutor = Callable[[str, Dict[str, Any]], Awaitable[Dict[str, Any]]]
+ToolExecutor = Callable[..., Awaitable[Any]]
+ToolValidator = Callable[..., Union[Optional[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]]]
+SemanticsResolver = Callable[[Dict[str, Any]], ToolSemantics]
 
 
 @dataclass
@@ -479,8 +762,11 @@ class ToolRoute:
     """Maps a tool name to (provider_label, executor)."""
 
     provider: str
+    base_name: str
     schema: Dict[str, Any]
     executor: ToolExecutor
+    semantics_resolver: SemanticsResolver
+    validator: Optional[ToolValidator] = None
 
 
 class ToolRegistry:
@@ -500,6 +786,11 @@ class ToolRegistry:
         schemas: List[Dict[str, Any]],
         executor: ToolExecutor,
         prefix: Optional[str] = None,
+        *,
+        semantics: Optional[ToolSemantics] = None,
+        semantics_resolver: Optional[Callable[[str, Dict[str, Any]], ToolSemantics]] = None,
+        validator: Optional[ToolValidator] = None,
+        close_schema: bool = False,
     ) -> None:
         for schema in schemas:
             fn = schema.get("function") or {}
@@ -510,19 +801,39 @@ class ToolRegistry:
             if name in self._routes:
                 # avoid collisions: prefix the new one
                 name = f"{provider}__{base}"
+            parameters = copy.deepcopy(
+                fn.get("parameters") or {"type": "object", "properties": {}}
+            )
+            if close_schema and parameters.get("type") == "object":
+                parameters.setdefault("additionalProperties", False)
             # rewrite the schema name so the model sees the routed name
             new_schema = {
                 "type": "function",
-                "function": {**fn, "name": name},
+                "function": {**fn, "name": name, "parameters": parameters},
             }
-            self._routes[name] = ToolRoute(provider=provider, schema=new_schema, executor=executor)
-            # Stash the underlying name so the executor can recover it.
-            self._routes[name].executor = self._wrap_executor(base, executor)
+            if semantics_resolver is not None:
+                route_semantics = lambda args, _base=base: semantics_resolver(_base, args)
+            else:
+                fixed = semantics or ToolSemantics()
+                route_semantics = lambda _args, _fixed=fixed: _fixed
+            self._routes[name] = ToolRoute(
+                provider=provider,
+                base_name=base,
+                schema=new_schema,
+                executor=self._wrap_executor(base, executor),
+                semantics_resolver=route_semantics,
+                validator=validator,
+            )
 
     @staticmethod
     def _wrap_executor(base_name: str, executor: ToolExecutor) -> ToolExecutor:
-        async def _call(_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-            return await executor(base_name, args)
+        async def _call(
+            _name: str,
+            args: Dict[str, Any],
+            context: Optional[ToolExecutionContext] = None,
+        ) -> Any:
+            result = _invoke_with_optional_context(executor, base_name, args, context)
+            return await result if inspect.isawaitable(result) else result
         return _call
 
     def schemas(self) -> List[Dict[str, Any]]:
@@ -531,15 +842,108 @@ class ToolRegistry:
     def names(self) -> List[str]:
         return list(self._routes.keys())
 
-    async def call(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def semantics(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> ToolSemantics:
         route = self._routes.get(name)
         if route is None:
-            return {"ok": False, "error": f"unknown_tool:{name}"}
+            return ToolSemantics()
         try:
-            return await route.executor(name, arguments)
-        except Exception as exc:  # pragma: no cover - defensive
+            return route.semantics_resolver(arguments or {})
+        except Exception:
+            logger.exception("Tool semantics resolver failed for %s", name)
+            return ToolSemantics()
+
+    async def validate_call(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[ToolExecutionContext] = None,
+    ) -> Optional[Dict[str, Any]]:
+        route = self._routes.get(name)
+        if route is None:
+            return _tool_error("unknown_tool", f"Unknown tool: {name}", retryable=False)
+        if not isinstance(arguments, dict):
+            return _tool_error(
+                "invalid_arguments",
+                f"Arguments for {name} must be a JSON object.",
+                retryable=False,
+            )
+
+        parameters = (route.schema.get("function") or {}).get("parameters") or {}
+        if Draft202012Validator is not None and parameters:
+            try:
+                errors = sorted(
+                    Draft202012Validator(parameters).iter_errors(arguments),
+                    key=lambda e: list(e.absolute_path),
+                )
+            except Exception as exc:
+                logger.warning("Invalid JSON schema for tool %s: %s", name, exc)
+                errors = []
+            if errors:
+                details = []
+                for err in errors[:5]:
+                    path = ".".join(str(part) for part in err.absolute_path) or "$"
+                    details.append({"path": path, "message": err.message})
+                return _tool_error(
+                    "invalid_arguments",
+                    f"Tool arguments failed schema validation for {name}.",
+                    retryable=False,
+                    details=details,
+                )
+
+        if route.validator is not None:
+            try:
+                validation = _invoke_with_optional_context(
+                    route.validator,
+                    route.base_name,
+                    arguments,
+                    context,
+                )
+                if inspect.isawaitable(validation):
+                    validation = await validation
+            except Exception as exc:
+                logger.exception("Custom validator failed for %s", name)
+                return _tool_error(
+                    "validator_error",
+                    f"Safety validation failed for {name}: {exc}",
+                    retryable=False,
+                )
+            if validation:
+                return _normalise_tool_result(validation)
+        return None
+
+    async def call(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[ToolExecutionContext] = None,
+    ) -> Dict[str, Any]:
+        route = self._routes.get(name)
+        validation_error = await self.validate_call(name, arguments, context)
+        if validation_error is not None:
+            return validation_error
+        assert route is not None
+        semantics = self.semantics(name, arguments)
+        try:
+            result = await asyncio.wait_for(
+                _invoke_executor(route.executor, name, arguments, context),
+                timeout=max(0.1, semantics.timeout_seconds),
+            )
+            return _normalise_tool_result(result)
+        except asyncio.TimeoutError:
+            return _tool_error(
+                "timeout",
+                f"Tool {name} timed out after {semantics.timeout_seconds:g}s.",
+                retryable=semantics.read_only or semantics.idempotent,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
             logger.exception("Tool %s raised", name)
-            return {"ok": False, "error": str(exc)}
+            return _tool_error(
+                "execution_error",
+                f"{type(exc).__name__}: {exc}",
+                retryable=semantics.read_only or semantics.idempotent,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -559,14 +963,30 @@ class ReasoningHarness:
         *,
         max_iterations: int = 12,
         max_tool_calls_per_turn: int = 5,
+        max_total_tool_calls: int = 30,
+        max_run_seconds: float = 180.0,
+        llm_timeout_seconds: float = 120.0,
+        max_parallel_tools: int = 5,
+        max_repeated_tool_calls: int = 2,
+        max_consecutive_tool_error_turns: int = 3,
+        max_tool_result_chars: int = 12000,
+        max_context_chars: int = 250000,
         on_event: Optional[EventCallback] = None,
         tool_call_interceptor: Optional[Any] = None,
     ) -> None:
         self.llm = llm
         self.tools = tools
         self.system_prompt = system_prompt
-        self.max_iterations = max_iterations
-        self.max_tool_calls_per_turn = max_tool_calls_per_turn
+        self.max_iterations = max(1, int(max_iterations))
+        self.max_tool_calls_per_turn = max(1, int(max_tool_calls_per_turn))
+        self.max_total_tool_calls = max(1, int(max_total_tool_calls))
+        self.max_run_seconds = max(1.0, float(max_run_seconds))
+        self.llm_timeout_seconds = max(0.01, float(llm_timeout_seconds))
+        self.max_parallel_tools = max(1, int(max_parallel_tools))
+        self.max_repeated_tool_calls = max(1, int(max_repeated_tool_calls))
+        self.max_consecutive_tool_error_turns = max(1, int(max_consecutive_tool_error_turns))
+        self.max_tool_result_chars = max(1000, int(max_tool_result_chars))
+        self.max_context_chars = max(10000, int(max_context_chars))
         self.on_event = on_event
         # Optional dry-run interceptor with ``async call(name, args)``
         # and ``set_iteration(int)`` (see :mod:`plan_executor`).
@@ -576,41 +996,145 @@ class ReasoningHarness:
         self,
         goal: str,
         context: Optional[Dict[str, Any]] = None,
+        *,
+        run_id: Optional[str] = None,
+        mode: str = "execute",
+        system_prompt: Optional[str] = None,
+        on_event: Optional[EventCallback] = None,
+        tool_call_interceptor: Optional[Any] = None,
     ) -> HarnessResult:
         started = time.monotonic()
+        run_id = run_id or uuid.uuid4().hex
+        event_callback = on_event if on_event is not None else self.on_event
+        interceptor = (
+            tool_call_interceptor
+            if tool_call_interceptor is not None
+            else self.tool_call_interceptor
+        )
         user_payload = goal.strip()
         if context:
             user_payload += "\n\nContext:\n" + json.dumps(context, indent=2, default=str)
 
         messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": system_prompt or self.system_prompt},
             {"role": "user", "content": user_payload},
         ]
         trace: List[HarnessStep] = []
         total_tool_calls = 0
+        requested_tool_calls = 0
+        rejected_tool_calls = 0
+        successful_tool_calls = 0
+        failed_tool_calls = 0
+        cached_tool_calls = 0
+        usage: Dict[str, int] = {}
+        continuation: Any = None
+        repeated_calls: Dict[str, int] = {}
+        successful_results: Dict[str, Dict[str, Any]] = {}
+        read_cache: Dict[str, Dict[str, Any]] = {}
+        consecutive_tool_error_turns = 0
         schemas = self.tools.schemas()
+        execution_context = ToolExecutionContext(run_id=run_id, mode=mode)
 
         for iteration in range(1, self.max_iterations + 1):
             step_started = time.monotonic()
-            if self.tool_call_interceptor is not None and hasattr(self.tool_call_interceptor, "set_iteration"):
+            elapsed = time.monotonic() - started
+            if elapsed >= self.max_run_seconds:
+                return self._build_result(
+                    answer="The reasoning run reached its wall-clock budget before completion.",
+                    trace=trace,
+                    iterations=iteration - 1,
+                    tool_calls=total_tool_calls,
+                    stopped_reason="time_budget",
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
+                )
+            if _estimate_messages_chars(messages) > self.max_context_chars:
+                return self._build_result(
+                    answer=(
+                        "The reasoning run reached its context budget. Narrow the goal "
+                        "or use more selective discovery filters."
+                    ),
+                    trace=trace,
+                    iterations=iteration - 1,
+                    tool_calls=total_tool_calls,
+                    stopped_reason="context_budget",
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
+                )
+
+            if interceptor is not None and hasattr(interceptor, "set_iteration"):
                 try:
-                    self.tool_call_interceptor.set_iteration(iteration)
+                    interceptor.set_iteration(iteration)
                 except Exception:
                     pass
             try:
-                response = await self.llm.chat(messages, schemas)
+                remaining = max(0.1, self.max_run_seconds - elapsed)
+                response = await asyncio.wait_for(
+                    self._call_llm(messages, schemas, continuation),
+                    timeout=min(self.llm_timeout_seconds, remaining),
+                )
+            except asyncio.TimeoutError:
+                logger.error("LLM call timed out at iteration %d", iteration)
+                return self._build_result(
+                    answer=f"LLM timeout after {min(self.llm_timeout_seconds, remaining):g}s.",
+                    trace=trace,
+                    iterations=iteration - 1,
+                    tool_calls=total_tool_calls,
+                    stopped_reason="llm_timeout",
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
+                )
+            except asyncio.CancelledError:
+                await self._emit(
+                    {"type": "cancelled", "run_id": run_id, "iteration": iteration},
+                    event_callback,
+                )
+                raise
             except Exception as exc:
                 logger.exception("LLM call failed at iteration %d", iteration)
-                return HarnessResult(
+                return self._build_result(
                     answer=f"LLM error: {exc}",
                     trace=trace,
                     iterations=iteration - 1,
                     tool_calls=total_tool_calls,
                     stopped_reason="llm_error",
-                    duration_ms=int((time.monotonic() - started) * 1000),
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
                 )
 
-            await self._emit({"type": "thought", "iteration": iteration, "content": response.content})
+            continuation = response.continuation
+            _merge_usage(usage, response.usage)
+            await self._emit({
+                "type": "thought",
+                "run_id": run_id,
+                "iteration": iteration,
+                "content": response.content,
+                "usage": response.usage,
+            }, event_callback)
 
             if response.is_final:
                 trace.append(HarnessStep(
@@ -618,21 +1142,39 @@ class ReasoningHarness:
                     thought=response.content,
                     duration_ms=int((time.monotonic() - step_started) * 1000),
                 ))
-                return HarnessResult(
+                return self._build_result(
                     answer=response.content,
                     trace=trace,
                     iterations=iteration,
                     tool_calls=total_tool_calls,
                     stopped_reason="final",
-                    duration_ms=int((time.monotonic() - started) * 1000),
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
                 )
 
-            # Cap tool calls per turn to bound cost.
-            calls = response.tool_calls[: self.max_tool_calls_per_turn]
+            all_calls = response.tool_calls
+            requested_tool_calls += len(all_calls)
+            remaining_tool_budget = max(0, self.max_total_tool_calls - total_tool_calls)
+            accepted_count = min(
+                len(all_calls),
+                self.max_tool_calls_per_turn,
+                remaining_tool_budget,
+            )
+            calls = all_calls[:accepted_count]
+            rejected = all_calls[accepted_count:]
             total_tool_calls += len(calls)
+            rejected_tool_calls += len(rejected)
 
-            # Append assistant turn (with tool calls) to history.
-            messages.append({
+            # Append every provider-requested call. Calls rejected by a budget
+            # still receive a synthetic result so provider protocols never see
+            # unresolved tool_use/function_call records.
+            assistant_message: Dict[str, Any] = {
                 "role": "assistant",
                 "content": response.content,
                 "tool_calls": [
@@ -641,40 +1183,60 @@ class ReasoningHarness:
                         "type": "function",
                         "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
                     }
-                    for c in calls
+                    for c in all_calls
                 ],
-            })
+            }
+            if response.provider_payload is not None:
+                assistant_message["provider_payload"] = response.provider_payload
+            messages.append(assistant_message)
 
-            # Execute in parallel, preserving order.
-            dispatch = (
-                self.tool_call_interceptor.call
-                if self.tool_call_interceptor is not None
-                else self.tools.call
+            results = await self._execute_batch(
+                calls,
+                interceptor=interceptor,
+                context=execution_context,
+                repeated_calls=repeated_calls,
+                successful_results=successful_results,
+                read_cache=read_cache,
             )
-            results = await asyncio.gather(
-                *[dispatch(c.name, c.arguments) for c in calls],
-                return_exceptions=False,
-            )
+            budget_results = [
+                _tool_error(
+                    "tool_budget_exceeded",
+                    (
+                        f"Tool call {call.name} was not executed because this turn or "
+                        "run exhausted its configured tool-call budget."
+                    ),
+                    retryable=False,
+                )
+                for call in rejected
+            ]
+            results.extend(budget_results)
 
             step_calls: List[Dict[str, Any]] = []
             step_results: List[Dict[str, Any]] = []
-            for call, result in zip(calls, results):
+            for call, result in zip(all_calls, results):
                 step_calls.append({"id": call.id, "name": call.name, "arguments": call.arguments})
                 step_results.append({"id": call.id, "name": call.name, "result": result})
+                if _result_ok(result):
+                    successful_tool_calls += 1
+                else:
+                    failed_tool_calls += 1
+                if bool((result.get("_harness") or {}).get("cached")):
+                    cached_tool_calls += 1
                 # Tool result message back to the model.
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.id,
                     "name": call.name,
-                    "content": _serialise_result(result),
+                    "content": _serialise_result(result, self.max_tool_result_chars),
                 })
                 await self._emit({
                     "type": "tool_call",
+                    "run_id": run_id,
                     "iteration": iteration,
                     "name": call.name,
                     "arguments": call.arguments,
                     "result": result,
-                })
+                }, event_callback)
 
             trace.append(HarnessStep(
                 iteration=iteration,
@@ -684,28 +1246,601 @@ class ReasoningHarness:
                 duration_ms=int((time.monotonic() - step_started) * 1000),
             ))
 
+            if results and all(not _result_ok(r) for r in results):
+                consecutive_tool_error_turns += 1
+            else:
+                consecutive_tool_error_turns = 0
+            if consecutive_tool_error_turns >= self.max_consecutive_tool_error_turns:
+                return self._build_result(
+                    answer=(
+                        "The run stopped after repeated tool-error turns. Review the "
+                        "trace and correct the tool inputs or connectivity before retrying."
+                    ),
+                    trace=trace,
+                    iterations=iteration,
+                    tool_calls=total_tool_calls,
+                    stopped_reason="tool_errors",
+                    started=started,
+                    run_id=run_id,
+                    requested=requested_tool_calls,
+                    rejected=rejected_tool_calls,
+                    successful=successful_tool_calls,
+                    failed=failed_tool_calls,
+                    cached=cached_tool_calls,
+                    usage=usage,
+                )
+
         # Budget exhausted.
-        return HarnessResult(
+        return self._build_result(
             answer="Maximum reasoning iterations reached without a final answer.",
             trace=trace,
             iterations=self.max_iterations,
             tool_calls=total_tool_calls,
             stopped_reason="max_iterations",
-            duration_ms=int((time.monotonic() - started) * 1000),
+            started=started,
+            run_id=run_id,
+            requested=requested_tool_calls,
+            rejected=rejected_tool_calls,
+            successful=successful_tool_calls,
+            failed=failed_tool_calls,
+            cached=cached_tool_calls,
+            usage=usage,
         )
 
-    async def _emit(self, event: Dict[str, Any]) -> None:
-        if self.on_event is None:
+    async def _call_llm(
+        self,
+        messages: List[Dict[str, Any]],
+        schemas: List[Dict[str, Any]],
+        continuation: Any,
+    ) -> LLMResponse:
+        if _accepts_keyword(self.llm.chat, "continuation"):
+            return await self.llm.chat(messages, schemas, continuation=continuation)
+        # Compatibility for small scripted test/custom backends written against
+        # the original two-argument protocol.
+        return await self.llm.chat(messages, schemas)
+
+    async def _execute_batch(
+        self,
+        calls: List[ToolCall],
+        *,
+        interceptor: Optional[Any],
+        context: ToolExecutionContext,
+        repeated_calls: Dict[str, int],
+        successful_results: Dict[str, Dict[str, Any]],
+        read_cache: Dict[str, Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        if not calls:
+            return []
+        semantics = [self.tools.semantics(c.name, c.arguments) for c in calls]
+        can_parallelise = all(s.read_only and s.parallel_safe for s in semantics)
+
+        async def execute(call: ToolCall) -> Dict[str, Any]:
+            return await self._execute_one(
+                call,
+                interceptor=interceptor,
+                context=context,
+                repeated_calls=repeated_calls,
+                successful_results=successful_results,
+                read_cache=read_cache,
+            )
+
+        if not can_parallelise:
+            # Any mutation makes the entire batch ordered. This preserves model
+            # call order and prevents read/write races against Home Assistant.
+            return [await execute(call) for call in calls]
+
+        semaphore = asyncio.Semaphore(self.max_parallel_tools)
+
+        async def limited(call: ToolCall) -> Dict[str, Any]:
+            async with semaphore:
+                return await execute(call)
+
+        gathered = await asyncio.gather(
+            *(limited(call) for call in calls),
+            return_exceptions=True,
+        )
+        out: List[Dict[str, Any]] = []
+        for call, result in zip(calls, gathered):
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, BaseException):
+                out.append(_tool_error(
+                    "execution_error",
+                    f"{type(result).__name__}: {result}",
+                    retryable=False,
+                ))
+            else:
+                out.append(_normalise_tool_result(result))
+        return out
+
+    async def _execute_one(
+        self,
+        call: ToolCall,
+        *,
+        interceptor: Optional[Any],
+        context: ToolExecutionContext,
+        repeated_calls: Dict[str, int],
+        successful_results: Dict[str, Dict[str, Any]],
+        read_cache: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        semantics = self.tools.semantics(call.name, call.arguments)
+        fingerprint = _tool_call_fingerprint(call.name, call.arguments)
+        repeated_calls[fingerprint] = repeated_calls.get(fingerprint, 0) + 1
+
+        if semantics.read_only and fingerprint in read_cache:
+            return _with_harness_meta(read_cache[fingerprint], cached=True, attempts=0)
+        if fingerprint in successful_results:
+            previous = successful_results[fingerprint]
+            if semantics.idempotent:
+                return _with_harness_meta(previous, cached=True, deduplicated=True, attempts=0)
+            return _tool_error(
+                "duplicate_non_idempotent_call",
+                f"Repeated non-idempotent call blocked: {call.name}",
+                retryable=False,
+            )
+        if repeated_calls[fingerprint] > self.max_repeated_tool_calls:
+            return _tool_error(
+                "repeated_call_limit",
+                f"Repeated identical call limit reached for {call.name}.",
+                retryable=False,
+            )
+
+        validation = await self.tools.validate_call(call.name, call.arguments, context)
+        if validation is not None:
+            return validation
+
+        dispatch = interceptor.call if interceptor is not None else self.tools.call
+        retries = max(0, semantics.max_retries if semantics.read_only else 0)
+        started = time.monotonic()
+        result: Dict[str, Any] = _tool_error("not_executed", "Tool was not executed.")
+        attempts = 0
+        for attempt in range(retries + 1):
+            attempts = attempt + 1
+            try:
+                invoked = _invoke_with_optional_context(
+                    dispatch,
+                    call.name,
+                    call.arguments,
+                    context,
+                )
+                raw_result = await asyncio.wait_for(
+                    invoked if inspect.isawaitable(invoked) else _as_awaitable(invoked),
+                    timeout=max(0.1, semantics.timeout_seconds),
+                )
+                result = _normalise_tool_result(raw_result)
+            except asyncio.TimeoutError:
+                result = _tool_error(
+                    "timeout",
+                    f"Tool {call.name} timed out after {semantics.timeout_seconds:g}s.",
+                    retryable=semantics.read_only,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                result = _tool_error(
+                    "execution_error",
+                    f"{type(exc).__name__}: {exc}",
+                    retryable=semantics.read_only,
+                )
+            if _result_ok(result) or not _result_retryable(result) or attempt >= retries:
+                break
+            await asyncio.sleep(min(1.0, 0.1 * (2 ** attempt)))
+
+        result = _with_harness_meta(
+            result,
+            attempts=attempts,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        if _result_ok(result):
+            successful_results[fingerprint] = copy.deepcopy(result)
+            if semantics.read_only:
+                read_cache[fingerprint] = copy.deepcopy(result)
+            else:
+                # A mutation may invalidate every state observation made so far.
+                read_cache.clear()
+        return result
+
+    @staticmethod
+    def _build_result(
+        *,
+        answer: str,
+        trace: List[HarnessStep],
+        iterations: int,
+        tool_calls: int,
+        stopped_reason: str,
+        started: float,
+        run_id: str,
+        requested: int,
+        rejected: int,
+        successful: int,
+        failed: int,
+        cached: int,
+        usage: Dict[str, int],
+    ) -> HarnessResult:
+        return HarnessResult(
+            answer=answer,
+            trace=trace,
+            iterations=iterations,
+            tool_calls=tool_calls,
+            stopped_reason=stopped_reason,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            run_id=run_id,
+            requested_tool_calls=requested,
+            rejected_tool_calls=rejected,
+            successful_tool_calls=successful,
+            failed_tool_calls=failed,
+            cached_tool_calls=cached,
+            usage=dict(usage),
+        )
+
+    async def _emit(
+        self,
+        event: Dict[str, Any],
+        callback: Optional[EventCallback],
+    ) -> None:
+        if callback is None:
             return
         try:
-            await self.on_event(event)
+            await callback(event)
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:  # pragma: no cover
             logger.debug("on_event callback failed: %s", exc)
 
 
-def _serialise_result(result: Any) -> str:
-    """Best-effort JSON serialisation of a tool result for the LLM."""
+def _serialise_result(result: Any, max_chars: int = 12000) -> str:
+    """Serialize a result as valid JSON, compacting rather than slicing it.
+
+    Raw string slicing can produce invalid JSON and hide that data was lost.
+    The compact envelope preserves success/error fields, reports the original
+    size, and includes a recursively-trimmed high-signal prefix.
+    """
+    normalised = _normalise_tool_result(result)
     try:
-        return json.dumps(result, default=str)[:8000]
+        raw = json.dumps(normalised, default=str, ensure_ascii=False, separators=(",", ":"))
     except (TypeError, ValueError):
-        return str(result)[:8000]
+        normalised = {"ok": True, "result": str(result)}
+        raw = json.dumps(normalised, ensure_ascii=False, separators=(",", ":"))
+    if len(raw) <= max_chars:
+        return raw
+
+    compacted = _compact_json_value(normalised, max_items=20, max_string=1200, depth=0)
+    envelope = {
+        "ok": _result_ok(normalised),
+        "truncated": True,
+        "original_chars": len(raw),
+        "note": "Tool result compacted by the harness; narrow the query or paginate for full data.",
+        "data": compacted,
+    }
+    encoded = json.dumps(envelope, default=str, ensure_ascii=False, separators=(",", ":"))
+    while len(encoded) > max_chars and envelope["data"]:
+        envelope["data"] = _compact_json_value(
+            envelope["data"], max_items=8, max_string=400, depth=0
+        )
+        encoded = json.dumps(envelope, default=str, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded) > max_chars:
+            envelope["data"] = {"summary": str(envelope["data"])[: max(100, max_chars // 3)]}
+            encoded = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
+            break
+    return encoded
+
+
+def _to_anthropic_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert the harness's OpenAI-style history to Claude content blocks."""
+    out: List[Dict[str, Any]] = []
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        role = message.get("role")
+        if role == "system":
+            index += 1
+            continue
+        if role == "tool":
+            results: List[Dict[str, Any]] = []
+            while index < len(messages) and messages[index].get("role") == "tool":
+                tool_message = messages[index]
+                content = str(tool_message.get("content") or "")
+                block: Dict[str, Any] = {
+                    "type": "tool_result",
+                    "tool_use_id": str(tool_message.get("tool_call_id") or ""),
+                    "content": content,
+                }
+                if _serialised_result_is_error(content):
+                    block["is_error"] = True
+                results.append(block)
+                index += 1
+            out.append({"role": "user", "content": results})
+            continue
+        if role == "assistant":
+            native_payload = message.get("provider_payload")
+            if isinstance(native_payload, list):
+                content_blocks = copy.deepcopy(native_payload)
+            else:
+                content_blocks: List[Dict[str, Any]] = []
+                text = str(message.get("content") or "")
+                if text:
+                    content_blocks.append({"type": "text", "text": text})
+                for tool_call in message.get("tool_calls") or []:
+                    function = tool_call.get("function") or {}
+                    args_raw = function.get("arguments") or "{}"
+                    try:
+                        args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                    except (json.JSONDecodeError, TypeError):
+                        args = {"_raw": args_raw}
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": str(tool_call.get("id") or uuid.uuid4()),
+                        "name": str(function.get("name") or ""),
+                        "input": args or {},
+                    })
+            out.append({"role": "assistant", "content": content_blocks})
+        else:
+            out.append({"role": "user", "content": message.get("content") or ""})
+        index += 1
+    return out
+
+
+def _to_openai_response_input(
+    messages: List[Dict[str, Any]],
+    *,
+    continuing: bool,
+) -> List[Dict[str, Any]]:
+    items: List[Dict[str, Any]] = []
+    for message in messages:
+        role = message.get("role")
+        if role == "system":
+            continue
+        if role == "tool":
+            items.append({
+                "type": "function_call_output",
+                "call_id": str(message.get("tool_call_id") or ""),
+                "output": str(message.get("content") or ""),
+            })
+            continue
+        # The assistant function calls are already part of the response named by
+        # previous_response_id and must not be submitted twice.
+        if continuing and role == "assistant" and message.get("tool_calls"):
+            continue
+        content = message.get("content")
+        if content not in (None, ""):
+            items.append({"role": role or "user", "content": content})
+    return items
+
+
+def _strict_schema_eligible(schema: Dict[str, Any]) -> bool:
+    return isinstance(schema, dict) and schema.get("type") == "object"
+
+
+def _openai_strict_schema_eligible(schema: Dict[str, Any]) -> bool:
+    if not _strict_schema_eligible(schema):
+        return False
+    properties = schema.get("properties") or {}
+    required = set(schema.get("required") or [])
+    return schema.get("additionalProperties") is False and required == set(properties)
+
+
+def _supports_adaptive_thinking(model: str) -> bool:
+    lowered = (model or "").lower()
+    return any(token in lowered for token in (
+        "claude-opus-4-6",
+        "claude-opus-4-7",
+        "claude-opus-4-8",
+        "claude-sonnet-4-6",
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-mythos",
+    ))
+
+
+def _validate_effort(effort: str) -> str:
+    value = (effort or "medium").strip().lower()
+    if value not in {"none", "low", "medium", "high", "xhigh", "max"}:
+        raise ValueError("effort must be one of none|low|medium|high|xhigh|max")
+    return value
+
+
+def _model_dump(value: Any) -> Dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(exclude_none=True)
+    if isinstance(value, dict):
+        return copy.deepcopy(value)
+    return {"type": _get_value(value, "type", "unknown"), "value": str(value)}
+
+
+def _get_value(value: Any, key: str, default: Any = None) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, Mapping):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _normalise_usage(usage: Mapping[str, Any]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for key, value in usage.items():
+        try:
+            number = int(value or 0)
+        except (TypeError, ValueError):
+            continue
+        if number:
+            out[key] = number
+    return out
+
+
+def _merge_usage(total: Dict[str, int], update: Optional[Mapping[str, Any]]) -> None:
+    for key, value in (update or {}).items():
+        try:
+            total[key] = total.get(key, 0) + int(value or 0)
+        except (TypeError, ValueError):
+            continue
+
+
+def _tool_error(
+    code: str,
+    message: str,
+    *,
+    retryable: bool = False,
+    details: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "ok": False,
+        "error": message,
+        "error_code": code,
+        "retryable": bool(retryable),
+    }
+    if details:
+        result["details"] = details
+    return result
+
+
+def _normalise_tool_result(result: Any) -> Dict[str, Any]:
+    if isinstance(result, dict):
+        out = copy.deepcopy(result)
+    else:
+        out = {"result": result}
+    if "ok" not in out:
+        is_error = bool(out.get("is_error") or out.get("isError"))
+        if out.get("error") not in (None, ""):
+            is_error = True
+        out["ok"] = not is_error
+    if not out.get("ok") and "error" not in out:
+        out["error"] = "Tool execution failed."
+    return out
+
+
+def _result_ok(result: Any) -> bool:
+    return bool(_normalise_tool_result(result).get("ok"))
+
+
+def _result_retryable(result: Any) -> bool:
+    normalised = _normalise_tool_result(result)
+    if "retryable" in normalised:
+        return bool(normalised.get("retryable"))
+    text = f"{normalised.get('error_code', '')} {normalised.get('error', '')}".lower()
+    return any(token in text for token in (
+        "timeout", "temporar", "connection", "unavailable", "rate limit", "429", "503"
+    ))
+
+
+def _with_harness_meta(result: Dict[str, Any], **metadata: Any) -> Dict[str, Any]:
+    out = _normalise_tool_result(result)
+    current = dict(out.get("_harness") or {})
+    current.update({key: value for key, value in metadata.items() if value is not None})
+    out["_harness"] = current
+    return out
+
+
+def _serialised_result_is_error(content: str) -> bool:
+    try:
+        parsed = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return not _result_ok(parsed)
+
+
+def _tool_call_fingerprint(name: str, arguments: Dict[str, Any]) -> str:
+    canonical = json.dumps(
+        {"name": name, "arguments": arguments},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _estimate_messages_chars(messages: List[Dict[str, Any]]) -> int:
+    try:
+        return len(json.dumps(messages, default=str, ensure_ascii=False))
+    except (TypeError, ValueError):
+        return sum(len(str(message)) for message in messages)
+
+
+def _compact_json_value(
+    value: Any,
+    *,
+    max_items: int,
+    max_string: int,
+    depth: int,
+) -> Any:
+    if depth >= 5:
+        return str(value)[:max_string]
+    if isinstance(value, dict):
+        items = list(value.items())
+        compacted = {
+            str(key): _compact_json_value(
+                item,
+                max_items=max_items,
+                max_string=max_string,
+                depth=depth + 1,
+            )
+            for key, item in items[:max_items]
+        }
+        if len(items) > max_items:
+            compacted["_omitted_keys"] = len(items) - max_items
+        return compacted
+    if isinstance(value, (list, tuple)):
+        compacted_list = [
+            _compact_json_value(
+                item,
+                max_items=max_items,
+                max_string=max_string,
+                depth=depth + 1,
+            )
+            for item in list(value)[:max_items]
+        ]
+        if len(value) > max_items:
+            compacted_list.append({"_omitted_items": len(value) - max_items})
+        return compacted_list
+    if isinstance(value, str) and len(value) > max_string:
+        return value[:max_string] + f"…[+{len(value) - max_string} chars]"
+    return value
+
+
+def _accepts_keyword(callable_obj: Callable[..., Any], keyword: str) -> bool:
+    try:
+        parameters = inspect.signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return False
+    return keyword in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+
+
+def _invoke_with_optional_context(
+    callable_obj: Callable[..., Any],
+    name: str,
+    arguments: Dict[str, Any],
+    context: Optional[ToolExecutionContext],
+) -> Any:
+    if _accepts_keyword(callable_obj, "context"):
+        return callable_obj(name, arguments, context=context)
+    try:
+        parameters = list(inspect.signature(callable_obj).parameters.values())
+        positional = [
+            parameter
+            for parameter in parameters
+            if parameter.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+        if len(positional) >= 3:
+            return callable_obj(name, arguments, context)
+    except (TypeError, ValueError):
+        pass
+    return callable_obj(name, arguments)
+
+
+async def _invoke_executor(
+    executor: ToolExecutor,
+    name: str,
+    arguments: Dict[str, Any],
+    context: Optional[ToolExecutionContext],
+) -> Any:
+    result = _invoke_with_optional_context(executor, name, arguments, context)
+    return await result if inspect.isawaitable(result) else result
+
+
+async def _as_awaitable(value: Any) -> Any:
+    return value

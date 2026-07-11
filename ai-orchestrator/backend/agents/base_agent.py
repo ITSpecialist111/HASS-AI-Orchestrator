@@ -51,7 +51,6 @@ class BaseAgent(ABC):
         self.agent_id = agent_id
         self.name = name
         self.mcp_server = mcp_server
-        self.mcp_server = mcp_server
         # Support lazy loading
         self._ha_provider = ha_client
         
@@ -156,9 +155,18 @@ class BaseAgent(ABC):
             Generated text
         """
         try:
+            provider_name = getattr(self.llm_provider, "name", "ollama")
+            selected_model = self.model_name
+            if provider_name != "ollama":
+                selected_model = {
+                    "openai": os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
+                    "anthropic": os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8"),
+                    "github": os.getenv("GITHUB_MODEL", "gpt-4o-mini"),
+                    "foundry": os.getenv("FOUNDRY_MODEL", ""),
+                }.get(provider_name, self.model_name) or self.model_name
             content = await asyncio.to_thread(
                 self.llm_provider.chat,
-                self.model_name,
+                selected_model,
                 [{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=max_tokens,

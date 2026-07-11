@@ -1,6 +1,6 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.11
 ARG BUILD_ARCH=amd64
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 # Build React dashboard
 WORKDIR /app/dashboard
@@ -62,7 +62,7 @@ ARG BUILD_VERSION
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \
       io.hass.name="AI Orchestrator" \
-      io.hass.description="Phase 6: Universal Agents, RAG, and No-Code Factory" \
+  io.hass.description="Deterministic Home Assistant agent kernel with guarded tools and durable plans" \
       io.hass.arch="amd64|armv7|aarch64"
 
 # Healthcheck

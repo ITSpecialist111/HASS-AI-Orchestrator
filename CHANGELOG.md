@@ -1,6 +1,50 @@
 # Changelog
 <br>
 
+## [0.12.0] - 2026-07-11
+### Added — Deterministic 2026 agent kernel
+- One provider-neutral reasoning kernel is now authoritative for chat, goals, prompts, and triggers.
+- JSON Schema validation, trusted execution context, read-only parallelism, ordered mutations,
+  bounded read retries, duplicate suppression, complete tool-call result pairing, valid result
+  compaction, hard run budgets, per-run isolation, usage accounting, and bounded streaming.
+- GPT-5.6 uses the Responses API with explicit effort and private local replay of encrypted
+  reasoning items (`store=false` by default).
+- Claude Opus 4.8 uses strict tools, adaptive thinking, native `tool_use`/`tool_result` blocks,
+  and signed thinking continuity. Anthropic is now a first-class `llm_provider`.
+- Plan execution now uses atomic claims, an `executing` state, trusted approval context, and
+  per-step SQLite checkpoints.
+- Added model-free kernel evaluations and a provider-neutral home-agent scenario dataset/scorer.
+- Reasoning UI now exposes Auto/Plan modes, model/effort, usage and reliability metrics, and
+  exact-plan approve/reject controls.
+- Model-generated dashboards now run in opaque iframes under a restrictive CSP. Trusted React
+  code fetches HA state and sends snapshots via `postMessage`; generated HTML has no API/network access.
+
+### Fixed
+- ApprovalQueue now initializes before MCPServer; high-impact requests no longer receive a
+  permanently missing queue.
+- Removed the direct native generic service path from the model surface; all HA mutations now
+  traverse blocked-domain, allowlist, service, entity-domain, and approval policy.
+- Fixed invalid Anthropic continuation formatting and lost adaptive-thinking signatures.
+- Fixed provider/model drift caused by implicit Anthropic precedence and silent remote fallback.
+- Fixed shared singleton harness state races and mismatched streaming run IDs/event order.
+- Lifespan services are declared globally correctly, and all background tasks are retained,
+  cancelled, and awaited during shutdown.
+
+### Changed / Breaking
+- Removed the unused no-op LangGraph façade and dependency.
+- `reasoning_allow_direct_execute`, `enable_legacy_autonomous_loops`, and
+  `enable_legacy_dashboard_loop` default to `false`.
+- OpenAI defaults to `gpt-5.6-terra`; Anthropic defaults to `claude-opus-4-8`.
+- Upgraded FastAPI, Pydantic, MCP, ChromaDB, NumPy, Ollama, OpenAI, Anthropic, React 19,
+  Vite 8, and the frontend build chain. Frontend audit: zero known vulnerabilities.
+- Container frontend builder now uses Node 22. Back up Chroma data before first upgrade.
+- Removed 9,091 generated `dashboard/node_modules` files from Git tracking; the audited
+  `package-lock.json` is now the reproducible source of frontend dependencies.
+
+### Verification
+- 2026 dependency stack: 266 backend tests passing and 4 opt-in live MCP tests skipped.
+- React 19 / Vite 8 production build passes with a clean `npm audit`.
+
 ## [0.10.1] - 2026-04-19
 ### Added — Phase 10A: Dashboard Studio (generative dashboards)
 - **Prompt-to-dashboard with a saved gallery.** Every generation is now persisted with full

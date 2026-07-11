@@ -22,6 +22,19 @@ export SMART_MODEL=$(jq -r '.smart_model // "deepseek-r1:8b"' $CONFIG_PATH)
 export FAST_MODEL=$(jq -r '.fast_model // "mistral:7b-instruct"' $CONFIG_PATH)
 export DECISION_INTERVAL=$(jq -r '.decision_interval // 120' $CONFIG_PATH)
 export ENABLE_GPU=$(jq -r '.enable_gpu // false' $CONFIG_PATH)
+export ENABLE_RAG=$(jq -r '.enable_rag // true' $CONFIG_PATH)
+export LLM_PROVIDER=$(jq -r '.llm_provider // "ollama"' $CONFIG_PATH)
+export OPENAI_API_KEY=$(jq -r '.openai_api_key // ""' $CONFIG_PATH)
+export OPENAI_BASE_URL=$(jq -r '.openai_base_url // ""' $CONFIG_PATH)
+export OPENAI_MODEL=$(jq -r '.openai_model // "gpt-5.6-terra"' $CONFIG_PATH)
+export ANTHROPIC_API_KEY=$(jq -r '.anthropic_api_key // ""' $CONFIG_PATH)
+export ANTHROPIC_MODEL=$(jq -r '.anthropic_model // "claude-opus-4-8"' $CONFIG_PATH)
+export REASONING_EFFORT=$(jq -r '.reasoning_effort // "medium"' $CONFIG_PATH)
+export REASONING_MAX_TOOL_CALLS=$(jq -r '.reasoning_max_tool_calls // 30' $CONFIG_PATH)
+export REASONING_MAX_SECONDS=$(jq -r '.reasoning_max_seconds // 180' $CONFIG_PATH)
+export REASONING_LLM_TIMEOUT=$(jq -r '.reasoning_llm_timeout // 120' $CONFIG_PATH)
+export REASONING_TOOL_TIMEOUT=$(jq -r '.reasoning_tool_timeout // 30' $CONFIG_PATH)
+export REASONING_MAX_CONCURRENT_RUNS=$(jq -r '.reasoning_max_concurrent_runs // 1' $CONFIG_PATH)
 
 # Security Controls
 export ALLOWED_DOMAINS=$(jq -r '.allowed_domains // ""' $CONFIG_PATH)
@@ -49,6 +62,8 @@ echo "  Smart Model: $SMART_MODEL"
 echo "  Fast Model: $FAST_MODEL"
 echo "  Decision Interval: ${DECISION_INTERVAL}s"
 echo "  GPU Enabled: $ENABLE_GPU"
+echo "  RAG Enabled: $ENABLE_RAG"
+echo "  LLM Provider: $LLM_PROVIDER"
 if [ -n "$HA_ACCESS_TOKEN" ]; then
     echo "  HA Access Token: PROVIDED (Length: ${#HA_ACCESS_TOKEN})"
     # Switch to Direct Core Access to bypass Supervisor Proxy issues ONLY if still using default proxy URL
@@ -63,7 +78,8 @@ else
 fi
 
 # Start Ollama server if using localhost
-if [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"* ]]; then
+if { [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"* ]]; } \
+    && { [[ "$LLM_PROVIDER" == "ollama" ]] || [[ "$ENABLE_RAG" == "true" ]]; }; then
     echo "=========================================="
     echo "Starting Ollama server..."
     echo "=========================================="
@@ -94,7 +110,7 @@ if [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"* ]
     
     # Pull heating model if not present
     echo "=========================================="
-    echo "Checking for model: $HEATING_MODEL"
+    echo "Checking for model: $SMART_MODEL"
     echo "=========================================="
     
     if ! ollama list | grep -q "${SMART_MODEL%%:*}"; then

@@ -43,6 +43,8 @@ class MCPToolSpec:
     name: str
     description: str
     input_schema: Dict[str, Any]
+    output_schema: Optional[Dict[str, Any]] = None
+    annotations: Dict[str, Any] = field(default_factory=dict)
     server: str = "external"
 
     def to_openai_schema(self) -> Dict[str, Any]:
@@ -189,6 +191,13 @@ class ExternalMCPClient:
                     name=t.name,
                     description=getattr(t, "description", "") or "",
                     input_schema=getattr(t, "inputSchema", None) or {"type": "object", "properties": {}},
+                    output_schema=getattr(t, "outputSchema", None),
+                    annotations=(
+                        t.annotations.model_dump(exclude_none=True)
+                        if getattr(t, "annotations", None) is not None
+                        and hasattr(t.annotations, "model_dump")
+                        else dict(getattr(t, "annotations", None) or {})
+                    ),
                     server=self.name,
                 )
                 for t in tools_resp.tools
@@ -249,12 +258,12 @@ class ExternalMCPClient:
 
         # Flatten content blocks to text where possible.
         text_chunks: List[str] = []
-        structured: Optional[Any] = None
+        structured: Optional[Any] = getattr(res, "structuredContent", None)
         for block in getattr(res, "content", []) or []:
             btype = getattr(block, "type", None)
             if btype == "text":
                 text_chunks.append(getattr(block, "text", "") or "")
-            elif btype == "json":
+            elif btype == "json" and structured is None:
                 structured = getattr(block, "data", None)
             else:
                 # image / resource / unknown — render a stub

@@ -11,9 +11,9 @@ import {
  * dashboards with prompt-to-design, iterate (refine an existing one),
  * variations (N parallel takes), and pin/delete.
  *
- * Live data binding is automatic: the backend injects a polling shim
- * into every saved dashboard, so iframes refresh values without the UI
- * doing anything.
+ * Live data binding is parent-mediated: this trusted component fetches
+ * state and posts it into an opaque sandbox. Generated HTML cannot call
+ * same-origin APIs or navigate the application.
  */
 export const DashboardStudio = () => {
     const [dashboards, setDashboards] = useState([]);
@@ -28,6 +28,7 @@ export const DashboardStudio = () => {
     const [error, setError] = useState(null);
     const [iframeNonce, setIframeNonce] = useState(0);
     const promptRef = useRef(null);
+    const iframeRef = useRef(null);
 
     const refreshList = async () => {
         try {
@@ -48,6 +49,38 @@ export const DashboardStudio = () => {
     };
 
     useEffect(() => { refreshList(); /* eslint-disable-next-line */ }, []);
+
+    const pushLiveState = async (dashboardId) => {
+        if (!dashboardId || !iframeRef.current?.contentWindow) return;
+        try {
+            const res = await fetch(`api/studio/dashboards/${dashboardId}/state`);
+            if (!res.ok) return;
+            const state = await res.json();
+            iframeRef.current.contentWindow.postMessage({
+                type: 'hass-dashboard-state',
+                dashboardId,
+                state,
+            }, '*'); // sandboxed frames have an opaque origin
+        } catch (_) {
+            // A transient refresh failure should not replace the rendered dashboard.
+        }
+    };
+
+    useEffect(() => {
+        if (!selected) return undefined;
+        const onReady = (event) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            if (event.data?.type !== 'hass-dashboard-ready') return;
+            if (event.data.dashboardId !== selected) return;
+            pushLiveState(selected);
+        };
+        window.addEventListener('message', onReady);
+        const timer = window.setInterval(() => pushLiveState(selected), 15000);
+        return () => {
+            window.removeEventListener('message', onReady);
+            window.clearInterval(timer);
+        };
+    }, [selected, iframeNonce]);
 
     const callJson = async (url, opts = {}) => {
         const res = await fetch(url, {
@@ -319,8 +352,12 @@ export const DashboardStudio = () => {
                             {/* Iframe */}
                             <div className="flex-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden min-h-0">
                                 <iframe
+                                    ref={iframeRef}
                                     key={`${selectedMeta.id}-${iframeNonce}`}
                                     src={`api/studio/dashboards/${selectedMeta.id}`}
+                                    sandbox="allow-scripts"
+                                    referrerPolicy="no-referrer"
+                                    onLoad={() => pushLiveState(selectedMeta.id)}
                                     className="w-full h-full border-none bg-slate-950"
                                     title={selectedMeta.title}
                                 />

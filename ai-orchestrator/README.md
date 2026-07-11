@@ -1,213 +1,118 @@
-# 🧠 AI Orchestrator
+# AI Orchestrator 0.12
 
-**The Autonomous AI Automation Engine for Home Assistant.**
+A local-first, deterministic AI control plane for Home Assistant.
 
-AI Orchestrator transforms your smart home from a collection of static "if-this-then-that" scripts into a dynamic, thinking ecosystem. It deploys autonomous AI agents that reason about your home's state, understand your intent, and execute actions intelligently using a built-in Model Context Protocol (MCP) toolset.
+AI Orchestrator observes the real home, reasons with local or cloud models, and turns model requests into validated, reviewable Home Assistant operations. The model proposes; application code enforces schemas, policy, budgets, ordering, approval, and replay.
 
-**Version**: v0.10.0 (Multi-Provider LLM, Deep Reasoning, Triggers & Prompt Library)
+## What is authoritative in 0.12
 
-## 🌟 Key Features
+- **One reasoning kernel** for dashboard goals, chat, prompts, and proactive triggers.
+- **Observation before action** with native entity, state, domain, service, and area tools.
+- **Plan → Approve → Execute** for mutations. Approved plans replay exact captured arguments without another model call.
+- **Deterministic tool scheduler**: read-only calls may run concurrently; any batch containing a mutation runs in model order.
+- **Application-side JSON Schema validation** before every tool call.
+- **Bounded recovery**: read-only transient failures retry; mutations do not retry automatically.
+- **Duplicate protection**: repeated idempotent actions are deduplicated and repeated non-idempotent actions are blocked within a run.
+- **Hard budgets** for iterations, total tool calls, wall time, model timeout, tool timeout, context, and result size.
+- **Human review** for high-impact plans and security services.
+- **Durable execution claims and per-step checkpoints** in SQLite, preventing concurrent double execution.
+- **Episodic memory**, built-in prompt workflows, cron/state triggers, external MCP, and Dashboard Studio remain supported.
 
-### 1. Dynamic Agent Reasoning 🧠
-Move beyond rigid YAML automations. Create agents with simple natural language job descriptions.
--   **Natural Language Instructions**: "Keep the living room cozy. If it's movie time (dim lights, TV on), ensure the temperature is comfortable."
--   **Smart Context Awareness**: Agents automatically discover relevant devices and services. They know *what* is available in your home.
+Legacy cadence-based specialist loops and the legacy dashboard generator are disabled by default. They can be enabled for compatibility, but the deterministic kernel is the recommended runtime.
 
--   **RAG Knowledge Base**: Feed your agents manuals, documentation, or specific facts so they make informed decisions (e.g., "Don't turn off the heater if the pump is running").
+## Model providers
 
-### 2. Internal MCP Tool Engine 🛠️
-The system features a purpose-built **Model Context Protocol (MCP) Server** responsible for safely executing agent decisions. This is the bridge between the AI's "brain" and Home Assistant's "hands".
--   It strictly maps AI intent to valid Home Assistant Service calls (`climate.set_temperature`, `light.turn_on`, etc.).
--   It validates parameters to prevent hallucinations or unsafe actions (e.g., preventing extreme temperature settings).
--   **Multi-Layer Security (v0.9.5)**:
-    -   **Configurable Safety**: All security settings (Allowlists, Blocked Domains, Impact Services, Temp Limits) are now editable via the Add-on Configuration tab in Home Assistant.
-    -   **Domain Allowlist**: Only approved domains are allowed for generic service calls.
-    -   **Critical Block**: Dangerous domains (`shell_command`, `script`, etc.) are strictly prohibited.
-    -   **Approval Queue**: High-impact actions (Entry/Security) require human-in-the-loop approval.
--   It logs every action for transparency.
+| Provider | Suggested model | Notes |
+|---|---|---|
+| `ollama` | A local tool-capable model | Default; home data remains local. |
+| `openai` | `gpt-5.6-terra` | Uses the Responses API, persisted reasoning, and local encrypted-state replay with `store=false`. Use `gpt-5.6-sol` for maximum capability. |
+| `anthropic` | `claude-opus-4-8` | Uses strict tools, adaptive thinking, interleaved tool reasoning, and explicit effort. |
+| `github` | A model available to the GitHub Models account | OpenAI-compatible tool calling. |
+| `foundry` | A deployed model name | Model-deployment mode keeps local tool execution. Hosted-agent mode owns its server-side tools. |
 
-### 3. Tri-Level Architecture (v0.9.5) 🧠⚡
-The system uses three distinct model roles to optimize for cost, speed, and intelligence:
--   **Orchestrator** (e.g., `deepseek-r1:8b`): The "Boss". Plans high-level strategies, delegates tasks to agents, and resolves conflicts (e.g. heating vs cooling).
--   **Smart Agents** (e.g., `deepseek-r1:8b`): Specialist agents that handle complex logic (Security, Energy Management).
--   **Fast Agents** (e.g., `mistral:7b-instruct`): Worker agents that execute simple instructions instantly (Motion Lights).
+Remote-provider misconfiguration fails the deep reasoner explicitly instead of silently sending a cloud model ID to Ollama. Other add-on services still start and report degraded health.
 
-### 4. "Minority Report" Dashboard 🖥️
--   **Live Decision Stream**: Watch your agents think in real-time. See *why* they made a decision.
--   **Smart Suggestions**: The Architect analyzes your home and suggests new automation opportunities directly in your grid.
--   **No-Code Factory**: Click a suggestion or the "+" button to interview the Architect and build new agents interactively.
+## Recommended first-run configuration
 
-### 5. Chat Assistant (v0.9.0) 💬
-A floating AI assistant lives in your dashboard, ready to help at any time.
--   **Quick Actions**: Hover over the icon for instant commands (Zap Lights, Arm Security).
--   **Direct Control**: Chat with the Orchestrator directly. "Turn off the kitchen lights and lock the front door."
--   **Context Aware**: It knows the current state of your home and uses your configured Orchestrator model to execute complex requests.
--   **Self-Diagnostic**: If it can't reach your LLM, it will tell you exactly which IP it tried and why it failed.
+1. Leave `dry_run_mode: true`.
+2. Keep `reasoning_allow_direct_execute: false`.
+3. Choose `llm_provider` and set its model/credential fields.
+4. Keep `reasoning_effort: medium` initially; evaluate before raising it.
+5. Run read-only audits and plan-mode scenarios.
+6. Review plans in the Reasoning dashboard.
+7. Disable global dry-run only after the tool allowlists and entity targets are correct.
 
-### 6. AI Visual Dashboard (v0.9.47) 🎨
-The system now features a real-time, LLM-driven visualization engine that builds your entire home interface using natural language.
-
-![AI Visual Dashboard](../AI_Visual_Dashboard.gif)
-
--   **Dynamic UI Generation**: Use local (Ollama) or state-of-the-art cloud models (**Google Gemini**) to generate bespoke, high-fidelity dashboards.
--   **No YAML, No Coding**: Because the system has deep access to your Home Assistant Entity Registry, it builds the dashboard autonomously. You don't need to manually configure cards or write a single line of YAML.
--   **Dynamic Design**: Just tell the Architect Agent: *"Make a dashboard focused on energy usage with a dark oceanic theme"* or *"Build a 3-column view for my heating and security"* and watch it regenerate in seconds.
--   **Gemini Robotics Model**: Explicitly supports `gemini-robotics-er-1.5-preview` for advanced robotics-grade visualizations.
--   **Mixergy-Style Visuals**: Features skeuomorphic designs like animated vertical water tanks, "Deep Ocean" themes, and glassmorphism.
--   **Integrated Experience**: Access the dashboard directly via the new sidebar button or trigger it from the Chat Assistant quick actions.
--   **Context-Aware**: The dashboard reflects live Home Assistant data and AI decision logic directly in its layout.
--   **Runtime Settings**: Dynamically toggle between Ollama and Gemini, and update API keys directly in the **Settings Modal** without restarting.
-
----
-
-## 📦 Installation
-
-1.  **Add Repository**: Add this repo URL to your Home Assistant Add-on Store.
-2.  **Install**: Find "AI Orchestrator" and click Install.
-3.  **Configure**:
-    *   **Ollama Models**: Pull the required models on your Ollama server:
-        ```bash
-        ollama pull deepseek-r1:8b
-        ollama pull mistral:7b-instruct
-        ollama pull nomic-embed-text
-        ```
-    *   **Ollama Host**: URL of your Ollama instance (default: `http://localhost:11434`).
-    *   **Orchestrator Model**: The main brain for high-level planning (default: `deepseek-r1:8b`).
-    *   **Smart Model**: The reasoning model for complex agents (default: `deepseek-r1:8b`).
-    *   **Fast Model**: The execution model for responsive agents (default: `mistral:7b-instruct`).
-    *   **Cloud AI API Key**: (Optional) Add your Google AI API key for high-fidelity "AI Visual Dashboard" generation.
-    *   **LLM Provider** (v0.10.0+, optional): Switch every agent and the orchestrator over to a remote provider by setting `llm_provider` to one of:
-        *   `ollama` *(default — local, private, free)*
-        *   `openai` — set `openai_api_key` (and optionally `openai_base_url` for any OpenAI-compatible endpoint) and `openai_model` (e.g. `gpt-4o-mini`).
-        *   `github` — set `github_token` (a GitHub PAT with the `models:read` scope) and `github_model` (e.g. `gpt-4o-mini`). Uses [GitHub Models](https://models.github.ai/).
-        *   `foundry` — set `foundry_endpoint` (your Microsoft Foundry / Azure AI Inference URL) plus either `foundry_api_key` *or* `foundry_bearer_token`, and `foundry_model` (e.g. `gpt-4o`). Set `foundry_agent_id` to call a hosted Foundry Agent instead of a model deployment (tools then run server-side in Foundry).
-        *   On any misconfiguration the add-on silently falls back to Ollama, so a wrong key never leaks conversations to a cloud provider.
-    *   **Access Token**: Create a Long-Lived Access Token in your HA User Profile.
-    *   **Direct Access Mode**: Automatically falls back to Direct Core Access (e.g., `http://homeassistant:8123`) if the Supervisor Proxy is unavailable or tokens are mismatched.
-    *   **Dry Run**: Set to `true` initially to see what agents *would* do without actually doing it.
-4.  **Start**: The first startup determines your available hardware and ingests your entities into the Knowledge Base.
-    *   **First Run**: May take ~1 minute to embed all entities.
-    *   **Subsequent Runs**: Instant (v0.9.1+ Delta Check enabled).
-
-## ⚙️ Configuration (`agents.yaml`)
-
-This file lives in `/addon_configs/ai-orchestrator/agents.yaml`. You can edit it manually or use the Dashboard Factory.
+Important defaults:
 
 ```yaml
-agents:
-  - id: "living_room_manager"
-    name: "Living Room Manager"
-    model: "mistral:7b-instruct"
-    # No entities listed? No problem. The agent will discover them.
-    instruction: |
-      Keep the living room cozy in the evening. 
-      Turn on warm lights if motion is detected after sunset.
-      
-  - id: "security_guard"
-    name: "Security"
-    model: "deepseek-r1:8b" # Use Smart model for complex security logic
-    decision_interval: 60
-    entities:
-      - lock.front_door  # Explicitly assigned entities are prioritized
-      - binary_sensor.front_door_motion
-    instruction: |
-      If the front door is unlocked for > 15 mins, lock it and notify me.
+llm_provider: ollama
+dry_run_mode: true
+enable_rag: true
+reasoning_effort: medium
+reasoning_max_tool_calls: 30
+reasoning_max_seconds: 180
+reasoning_llm_timeout: 120
+reasoning_tool_timeout: 30
+reasoning_max_concurrent_runs: 1
+reasoning_allow_direct_execute: false
+enable_legacy_autonomous_loops: false
+enable_legacy_dashboard_loop: false
 ```
 
-## 🧠 Anti-Hallucination & Entity Awareness
+## Safety model
 
-The system now includes sophisticated mechanisms to ensure agents only interact with devices that actually exist in your home:
+1. The model only sees registered schemas.
+2. Tool arguments are validated against JSON Schema in the kernel.
+3. The local tool server validates entity domain, temperature, domain allowlist, blocked domains, and service allowlist.
+4. Plan/auto mode intercepts mutations and records exact intents.
+5. High-impact intents remain pending until a human executes the plan.
+6. Execution atomically claims the plan, carries trusted approval context, and checkpoints every completed step.
+7. Failure aborts remaining ordered steps and marks them skipped.
+8. Every call and plan result is logged.
 
-### 🎯 Assigned Entities (Visual)
-In the Dashboard Agent Details, you can now see exactly which entities an agent has been assigned. 
-- **Green Badges**: Actuators (Lights, Switches, Locks)
-- **Blue Badges**: Sensors (Motion, Temperature, Contact)
+The generic native `ha_call_service` route is not exposed to the reasoning model. Generic service calls use the guarded local `call_ha_service` route, so native WebSocket access cannot bypass policy.
 
-If an agent has "No assigned entities", it will attempt to discover them dynamically at runtime, but explicitly assigning them (or letting the auto-discovery find them) is safer.
+## External MCP
 
-### 🔍 Auto-Discovery on Update
-When you change an agent's instruction in the Dashboard (e.g., changing "Manage the kitchen" to "Manage the garage"), the **Architect** immediately scans your Entity Registry.
-1.  It extracts keywords from your new instruction.
-2.  It finds matching entity IDs in your Home Assistant.
-3.  It automatically updates the agent's `entities` list.
+External MCP is optional and additive. The client supports current Streamable HTTP discovery, structured content, output schemas, tool errors, and per-call timeouts. External annotations are retained as metadata but never automatically trusted to downgrade local safety policy.
 
-This prevents the "Hallucinated Entity ID" errors common in other LLM integrations.
+## Evaluation
 
-### 🛡️ Dynamic Service Restriction (Approved Methods)
-Each agent is strictly limited to the Home Assistant services that match its assigned entities. 
-*   **Example**: If an agent controls `light.living_room`, it is injected with approved methods like `light.turn_on` and `light.turn_off`.
-*   **Effect**: It CANNOT haphazardly call `switch.turn_on` or hallucinate fake services like `light.explode`. The generic "call_ha_service" tool is contextually bound to these approved methods "behind the scenes" in the system prompt.
+Two layers are included:
 
----
+- `tests/test_agent_kernel_2026.py`: model-free executable safety and determinism contracts.
+- `evals/home_agent_scenarios.yaml`: representative model scenarios with deterministic pass/fail assertions for tool budgets, mutations, approvals, and forbidden tools.
 
-## 🔧 Troubleshooting
+Validate the dataset:
 
-### "Agent is hallucinating entity IDs?"
-*   **Cause**: The agent is searching for devices that don't match its internal registry.
-*   **Fix**:
-    1.  Ensure you are on **v0.9.9+** (includes Dynamic Service Discovery and Anti-Hallucination).
-    2.  Check the "Decision Stream" log. Does it verify the entity exists?
-    3.  Manually assign the entity in `agents.yaml` if auto-discovery is missing it.
-
-### "I see 'Dry Run' in the logs?"
-*   **Cause**: `dry_run_mode` is enabled in configuration.
-*   **Fix**: Go to Add-on Configuration and toggle `Dry Run Mode` to `false` when you trust your agents.
-
-### "Agent is stuck in 'Initializing'?"
-*   **Cause**: The agent loop likely crashed or LLM is unreachable.
-*   **Fix**: Check the "Logs" tab in the Add-on. Ensure Ollama is running and accessible.
-
-### "Chat Assistant says 'No route to host'?"
-*   **Cause**: The Add-on container cannot reach your Ollama IP.
-*   **Fix**: 
-    1.  If Ollama is on the host, use your LAN IP (e.g., `192.168.1.x`), NOT `localhost`.
-    2.  Check the error details in the chat bubble for the exact URL it tried.
-
----
-
-## 📊 Telemetry & Data Collection
-
-We value your privacy. The AI Orchestrator uses **ChromaDB** for local vector storage (Knowledge Base). 
-
-### What is collected?
-ChromaDB collects basic, anonymous usage events:
-*   When the client starts.
-*   When a collection is created.
-*   The version of the library.
-
-### What is NOT collected?
-*   **Your Home Data**: Entity names, states, and history stay local.
-*   **Agent Instructions**: Your prompts and logic are never shared.
-*   **Personal Info**: No names, IPs, or location data.
-
-### How to disable?
-Set the following environment variable in your Home Assistant configuration:
-`CHROMA_TELEMETRY_EXCEPT_OPT_OUT=True`
-
----
-
-## ⚡ Agent Speed & "Real-Time" Monitoring
-
-By default, agents operate on a **120-second heartbeat**. This balances intelligence with hardware resources.
-
-### Changing the Interval
-You can customize this per-agent in `agents.yaml`:
-```yaml
-- id: "lighting_agent"
-  decision_interval: 10 # Check every 10 seconds
+```text
+python evals/scenario_contract.py
 ```
 
-### Real-Time Monitoring
-For mission-critical monitoring (Greenhouses, Security), you can set the interval to **"Real-Time"** (effectively 1-5 seconds). 
-> [!IMPORTANT]
-> Real-time monitoring significantly increases CPU/GPU usage as the LLM is constantly processing home state. Use a capable LLM server for the best experience.
+Run the backend suite from the backend directory:
 
----
+```text
+pytest -q
+```
 
-## 🔬 Advanced Monitoring (MLFlow)
-Pro users can wrap the `orchestrator.process_chat_request` or `rag_manager.query` methods in Python to connect their own **MLFlow** tracking server for real-time monitoring of agent reasoning and retrieval accuracy.
+## Runtime architecture
 
-## 🗺️ Roadmap
+```mermaid
+flowchart LR
+    UI[Dashboard / Chat / Trigger / Prompt] --> K[Deterministic reasoning kernel]
+    K --> M[Ollama / GPT-5.6 / Claude 4.8 / GitHub / Foundry]
+    K --> R[Validated tool registry]
+    R --> N[Native HA observations]
+    R --> S[Safety-checked HA mutations]
+    R --> X[Optional external MCP]
+    S --> P[Plan store + approval]
+    P --> E[Atomic deterministic replay]
+    E --> HA[Home Assistant WebSocket API]
+    K --> MEM[Episode memory / RAG]
+```
 
--   **v1.0**: Voice Integration (Talk to your house).
--   **v1.1**: Vision capabilities (Show your house camera feeds to agents).
+## Installation
+
+Add this repository to the Home Assistant Add-on Store, install **AI Orchestrator**, configure the provider, and open the ingress dashboard. If Ollama or RAG uses a local host, the container starts the local Ollama service and pulls configured models when needed.
+
+For architecture decisions, breaking changes, research sources, and the next roadmap, see [../MODERNIZATION_2026.md](../MODERNIZATION_2026.md).

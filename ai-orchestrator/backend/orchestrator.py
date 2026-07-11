@@ -1,13 +1,14 @@
-"""
-Central Orchestrator for Multi-Agent Coordination.
-Uses LangGraph workflow to plan, distribute tasks, resolve conflicts, and execute.
+"""Legacy multi-agent coordinator retained for compatibility surfaces.
+
+The deterministic :class:`DeepReasoningAgent` is authoritative for chat,
+prompts, and triggers. Fixed-cadence planning in this module is opt-in.
 """
 import asyncio
 import collections
 import logging
 import json
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal, TypedDict
 from pathlib import Path
 
 import ollama
@@ -19,10 +20,43 @@ except ImportError:
     _genai_module = None
     _GENAI_AVAILABLE = False
 from llm_providers import make_chat_provider
-from workflow_graph import (
-    OrchestratorState, Task, Decision, Conflict,
-    create_workflow
-)
+
+
+class Task(TypedDict):
+    task_id: str
+    agent_id: str
+    description: str
+    priority: Literal["low", "medium", "high", "critical"]
+    context: Dict
+
+
+class Decision(TypedDict):
+    agent_id: str
+    task_id: str
+    reasoning: str
+    actions: List[Dict]
+    confidence: float
+    impact_level: Literal["low", "medium", "high", "critical"]
+
+
+class Conflict(TypedDict):
+    conflict_id: str
+    agent_ids: List[str]
+    conflict_type: str
+    description: str
+    resolution: Optional[str]
+
+
+class OrchestratorState(TypedDict):
+    timestamp: str
+    home_state: Dict
+    tasks: List[Task]
+    decisions: List[Decision]
+    conflicts: List[Conflict]
+    approval_required: bool
+    approved_actions: List[Dict]
+    rejected_actions: List[Dict]
+    execution_results: List[Dict]
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +103,6 @@ class Orchestrator:
         self.model_name = model_name
         self.planning_interval = planning_interval
         self.deep_reasoner = None  # Set externally after init
-
-        # LangGraph workflow
-        self.workflow = create_workflow()
-
-
-        self.compiled_workflow = self.workflow.compile()
 
         # Ollama client for planning LLM (kept for back-compat; some
         # planning paths still use Ollama-specific ``format="json"``).
@@ -470,25 +498,30 @@ Only create tasks if action is needed. Return empty tasks array if everything is
     async def process_chat_request(self, user_message: str) -> Dict[str, Any]:
         """
         Process a direct chat message from the user.
-        If the message is complex and a deep reasoner is available, escalate.
+        The deterministic deep-reasoning kernel is authoritative whenever it is
+        available. The legacy single-shot path remains only as a boot fallback.
         """
-        # Check if this is a complex query that should go to the deep reasoner
-        if self.deep_reasoner and self._is_complex_query(user_message):
-            logger.info("Escalating complex query to deep reasoner: %s", user_message[:80])
+        if self.deep_reasoner:
+            logger.info("Routing chat request to deterministic reasoner: %s", user_message[:80])
             try:
-                result = await self.deep_reasoner.run(user_message)
+                result = await self.deep_reasoner.run(user_message, mode="auto")
                 return {
                     "response": result.answer,
-                    "actions_executed": [],
+                    "actions_executed": getattr(result, "execution_results", None) or [],
+                    "run_id": result.run_id,
+                    "plan": getattr(result, "plan", None),
                     "reasoning_trace": {
                         "iterations": result.iterations,
                         "tool_calls": result.tool_calls,
+                        "successful_tool_calls": result.successful_tool_calls,
+                        "failed_tool_calls": result.failed_tool_calls,
+                        "usage": result.usage,
                         "stopped_reason": result.stopped_reason,
                         "duration_ms": result.duration_ms,
                     },
                 }
             except Exception as e:
-                logger.error("Deep reasoner failed, falling back to single-shot: %s", e)
+                logger.error("Deep reasoner failed, falling back to legacy single-shot: %s", e)
 
         # 1. Gather Context
         try:

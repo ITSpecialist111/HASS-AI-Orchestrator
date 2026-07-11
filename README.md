@@ -1,102 +1,56 @@
-# 🏠 Graham's AI Orchestrator
+# Graham's AI Orchestrator
 
-![Version](https://img.shields.io/badge/version-v0.10.0-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Status](https://img.shields.io/badge/Status-Alpha-orange)
+![Version](https://img.shields.io/badge/version-v0.12.0-blue) ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue) ![Kernel](https://img.shields.io/badge/agent%20kernel-deterministic-8b5cf6)
 
-**The Autonomous Multi-Agent Brain for your Smart Home.**
+**A local-first AI control plane for Home Assistant.**
 
-> 🚀 **Alpha Release (v0.10.0)**: Now seeking testers!
+AI Orchestrator turns natural-language goals into grounded observations and policy-checked Home Assistant plans. It combines the flexibility of frontier models with deterministic application code for validation, ordering, approvals, replay, budgets, and auditability.
 
-The AI Orchestrator transforms your Home Assistant from a collection of manual toggles and rigid automations into a dynamic, thinking ecosystem. It deploys **Autonomous AI Agents** that reason about your home's state, understand your intent, and execute actions intelligently using a built-in RAG Knowledge Base and Safe Tool Execution Engine.
+## Why this project is different
 
-![Dashboard Preview](screenshot.png)
-*(Note: Dashboard images are representative)*
+- Home Assistant-native entity discovery and state observation.
+- Local Ollama by default; OpenAI GPT‑5.6, Anthropic Claude Opus 4.8, GitHub Models, and Microsoft Foundry are opt-in.
+- One transparent reasoning loop for chat, dashboard goals, prompt workflows, and proactive triggers.
+- Plan → Approve → Execute with exact-argument replay and per-step persistence.
+- Read-only parallelism but ordered mutations.
+- Schema validation, allowlists, blocked domains, service policy, temperature bounds, timeouts, retry policy, duplicate suppression, and hard budgets.
+- Episodic memory, RAG, optional external MCP, no-code agent factory, and generative live dashboards.
+- Model-free safety evaluations plus a provider-neutral home-agent scenario dataset.
 
----
+## 0.12 modernization
 
-## 🌟 Why use this?
+The 2026 release removes the dormant no-op LangGraph façade and makes the custom deterministic kernel authoritative. Legacy fixed-cadence autonomous loops are now opt-in because periodic single-shot model actions are less safe and less efficient than event-driven goals and Home Assistant triggers.
 
-### 🧠 Real Reasoning, Not Scripts
-Instead of writing complex YAML for "If motion > 5mins AND sun is down", just tell an agent:  
-> *"You are the Security Guard. If the front porch is occupied for more than 5 minutes at night, turn on the floodlight and notify me."*
+It also adds:
 
-### 🗣️ Natural Language Chat
-A **Floating Chat Assistant** lives in your dashboard. Talk to your house naturally:
-> *"It's movie night. Get the living room ready."*  
-> *"Who left the garage door open?"*
+- GPT‑5.6 Responses API continuation with private local replay of encrypted reasoning items.
+- Claude Opus 4.8 strict tools, adaptive thinking, effort control, and correct signed thinking/tool-result continuity.
+- First-class `anthropic` provider selection.
+- Atomic plan execution claims and progress checkpoints.
+- A single guarded Home Assistant mutation path.
+- Current FastAPI, Pydantic, MCP, ChromaDB, Ollama, React 19, and Vite 8 baselines.
+- A vulnerability-free frontend dependency audit.
 
-### 🔧 No-Code Agent Factory
-Don't know how to prompt? The **Architect AI** will interview you and build the perfect agent for your needs automatically. It even surfaces **Smart Suggestions** based on your devices!
+See [MODERNIZATION_2026.md](MODERNIZATION_2026.md) for the review, research, architecture decisions, breaking changes, and roadmap.
 
-### 📚 RAG Knowledge Base
-Feed your AI manuals, PDF guides, or specific house rules. The agents read them before acting.
-> *"Don't turn on the dishwasher if the 'Clean' sign is flipped."*
+## Install
 
-### 🎨 AI Visual Dashboard
-Experience high-fidelity, skeuomorphic visualizations generated in real-time. The **AI Visual Dashboard** allows you to dynamically request and rebuild your entire home interface using natural language.
+1. Add `https://github.com/ITSpecialist111/HASS-AI-Orchestrator` to the Home Assistant Add-on Store repositories.
+2. Install **AI Orchestrator**.
+3. Keep dry-run enabled and direct execution disabled initially.
+4. Select a provider and configure its model and credentials.
+5. Open the ingress dashboard, run read-only audits, and review generated plans before enabling live changes.
 
-![AI Visual Dashboard](AI_Visual_Dashboard.gif)
+Detailed add-on configuration and safety behavior are documented in [ai-orchestrator/README.md](ai-orchestrator/README.md).
 
-*   **No YAML, No Coding**: Because the system has deep access to your Home Assistant Entity Registry, it builds the dashboard autonomously. You don't need to manually configure cards or write a single line of YAML.
-*   **Dynamic Design**: Just tell the Architect Agent: *"Make a dashboard focused on energy usage with a dark oceanic theme"* or *"Build a 3-column view for my heating and security"* and watch it regenerate in seconds.
-*   **Advanced LLM Support**: Leverages both local (Ollama) and cloud-based (**Google Gemini**) advanced LLMs for stunning, context-aware UIs.
-*   **Quick Trigger**: Use the FAB quick actions for instant generation or access via the dedicated sidebar button.
+## Development verification
 
----
+The supported backend test runtime is Python 3.11 or 3.12. The suite includes deterministic kernel, API, safety, plan execution, MCP, memory, trigger, provider, streaming, and Home Assistant adapter tests. The dashboard builds with Node 22 and Vite 8.
 
-## 📦 How to Install
+The root [Dockerfile.test](Dockerfile.test) now runs a clean lockfile-only frontend install/audit/build before assembling the Python test image, so CI also proves that no committed `node_modules` tree is required.
 
-1.  **Add Repository**:
-    Copy this URL:  
-    `https://github.com/ITSpecialist111/HASS-AI-Orchestrator`
-    
-    Go to **Home Assistant > Settings > Add-ons > Add-on Store > Repositories** (3 dots top right) and add it.
+Current verified baseline: **266 backend tests passing, 4 live MCP tests skipped**, plus a clean frontend security audit and production build.
 
-2.  **Install "AI Orchestrator"**:
-    Find it in the list and click **Install**.
+## Project status
 
-3.  **Configure**:
-    *   **Ollama Models**: Ensure you have pulled the required models on your Ollama server:
-        ```bash
-        ollama pull deepseek-r1:8b
-        ollama pull mistral:7b-instruct
-        ollama pull nomic-embed-text  # Mandatory for RAG Knowledge Base
-        ```
-    *   **Tokens**: Create a Long-Lived Access Token in your Profile.
-
-4.  **Start & Explore**:
-    Open the **Web UI** to see your agents thinking in real-time!
-
----
-
-## 🔒 Privacy & Safety
-
-*   **100% Local**: Works with your local Ollama instance. No data leaves your network.
-*   **Safe Execution Engine (v0.9.9)**: 
-    *   **Configurable Safety**: All security settings (Allowlists, Blocked Domains, Impact Services, Temp Limits) are now editable via the Add-on Configuration tab in Home Assistant.
-    *   **Domain Allowlist**: AI only has access to safe domains (`light`, `switch`, `climate`, etc.) by default.
-    *   **Critical Guard**: Dangerous domains (`shell_command`, `hassio`, etc.) are explicitly blocked.
-    *   **Approval Queue**: High-impact actions (unlocking doors, disarming alarms) require manual approval.
-*   **Dry Run Mode**: Test your agents efficiently without them actually touching your devices until you trust them.
-*   **Anonymized Telemetry**: We use ChromaDB for local vector storage. By default, it sends basic, anonymized usage statistics (client start, collection creation). No personal house data is ever collected. You can disable this by setting `CHROMA_TELEMETRY_EXCEPT_OPT_OUT=True` in your environment.
-
----
-
-## ⚡ Agent Speed & Real-Time Monitoring
-
-Agents are rate-limited by default to a **120-second decision interval** to save CPU and LLM resources. 
-
-*   **Custom Intervals**: Set individual intervals in your `agents.yaml` or directly in the Dashboard.
-*   **Real-Time Monitoring**: Want an agent to react instantly? Set its interval to **5-10 seconds**. We call this "Real-Time" mode—ideal for lighting or security presence.
-*   **Speed Note**: The actual reaction time is limited by your LLM inference speed. A dedicated GPU server is recommended for "Real-Time" behavior.
-
----
-
-## ⚠️ Requirements
-
-*   **Home Assistant OS** (or Supervised)
-*   **Ollama Server** (Running locally or on another machine in your network)
-*   **Hardware**: Raspberry Pi 4 (8GB) or NUC recommended for fluid dashboard performance. External LLM server recommended for AI speed.
-
----
-
-[Read Full Documentation](ai-orchestrator/README.md)
+The project remains pre-1.0 because live-home evaluations and a native Home Assistant conversation integration still need broader field testing. The safety and execution substrate is now suitable for that next stage; model intelligence is no longer being asked to compensate for missing runtime guarantees.

@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.git
+**/.vscode
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.env
+**/.DS_Store
+**/bin
+**/obj
+ai-orchestrator/backend/logs
+addon_configs

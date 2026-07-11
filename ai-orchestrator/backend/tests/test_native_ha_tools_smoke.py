@@ -39,7 +39,19 @@ def fake_client():
 
 @pytest.fixture
 def tools(fake_client):
-    return NativeHATools(fake_client)
+    async def safe_service_executor(arguments):
+        try:
+            result = await fake_client.call_service(
+                domain=arguments["domain"],
+                service=arguments["service"],
+                entity_id=arguments.get("entity_id"),
+                **(arguments.get("service_data") or {}),
+            )
+            return {"ok": True, "result": result}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    return NativeHATools(fake_client, service_executor=safe_service_executor)
 
 
 # ---------------------------------------------------------------------------

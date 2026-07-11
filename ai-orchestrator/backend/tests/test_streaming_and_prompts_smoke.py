@@ -55,6 +55,7 @@ def agent_factory(monkeypatch, tmp_path):
             external_mcp=None,
             ollama_model="ignored",
             default_mode=default_mode,
+            allow_direct_execute=(default_mode == "execute"),
         )
         # Register a few tools so the LLM has something to "call".
         agent.registry._routes.clear()

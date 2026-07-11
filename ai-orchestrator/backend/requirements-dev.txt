@@ -1,0 +1,5 @@
+-r requirements.txt
+
+pytest>=9.1,<10
+pytest-asyncio>=1.4,<2
+httpx2>=2.5,<3

@@ -171,6 +171,27 @@ native_prompts: Optional[NativePromptLibrary] = None
 dashboard_studio: Optional[DashboardStudio] = None
 agents: Dict[str, object] = {}
 dashboard_clients: List[WebSocket] = []
+background_tasks: set[asyncio.Task] = set()
+
+
+def spawn_background(coro: Any, name: str) -> asyncio.Task:
+    """Start and retain a named background task for graceful shutdown."""
+    task = asyncio.create_task(coro, name=name)
+    background_tasks.add(task)
+
+    def _done(completed: asyncio.Task) -> None:
+        background_tasks.discard(completed)
+        if completed.cancelled():
+            return
+        try:
+            exc = completed.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            logger.error("Background task %s failed: %s", name, exc, exc_info=exc)
+
+    task.add_done_callback(_done)
+    return task
 
 # Load version from config.json
 VERSION = "0.0.0"
@@ -227,6 +248,9 @@ class ApprovalRequestResponse(BaseModel):
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks"""
     global ha_client, mcp_server, approval_queue, orchestrator, agents
+    global rag_manager, knowledge_base, external_mcp, deep_reasoner
+    global trigger_registry, native_prompts, dashboard_studio, _api_token
+    _api_token = None
     
     print("🚀 Starting AI Orchestrator backend (Phase 2 Multi-Agent)...")
     
@@ -234,12 +258,42 @@ async def lifespan(app: FastAPI):
     # Prefer reading directly from options.json for reliability in HA Add-on environment
     dry_run = True
     disable_telemetry = True
+    enable_rag_opt = True
     ha_access_token_opt = ""
     
     # Gemini Options (Initialize to avoid NameError on failure)
     gemini_api_key_opt = ""
     use_gemini_dashboard_opt = False
     gemini_model_name_opt = "gemini-1.5-pro"
+
+    # Agent-kernel and provider defaults. Keep local Ollama as the private
+    # default; current cloud models are selected only when their provider is.
+    mcp_server_url_opt = ""
+    mcp_server_token_opt = ""
+    deep_reasoning_model_opt = "qwen2.5:14b-instruct"
+    anthropic_api_key_opt = ""
+    anthropic_model_opt = "claude-opus-4-8"
+    llm_provider_opt = "ollama"
+    openai_api_key_opt = ""
+    openai_base_url_opt = ""
+    openai_model_opt = "gpt-5.6-terra"
+    github_token_opt = ""
+    github_model_opt = "gpt-4o-mini"
+    foundry_endpoint_opt = ""
+    foundry_api_key_opt = ""
+    foundry_bearer_token_opt = ""
+    foundry_model_opt = ""
+    foundry_agent_id_opt = ""
+    deep_reasoning_max_iter_opt = 12
+    reasoning_max_tool_calls_opt = 30
+    reasoning_max_seconds_opt = 180
+    reasoning_llm_timeout_opt = 120
+    reasoning_tool_timeout_opt = 30
+    reasoning_effort_opt = "medium"
+    reasoning_max_concurrent_opt = 1
+    reasoning_allow_direct_execute_opt = False
+    enable_legacy_autonomous_opt = False
+    enable_legacy_dashboard_opt = False
     
     options_path = Path("/data/options.json")
     if options_path.exists():
@@ -248,6 +302,7 @@ async def lifespan(app: FastAPI):
                 opts = json.load(f)
                 dry_run = opts.get("dry_run_mode", True)
                 disable_telemetry = opts.get("disable_telemetry", True)
+                enable_rag_opt = bool(opts.get("enable_rag", True))
                 ha_access_token_opt = opts.get("ha_access_token", "").strip()
                 
                 # Gemini Options
@@ -260,14 +315,23 @@ async def lifespan(app: FastAPI):
                 mcp_server_token_opt = opts.get("mcp_server_token", "").strip()
                 deep_reasoning_model_opt = opts.get("deep_reasoning_model", "qwen2.5:14b-instruct")
                 anthropic_api_key_opt = opts.get("anthropic_api_key", "").strip()
-                anthropic_model_opt = opts.get("anthropic_model", "claude-opus-4-7").strip()
+                anthropic_model_opt = opts.get("anthropic_model", "claude-opus-4-8").strip()
                 deep_reasoning_max_iter_opt = int(opts.get("deep_reasoning_max_iterations", 12) or 12)
+                reasoning_max_tool_calls_opt = int(opts.get("reasoning_max_tool_calls", 30) or 30)
+                reasoning_max_seconds_opt = int(opts.get("reasoning_max_seconds", 180) or 180)
+                reasoning_llm_timeout_opt = int(opts.get("reasoning_llm_timeout", 120) or 120)
+                reasoning_tool_timeout_opt = int(opts.get("reasoning_tool_timeout", 30) or 30)
+                reasoning_effort_opt = opts.get("reasoning_effort", "medium").strip()
+                reasoning_max_concurrent_opt = int(opts.get("reasoning_max_concurrent_runs", 1) or 1)
+                reasoning_allow_direct_execute_opt = bool(opts.get("reasoning_allow_direct_execute", False))
+                enable_legacy_autonomous_opt = bool(opts.get("enable_legacy_autonomous_loops", False))
+                enable_legacy_dashboard_opt = bool(opts.get("enable_legacy_dashboard_loop", False))
 
                 # Phase 9 — multi-provider LLM options
-                llm_provider_opt = opts.get("llm_provider", "").strip()
+                llm_provider_opt = opts.get("llm_provider", "ollama").strip()
                 openai_api_key_opt = opts.get("openai_api_key", "").strip()
                 openai_base_url_opt = opts.get("openai_base_url", "").strip()
-                openai_model_opt = opts.get("openai_model", "gpt-4o-mini").strip()
+                openai_model_opt = opts.get("openai_model", "gpt-5.6-terra").strip()
                 github_token_opt = opts.get("github_token", "").strip()
                 github_model_opt = opts.get("github_model", "gpt-4o-mini").strip()
                 foundry_endpoint_opt = opts.get("foundry_endpoint", "").strip()
@@ -277,7 +341,6 @@ async def lifespan(app: FastAPI):
                 foundry_agent_id_opt = opts.get("foundry_agent_id", "").strip()
 
                 # API auth token (Phase 7 Milestone B)
-                global _api_token
                 _api_token_opt = opts.get("api_token", "").strip()
                 if _api_token_opt:
                     _api_token = _api_token_opt
@@ -291,9 +354,36 @@ async def lifespan(app: FastAPI):
     else:
         # Fallback to env var
         dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
+        enable_rag_opt = os.getenv("ENABLE_RAG", "true").lower() == "true"
         gemini_api_key_opt = os.getenv("GEMINI_API_KEY", "")
         use_gemini_dashboard_opt = os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
         gemini_model_name_opt = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
+        llm_provider_opt = os.getenv("LLM_PROVIDER", "ollama")
+        anthropic_api_key_opt = os.getenv("ANTHROPIC_API_KEY", "")
+        anthropic_model_opt = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
+        openai_api_key_opt = os.getenv("OPENAI_API_KEY", "")
+        openai_base_url_opt = os.getenv("OPENAI_BASE_URL", "")
+        openai_model_opt = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
+        github_token_opt = os.getenv("GITHUB_TOKEN", "")
+        github_model_opt = os.getenv("GITHUB_MODEL", "gpt-4o-mini")
+        foundry_endpoint_opt = os.getenv("FOUNDRY_ENDPOINT", "")
+        foundry_api_key_opt = os.getenv("FOUNDRY_API_KEY", "")
+        foundry_bearer_token_opt = os.getenv("FOUNDRY_BEARER_TOKEN", "")
+        foundry_model_opt = os.getenv("FOUNDRY_MODEL", "")
+        foundry_agent_id_opt = os.getenv("FOUNDRY_AGENT_ID", "")
+        mcp_server_url_opt = os.getenv("MCP_SERVER_URL", "")
+        mcp_server_token_opt = os.getenv("MCP_SERVER_TOKEN", "")
+        deep_reasoning_model_opt = os.getenv("DEEP_REASONING_MODEL", "qwen2.5:14b-instruct")
+        deep_reasoning_max_iter_opt = int(os.getenv("DEEP_REASONING_MAX_ITERATIONS", "12"))
+        reasoning_max_tool_calls_opt = int(os.getenv("REASONING_MAX_TOOL_CALLS", "30"))
+        reasoning_max_seconds_opt = int(os.getenv("REASONING_MAX_SECONDS", "180"))
+        reasoning_llm_timeout_opt = int(os.getenv("REASONING_LLM_TIMEOUT", "120"))
+        reasoning_tool_timeout_opt = int(os.getenv("REASONING_TOOL_TIMEOUT", "30"))
+        reasoning_effort_opt = os.getenv("REASONING_EFFORT", "medium")
+        reasoning_max_concurrent_opt = int(os.getenv("REASONING_MAX_CONCURRENT_RUNS", "1"))
+        reasoning_allow_direct_execute_opt = os.getenv("REASONING_ALLOW_DIRECT_EXECUTE", "false").lower() == "true"
+        enable_legacy_autonomous_opt = os.getenv("ENABLE_LEGACY_AUTONOMOUS_LOOPS", "false").lower() == "true"
+        enable_legacy_dashboard_opt = os.getenv("ENABLE_LEGACY_DASHBOARD_LOOP", "false").lower() == "true"
         # API token from env
         _api_token = os.getenv("API_TOKEN", "").strip() or None
 
@@ -344,7 +434,7 @@ async def lifespan(app: FastAPI):
     # 3. Start HA Client with Reconnection Loop
     try:
         # Start the background reconnection loop
-        asyncio.create_task(ha_client.run_reconnect_loop())
+        spawn_background(ha_client.run_reconnect_loop(), "ha-reconnect")
         
         # Wait up to 5s for early feedback
         connected = await ha_client.wait_until_connected(timeout=5.0)
@@ -358,7 +448,7 @@ async def lifespan(app: FastAPI):
     print(f"✓ HA Client configured (URL: {ha_url})")
 
     # 3. Initialize RAG & Knowledge Base (Phase 3)
-    enable_rag = os.getenv("ENABLE_RAG", "true").lower() == "true"
+    enable_rag = enable_rag_opt
     if enable_rag:
         try:
             rag_manager = RagManager(persist_dir="/data/chroma", disable_telemetry=disable_telemetry)
@@ -367,22 +457,28 @@ async def lifespan(app: FastAPI):
             print("✓ RAG Manager & Knowledge Base initialized")
             
             # Start background ingestion
-            asyncio.create_task(knowledge_base.ingest_ha_registry())
-            asyncio.create_task(knowledge_base.ingest_manuals())
+            spawn_background(knowledge_base.ingest_ha_registry(), "rag-ingest-registry")
+            spawn_background(knowledge_base.ingest_manuals(), "rag-ingest-manuals")
         except Exception as e:
             print(f"⚠️ RAG initialization failed: {e}")
             rag_manager = None
 
-    # 4. Initialize MCP server
-    # FIX: Pass lambda for lazy resolution
-    mcp_server = MCPServer(lambda: ha_client, approval_queue=approval_queue, rag_manager=rag_manager, dry_run=dry_run)
-    print(f"✓ MCP Server initialized (dry_run={dry_run})")
-    
-    # 4. Initialize Approval Queue
+    # 4. Initialize Approval Queue before the MCP safety layer. The previous
+    # order passed ``None`` permanently and made high-impact calls impossible
+    # to approve without restarting.
     approval_queue = ApprovalQueue(db_path="/data/approvals.db")
     # Register callback for dashboard notifications
     approval_queue.register_callback(broadcast_approval_request)
     print("✓ Approval Queue initialized")
+
+    # 4.1 Initialize the safety-checked local tool server.
+    mcp_server = MCPServer(
+        lambda: ha_client,
+        approval_queue=approval_queue,
+        rag_manager=rag_manager,
+        dry_run=dry_run,
+    )
+    print(f"✓ MCP Server initialized (dry_run={dry_run})")
 
     # 4.5 Phase 9 — export multi-provider LLM credentials into the
     # process environment so every downstream factory (BaseAgent,
@@ -393,6 +489,9 @@ async def lifespan(app: FastAPI):
         "OPENAI_API_KEY": locals().get("openai_api_key_opt", ""),
         "OPENAI_BASE_URL": locals().get("openai_base_url_opt", ""),
         "OPENAI_MODEL": locals().get("openai_model_opt", ""),
+        "ANTHROPIC_API_KEY": locals().get("anthropic_api_key_opt", ""),
+        "ANTHROPIC_MODEL": locals().get("anthropic_model_opt", ""),
+        "REASONING_EFFORT": locals().get("reasoning_effort_opt", ""),
         "GITHUB_TOKEN": locals().get("github_token_opt", ""),
         "GITHUB_MODEL": locals().get("github_model_opt", ""),
         "FOUNDRY_ENDPOINT": locals().get("foundry_endpoint_opt", ""),
@@ -491,16 +590,19 @@ async def lifespan(app: FastAPI):
     )
     print(f"✓ Orchestrator initialized with model {orchestrator.model_name}")
     
-    # 7. Start Orchestrator Loops
-    asyncio.create_task(orchestrator.run_planning_loop())
-    asyncio.create_task(orchestrator.run_dashboard_refresh_loop())
-    print("✓ Orchestration & Dashboard loops started")
-    
-    # 7.5 Start Specialist Agent Loops (Autonomous Mode)
-    for agent_id, agent in agents.items():
-        if hasattr(agent, "run_decision_loop") and getattr(agent, "decision_interval", 0) > 0:
-            asyncio.create_task(agent.run_decision_loop())
-            print(f"✓ Started decision loop for {agent_id}")
+    # 7. Legacy cadence loops are opt-in. The modern path is event/goal driven
+    # through the deterministic deep-reasoning kernel and proactive triggers.
+    if enable_legacy_autonomous_opt:
+        spawn_background(orchestrator.run_planning_loop(), "legacy-orchestrator")
+        for agent_id, agent in agents.items():
+            if hasattr(agent, "run_decision_loop") and getattr(agent, "decision_interval", 0) > 0:
+                spawn_background(agent.run_decision_loop(), f"legacy-agent-{agent_id}")
+        print("⚠️ Legacy autonomous agent loops enabled")
+    else:
+        print("✓ Legacy autonomous loops disabled; deterministic kernel is authoritative")
+    if enable_legacy_dashboard_opt:
+        spawn_background(orchestrator.run_dashboard_refresh_loop(), "legacy-dashboard-refresh")
+        print("⚠️ Legacy dashboard refresh loop enabled")
     
     # 8. Initialize Architect (Phase 6)
     architect = ArchitectAgent(lambda: ha_client, rag_manager=rag_manager)
@@ -508,12 +610,11 @@ async def lifespan(app: FastAPI):
     print("✓ Architect Agent initialized")
 
     # 9. Initialize External MCP client + Deep Reasoning Agent (Phase 7)
-    global external_mcp, deep_reasoner
     mcp_url = locals().get("mcp_server_url_opt", "") or os.getenv("MCP_SERVER_URL", "")
     mcp_token = locals().get("mcp_server_token_opt", "") or os.getenv("MCP_SERVER_TOKEN", "")
     deep_model = locals().get("deep_reasoning_model_opt", "") or os.getenv("DEEP_REASONING_MODEL", "qwen2.5:14b-instruct")
     anthropic_key = locals().get("anthropic_api_key_opt", "") or os.getenv("ANTHROPIC_API_KEY", "")
-    anthropic_model = locals().get("anthropic_model_opt", "") or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-7")
+    anthropic_model = locals().get("anthropic_model_opt", "") or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
     max_iter = int(locals().get("deep_reasoning_max_iter_opt", 12) or 12)
 
     # Phase 9 — re-read provider locals (env was already exported in
@@ -522,7 +623,7 @@ async def lifespan(app: FastAPI):
     llm_provider = locals().get("llm_provider_opt", "") or os.getenv("LLM_PROVIDER", "")
     openai_api_key = locals().get("openai_api_key_opt", "") or os.getenv("OPENAI_API_KEY", "")
     openai_base_url = locals().get("openai_base_url_opt", "") or os.getenv("OPENAI_BASE_URL", "")
-    openai_model = locals().get("openai_model_opt", "") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    openai_model = locals().get("openai_model_opt", "") or os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
     github_token = locals().get("github_token_opt", "") or os.getenv("GITHUB_TOKEN", "")
     github_model = locals().get("github_model_opt", "") or os.getenv("GITHUB_MODEL", "gpt-4o-mini")
     foundry_endpoint = locals().get("foundry_endpoint_opt", "") or os.getenv("FOUNDRY_ENDPOINT", "")
@@ -568,6 +669,13 @@ async def lifespan(app: FastAPI):
             foundry_model=foundry_model or None,
             foundry_agent_id=foundry_agent_id or None,
             max_iterations=max_iter,
+            max_total_tool_calls=reasoning_max_tool_calls_opt,
+            max_run_seconds=reasoning_max_seconds_opt,
+            llm_timeout_seconds=reasoning_llm_timeout_opt,
+            tool_timeout_seconds=reasoning_tool_timeout_opt,
+            reasoning_effort=reasoning_effort_opt,
+            max_concurrent_runs=reasoning_max_concurrent_opt,
+            allow_direct_execute=reasoning_allow_direct_execute_opt,
             broadcast_func=broadcast_to_dashboard,
             memory_store=memory_store,
             plan_store=plan_store,
@@ -582,7 +690,6 @@ async def lifespan(app: FastAPI):
     # ----------------------------------------------------------------
     # Phase 10A — Dashboard Studio (generative dashboards)
     # ----------------------------------------------------------------
-    global dashboard_studio
     try:
         studio_dir_str = os.getenv("DASHBOARD_STUDIO_DIR", "")
         if not studio_dir_str:
@@ -607,7 +714,6 @@ async def lifespan(app: FastAPI):
     # ----------------------------------------------------------------
     # Phase 8.5 — native prompt library (always-available workflows)
     # ----------------------------------------------------------------
-    global native_prompts
     try:
         builtin_dir = Path(__file__).parent / "prompts"
         user_dir_str = os.getenv("PROMPTS_DIR", "/data/prompts")
@@ -622,7 +728,6 @@ async def lifespan(app: FastAPI):
     # ----------------------------------------------------------------
     # Phase 8 / Milestone F — proactive triggers
     # ----------------------------------------------------------------
-    global trigger_registry
     if deep_reasoner is not None:
         try:
             trigger_store = TriggerStore()
@@ -661,6 +766,12 @@ async def lifespan(app: FastAPI):
             await external_mcp.aclose()
         except Exception as e:
             print(f"⚠️ External MCP close error: {e}")
+    pending_tasks = list(background_tasks)
+    for task in pending_tasks:
+        task.cancel()
+    if pending_tasks:
+        await asyncio.gather(*pending_tasks, return_exceptions=True)
+    background_tasks.clear()
     if ha_client:
         await ha_client.disconnect()
     print("✅ Shutdown complete")
@@ -697,7 +808,11 @@ async def health_check():
         "status": "online",
         "version": VERSION,
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
-        "agent_count": len(orchestrator.agents) if orchestrator else 0
+        "agent_count": len(orchestrator.agents) if orchestrator else 0,
+        "reasoning_kernel": deep_reasoner.info() if deep_reasoner else None,
+        "legacy_autonomous_loops": bool(
+            any(task.get_name().startswith("legacy-agent-") for task in background_tasks)
+        ),
     }
 
 
@@ -721,6 +836,16 @@ class ReasoningRequest(BaseModel):
     mode: Optional[str] = None  # "auto" | "plan" | "execute"
 
 
+def validate_reasoning_mode(mode: Optional[str]) -> None:
+    if mode is not None and mode not in ("auto", "plan", "execute"):
+        raise HTTPException(status_code=400, detail="mode must be one of auto|plan|execute")
+    if mode == "execute" and deep_reasoner and not deep_reasoner.allow_direct_execute:
+        raise HTTPException(
+            status_code=403,
+            detail="direct execute mode is disabled; use auto/plan and approve the persisted plan",
+        )
+
+
 @app.get("/api/reasoning/info")
 async def reasoning_info():
     """Status & tool surface of the deep reasoning agent."""
@@ -740,8 +865,7 @@ async def reasoning_run(req: ReasoningRequest):
         raise HTTPException(status_code=503, detail="Deep reasoning agent not ready")
     if not req.goal or not req.goal.strip():
         raise HTTPException(status_code=400, detail="goal must not be empty")
-    if req.mode is not None and req.mode not in ("auto", "plan", "execute"):
-        raise HTTPException(status_code=400, detail="mode must be one of auto|plan|execute")
+    validate_reasoning_mode(req.mode)
     result = await deep_reasoner.run(req.goal, req.context, mode=req.mode)
     return {
         "run_id": getattr(result, "run_id", None),
@@ -753,6 +877,12 @@ async def reasoning_run(req: ReasoningRequest):
         "answer": result.answer,
         "iterations": result.iterations,
         "tool_calls": result.tool_calls,
+        "requested_tool_calls": result.requested_tool_calls,
+        "rejected_tool_calls": result.rejected_tool_calls,
+        "successful_tool_calls": result.successful_tool_calls,
+        "failed_tool_calls": result.failed_tool_calls,
+        "cached_tool_calls": result.cached_tool_calls,
+        "usage": result.usage,
         "stopped_reason": result.stopped_reason,
         "duration_ms": result.duration_ms,
         "recalled": getattr(result, "recalled", []),
@@ -782,8 +912,7 @@ async def reasoning_stream(req: ReasoningRequest):
         raise HTTPException(status_code=503, detail="Deep reasoning agent not ready")
     if not req.goal or not req.goal.strip():
         raise HTTPException(status_code=400, detail="goal must not be empty")
-    if req.mode is not None and req.mode not in ("auto", "plan", "execute"):
-        raise HTTPException(status_code=400, detail="mode must be one of auto|plan|execute")
+    validate_reasoning_mode(req.mode)
 
     async def _gen():
         try:
@@ -911,6 +1040,7 @@ async def reasoning_prompt_run(name: str, req: PromptRunRequest):
     """
     if not deep_reasoner:
         raise HTTPException(status_code=503, detail="Deep reasoning agent not ready")
+    validate_reasoning_mode(req.mode)
     rendered = await _render_any_prompt(name, req.arguments or {})
     if not rendered.get("ok"):
         err = rendered.get("error", "render_failed")
@@ -953,6 +1083,12 @@ async def reasoning_prompt_run(name: str, req: PromptRunRequest):
         "answer": result.answer,
         "iterations": result.iterations,
         "tool_calls": result.tool_calls,
+        "requested_tool_calls": result.requested_tool_calls,
+        "rejected_tool_calls": result.rejected_tool_calls,
+        "successful_tool_calls": result.successful_tool_calls,
+        "failed_tool_calls": result.failed_tool_calls,
+        "cached_tool_calls": result.cached_tool_calls,
+        "usage": result.usage,
         "stopped_reason": result.stopped_reason,
         "duration_ms": result.duration_ms,
         "plan": getattr(result, "plan", None),
@@ -1401,7 +1537,22 @@ async def studio_get_dashboard(dashboard_id: str):
     html = studio.get_html(dashboard_id)
     if html is None:
         raise HTTPException(status_code=404, detail="Dashboard not found")
-    return HTMLResponse(content=html)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Security-Policy": (
+                "sandbox allow-scripts; default-src 'none'; "
+                "script-src 'unsafe-inline' https://cdn.tailwindcss.com/ "
+                "https://unpkg.com/lucide@latest; "
+                "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+                "connect-src 'none'; form-action 'none'; base-uri 'none'; "
+                "frame-ancestors 'self'"
+            ),
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.get("/api/studio/dashboards/{dashboard_id}/meta")
@@ -1417,8 +1568,8 @@ async def studio_get_meta(dashboard_id: str):
 async def studio_get_state(dashboard_id: str):
     """Live state map for every entity referenced by the dashboard.
 
-    Polled by the shim injected at save time so dashboards stay fresh
-    without re-running the LLM.
+    Fetched by the trusted React parent and sent into the sandbox via
+    ``postMessage`` so generated HTML cannot call same-origin APIs.
     """
     studio = _require_studio()
     return await studio.live_state_for(dashboard_id)

@@ -1,12 +1,28 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.10.0 (Multi-Provider LLM, Deep Reasoning, Triggers & Prompt Library)
+**Current Version**: v0.12.0 (Deterministic Agent Kernel)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 
 ---
 
 ## 🚀 Short Term (v1.0 - The "Polish" Update)
+
+### 0.12 foundation completed
+
+-   [x] **Single Authoritative Kernel**: Chat, prompts, triggers, and goals share one bounded loop.
+-   [x] **Deterministic Tools**: Schema validation, ordered mutations, read-only concurrency, retries, deduplication, and hard budgets.
+-   [x] **Durable Plans**: Atomic execution claims, exact replay, trusted approval context, and per-step checkpoints.
+-   [x] **Frontier Provider Semantics**: GPT-5.6 Responses and Claude Opus 4.8 adaptive/strict tool support.
+-   [x] **Executable Evaluations**: Model-free safety contracts and a provider-neutral home scenario dataset.
+
+### Highest-priority path to 1.0
+
+1. **Native Home Assistant conversation integration** using `ConversationEntity`, `ChatLog`, `LLMContext`, exposed entities, conversation IDs, and Assist voice pipelines.
+2. **Outcome verification** that re-observes affected entities after replay and marks each intent verified, failed, or uncertain.
+3. **Temporal world model** built from HA recorder/statistics for occupancy, comfort, energy, and anomaly baselines.
+4. **Real-provider evaluation CI** comparing model profiles on task success, safety, calls, tokens, latency, and cost.
+5. **Run trace export** using the existing run IDs/checkpoints with an OpenTelemetry-compatible sink.
 
 ### 1. Zero-Downtime Agent Reloading
 - **Goal**: Add/Update agents without restarting the entire backend (Hot Reload).
@@ -20,7 +36,7 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 -   [x] **Gemini Intelligence Provider**: Integrated Google Gemini for high-fidelity dashboards. (v0.9.43)
 -   [x] **Deep Reasoning Agent**: Goal-driven agentic loop with native HA tool surface, optional external MCP, Anthropic Claude backend. (v0.10.0 / Phase 7)
 -   [x] **Triggers & Prompt Library**: Proactive triggers + reusable workflow prompts surfaced in the dashboard. (v0.10.0 / Phase 8 + 8.5)
--   [x] **Multi-Provider LLM**: Ollama (local), OpenAI, GitHub Models, and Microsoft Foundry (model deployments + hosted agents) selectable per install with graceful fallback. (v0.10.0 / Phase 9)
+-   [x] **Multi-Provider LLM**: Ollama, OpenAI, Anthropic, GitHub Models, and Microsoft Foundry selectable per install. Remote deep-reasoner configuration now fails explicitly instead of silently drifting providers. (v0.12.0)
 -   [ ] **Voice Interface**: Real-time voice interaction via Home Assistant Assist pipeline. (v1.0)
 
 ### 2. Voice Integration (HA Assist)

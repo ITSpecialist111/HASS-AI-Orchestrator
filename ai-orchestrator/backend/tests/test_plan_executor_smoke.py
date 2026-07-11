@@ -354,6 +354,7 @@ def stubbed_agent_factory(monkeypatch, tmp_path):
             ollama_model="ignored",
             plan_store=plan_store,
             default_mode=default_mode,
+            allow_direct_execute=True,
         )
         # Manually register a couple of tools so the registry has entries
         # the LLM can "call".

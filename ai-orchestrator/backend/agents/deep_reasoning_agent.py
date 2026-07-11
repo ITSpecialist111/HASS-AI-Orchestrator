@@ -48,7 +48,9 @@ from reasoning_harness import (
     LLMBackend,
     OllamaToolBackend,
     ReasoningHarness,
+    ToolExecutionContext,
     ToolRegistry,
+    ToolSemantics,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,7 @@ class DeepReasoningAgent:
         ollama_model: str = "qwen2.5:14b-instruct",
         ollama_host: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
-        anthropic_model: str = "claude-opus-4-7",
+        anthropic_model: str = "claude-opus-4-8",
         provider: Optional[str] = None,
         openai_api_key: Optional[str] = None,
         openai_base_url: Optional[str] = None,
@@ -137,6 +139,13 @@ class DeepReasoningAgent:
         foundry_agent_id: Optional[str] = None,
         max_iterations: int = 12,
         max_tool_calls_per_turn: int = 5,
+        max_total_tool_calls: int = 30,
+        max_run_seconds: float = 180.0,
+        llm_timeout_seconds: float = 120.0,
+        tool_timeout_seconds: float = 30.0,
+        reasoning_effort: str = "medium",
+        max_concurrent_runs: int = 1,
+        allow_direct_execute: bool = False,
         broadcast_func: Optional[Any] = None,
         memory_store: Optional[MemoryStore] = None,
         recall_k: int = 3,
@@ -151,11 +160,9 @@ class DeepReasoningAgent:
         self.external_mcp = external_mcp
         self.ha_client = ha_client
         self.native_tools: Optional[NativeHATools] = (
-            NativeHATools(ha_client) if ha_client is not None else None
-        )
-        self.ha_client = ha_client
-        self.native_tools: Optional[NativeHATools] = (
-            NativeHATools(ha_client) if ha_client is not None else None
+            NativeHATools(ha_client, service_executor=self._safe_native_service_call)
+            if ha_client is not None
+            else None
         )
         self.broadcast_func = broadcast_func
         self.memory_store = memory_store
@@ -163,6 +170,11 @@ class DeepReasoningAgent:
         self.recall_max_age_days = recall_max_age_days
         self.plan_store = plan_store
         self.tool_classifier = tool_classifier or ToolClassifier()
+        self.tool_timeout_seconds = max(1.0, float(tool_timeout_seconds))
+        self.reasoning_effort = reasoning_effort
+        self.allow_direct_execute = allow_direct_execute
+        self._run_semaphore = asyncio.Semaphore(max(1, int(max_concurrent_runs)))
+        self._active_runs = 0
         if default_mode not in ("auto", "plan", "execute"):
             raise ValueError("default_mode must be one of auto|plan|execute")
         self.default_mode = default_mode
@@ -178,51 +190,49 @@ class DeepReasoningAgent:
         self.log_dir = base / "deep_reasoner"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Provider precedence:
-        #   1. explicit anthropic_api_key (legacy fast-path)
-        #   2. provider arg / LLM_PROVIDER env (new, multi-provider)
-        #   3. Ollama default
+        # Provider selection is explicit. A configured credential never silently
+        # overrides LLM_PROVIDER, which prevents accidental provider/model drift.
         self.llm: LLMBackend
-        if anthropic_api_key:
+        resolved = resolve_provider_name(provider)
+        if resolved == "anthropic":
             try:
-                self.llm = AnthropicBackend(model=anthropic_model, api_key=anthropic_api_key)
+                self.llm = AnthropicBackend(
+                    model=anthropic_model,
+                    api_key=anthropic_api_key,
+                    effort=reasoning_effort,
+                )
                 logger.info("DeepReasoningAgent using Anthropic backend (%s)", anthropic_model)
             except Exception as exc:
-                logger.warning("Anthropic backend unavailable, falling back to Ollama: %s", exc)
-                self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
+                raise RuntimeError(f"Anthropic backend unavailable: {exc}") from exc
+        elif resolved == PROVIDER_OLLAMA:
+            self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
+            logger.info("DeepReasoningAgent using Ollama backend (%s)", ollama_model)
         else:
-            resolved = resolve_provider_name(provider)
-            if resolved == PROVIDER_OLLAMA:
-                self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
-                logger.info("DeepReasoningAgent using Ollama backend (%s)", ollama_model)
-            else:
-                # Pick the per-provider model; fall back to ollama_model
-                # as a last-resort string (some providers will reject it,
-                # but we surface that as a runtime error rather than a
-                # silent default that hides misconfiguration).
-                model_for_provider = (
-                    openai_model if resolved == "openai"
-                    else github_model if resolved == "github"
-                    else foundry_model if resolved == "foundry"
-                    else ollama_model
-                ) or ollama_model
-                self.llm = make_tool_backend(
-                    resolved,
-                    model=model_for_provider,
-                    ollama_host=ollama_host,
-                    openai_api_key=openai_api_key,
-                    openai_base_url=openai_base_url,
-                    github_token=github_token,
-                    foundry_endpoint=foundry_endpoint,
-                    foundry_api_key=foundry_api_key,
-                    foundry_bearer_token=foundry_bearer_token,
-                    foundry_agent_id=foundry_agent_id,
-                )
-                logger.info(
-                    "DeepReasoningAgent using %s backend (%s)",
-                    getattr(self.llm, "name", resolved),
-                    model_for_provider,
-                )
+            model_for_provider = (
+                openai_model if resolved == "openai"
+                else github_model if resolved == "github"
+                else foundry_model if resolved == "foundry"
+                else ollama_model
+            ) or ollama_model
+            self.llm = make_tool_backend(
+                resolved,
+                model=model_for_provider,
+                ollama_host=ollama_host,
+                openai_api_key=openai_api_key,
+                openai_base_url=openai_base_url,
+                github_token=github_token,
+                foundry_endpoint=foundry_endpoint,
+                foundry_api_key=foundry_api_key,
+                foundry_bearer_token=foundry_bearer_token,
+                foundry_agent_id=foundry_agent_id,
+                reasoning_effort=reasoning_effort,
+                fallback_to_ollama=False,
+            )
+            logger.info(
+                "DeepReasoningAgent using %s backend (%s)",
+                getattr(self.llm, "name", resolved),
+                model_for_provider,
+            )
 
         self.registry = ToolRegistry()
         self._register_tools()
@@ -232,26 +242,51 @@ class DeepReasoningAgent:
             system_prompt=SYSTEM_PROMPT,
             max_iterations=max_iterations,
             max_tool_calls_per_turn=max_tool_calls_per_turn,
-            on_event=self._on_event,
+            max_total_tool_calls=max_total_tool_calls,
+            max_run_seconds=max_run_seconds,
+            llm_timeout_seconds=llm_timeout_seconds,
         )
 
     # ------------------------------------------------------------------
     def _register_tools(self) -> None:
         # Local safety-checked tools.
-        local_schemas = _local_tool_schemas(self.local_mcp)
+        local_schemas = [
+            schema
+            for schema in _local_tool_schemas(self.local_mcp)
+            if (schema.get("function") or {}).get("name") not in {"log", "get_state"}
+        ]
         if local_schemas:
             self.registry.register(
                 provider="local",
                 schemas=local_schemas,
                 executor=self._local_executor,
+                semantics_resolver=self._local_semantics,
+                validator=self._local_validator,
+                close_schema=True,
             )
 
-        # Native HA discovery + control tools (no external dependency).
+        # Native HA discovery tools. Mutations use the single safety-checked
+        # local ``call_ha_service`` route; exposing a second direct mutation
+        # path would let plans bypass deployment allowlists.
         if self.native_tools is not None:
+            native_schemas = [
+                schema for schema in self.native_tools.tool_schemas()
+                if (schema.get("function") or {}).get("name") != "ha_call_service"
+            ]
             self.registry.register(
                 provider="native_ha",
-                schemas=self.native_tools.tool_schemas(),
+                schemas=native_schemas,
                 executor=self._native_executor,
+                semantics=ToolSemantics(
+                    read_only=True,
+                    destructive=False,
+                    idempotent=True,
+                    parallel_safe=True,
+                    impact_level="read",
+                    timeout_seconds=self.tool_timeout_seconds,
+                    max_retries=2,
+                ),
+                close_schema=True,
             )
 
         # Optional external MCP server (additive, e.g. OpenClaw HASS_MCP).
@@ -263,6 +298,7 @@ class DeepReasoningAgent:
                     schemas=ext_schemas,
                     executor=self._external_executor,
                     prefix="ext_",
+                    semantics_resolver=self._external_semantics,
                 )
 
         logger.info(
@@ -271,18 +307,82 @@ class DeepReasoningAgent:
             ", ".join(self.registry.names()[:10]) + ("…" if len(self.registry.names()) > 10 else ""),
         )
 
-    async def _local_executor(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _local_executor(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[ToolExecutionContext] = None,
+    ) -> Dict[str, Any]:
         return await self.local_mcp.execute_tool(
-            tool_name=name, parameters=arguments, agent_id=self.agent_id
+            tool_name=name,
+            parameters=arguments,
+            agent_id=self.agent_id,
+            context=context,
         )
 
     async def _native_executor(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         assert self.native_tools is not None
         return await self.native_tools.call(name, arguments)
 
-    async def _external_executor(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _external_executor(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[ToolExecutionContext] = None,
+    ) -> Dict[str, Any]:
         assert self.external_mcp is not None
         return await self.external_mcp.call_tool(name, arguments)
+
+    async def _safe_native_service_call(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._local_executor("call_ha_service", arguments)
+
+    async def _local_validator(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[ToolExecutionContext] = None,
+    ) -> Optional[Dict[str, Any]]:
+        validator = getattr(self.local_mcp, "validate_tool_call", None)
+        if validator is None:
+            return None
+        return validator(name, arguments, context)
+
+    def _local_semantics(self, name: str, arguments: Dict[str, Any]) -> ToolSemantics:
+        cls = self.tool_classifier.classify(name, arguments)
+        lowered = name.lower()
+        idempotent_mutation = (
+            any(token in lowered for token in (
+                "set_", "turn_on", "turn_off", "lock", "unlock", "arm_", "disarm_",
+                "enable", "disable",
+            ))
+            and "toggle" not in lowered
+            and "call_service" not in lowered
+        )
+        return ToolSemantics(
+            read_only=not cls.is_mutating,
+            destructive=cls.impact_level == "high",
+            idempotent=(not cls.is_mutating) or idempotent_mutation,
+            parallel_safe=not cls.is_mutating,
+            impact_level=cls.impact_level,
+            timeout_seconds=self.tool_timeout_seconds,
+            max_retries=2 if not cls.is_mutating else 0,
+        )
+
+    def _external_semantics(self, name: str, arguments: Dict[str, Any]) -> ToolSemantics:
+        cls = self.tool_classifier.classify(name, arguments)
+        # A configured MCP server may describe read operations by conventional
+        # names, but unknown/mutating external calls remain high-impact. Remote
+        # annotations alone never downgrade this policy.
+        read_only = not cls.is_mutating
+        return ToolSemantics(
+            read_only=read_only,
+            destructive=not read_only,
+            idempotent=read_only,
+            parallel_safe=read_only,
+            impact_level="read" if read_only else "high",
+            timeout_seconds=self.tool_timeout_seconds,
+            max_retries=1 if read_only else 0,
+        )
 
     async def _on_event(self, event: Dict[str, Any]) -> None:
         if self.broadcast_func is None:
@@ -303,6 +403,8 @@ class DeepReasoningAgent:
         context: Optional[Dict[str, Any]] = None,
         *,
         mode: Optional[str] = None,
+        run_id: Optional[str] = None,
+        event_callback: Optional[Any] = None,
     ) -> HarnessResult:
         """Run a reasoning goal.
 
@@ -316,76 +418,125 @@ class DeepReasoningAgent:
         effective_mode = (mode or self.default_mode).lower()
         if effective_mode not in ("auto", "plan", "execute"):
             raise ValueError(f"unknown mode {mode!r}")
-
-        self.status = "thinking"
-        self.last_run_at = datetime.now()
-        run_id = uuid.uuid4().hex
-
-        # ---- D2: pre-flight memory recall --------------------------------
-        recalled = await self._recall(goal)
-        recall_block = _format_recall(recalled)
-        base_prompt = SYSTEM_PROMPT
-        if effective_mode in ("plan", "auto"):
-            base_prompt = base_prompt + "\n\n" + _PLAN_MODE_NOTE
-        if recall_block:
-            self.harness.system_prompt = base_prompt + "\n\n" + recall_block
-        else:
-            self.harness.system_prompt = base_prompt
-
-        # ---- E1+E2: install dry-run interceptor for plan/auto -----------
-        interceptor: Optional[DryRunInterceptor] = None
-        if effective_mode in ("plan", "auto"):
-            interceptor = DryRunInterceptor(
-                underlying_call=self.registry.call,
-                classifier=self.tool_classifier,
+        if effective_mode == "execute" and not self.allow_direct_execute:
+            raise ValueError(
+                "direct execute mode is disabled; use auto/plan and execute the persisted plan"
             )
-            self.harness.tool_call_interceptor = interceptor
-        else:
-            self.harness.tool_call_interceptor = None
 
-        try:
-            result = await self.harness.run(goal=goal, context=context)
-            self.last_result = result
-            self._persist(goal, result, run_id=run_id)
-            episode_id = await self._remember_episode(goal, result)
-            if episode_id:
-                self._run_to_episode[run_id] = episode_id
+        run_id = run_id or uuid.uuid4().hex
 
-            plan: Optional[PlanProposal] = None
-            execution_results: Optional[List[Dict[str, Any]]] = None
-            executed_inline = False
-            if interceptor is not None:
-                plan = self._build_plan(run_id, goal, result, interceptor.intents)
-                # E5: auto mode — execute inline when nothing dangerous.
-                if effective_mode == "auto" and plan.high_impact_count == 0 and plan.intents:
-                    plan.requires_approval = False
-                    plan.status = "executed"
-                    plan.executed_at = datetime.now(timezone.utc).isoformat()
-                    execution_results = await replay_plan(plan, self.registry.call)
-                    plan.execution_results = execution_results
-                    executed_inline = True
-                elif effective_mode == "auto" and not plan.intents:
-                    # Read-only plan — nothing to execute, mark complete.
-                    plan.requires_approval = False
-                    plan.status = "executed"
-                    plan.executed_at = datetime.now(timezone.utc).isoformat()
-                if self.plan_store is not None:
-                    self.plan_store.save(plan)
+        async def emit(event: Dict[str, Any]) -> None:
+            enriched = {"run_id": run_id, **event}
+            if event_callback is not None:
+                await event_callback(enriched)
+            await self._on_event(enriched)
 
+        async with self._run_semaphore:
+            self._active_runs += 1
+            self.status = "thinking"
+            self.last_run_at = datetime.now()
             try:
-                setattr(result, "run_id", run_id)
+                # ---- D2: pre-flight memory recall ------------------------
+                recalled = await self._recall(goal)
+                recalled_payload = [_recall_to_dict(r) for r in recalled]
+                await emit({"type": "recall", "recalled": recalled_payload})
+                recall_block = _format_recall(recalled)
+                base_prompt = SYSTEM_PROMPT
+                if effective_mode in ("plan", "auto"):
+                    base_prompt = base_prompt + "\n\n" + _PLAN_MODE_NOTE
+                effective_prompt = (
+                    base_prompt + "\n\n" + recall_block if recall_block else base_prompt
+                )
+
+                # ---- E1+E2: per-run dry-run interceptor -----------------
+                interceptor: Optional[DryRunInterceptor] = None
+                if effective_mode in ("plan", "auto"):
+                    interceptor = DryRunInterceptor(
+                        underlying_call=self.registry.call,
+                        underlying_validate=self.registry.validate_call,
+                        classifier=self.tool_classifier,
+                    )
+
+                result = await self.harness.run(
+                    goal=goal,
+                    context=context,
+                    run_id=run_id,
+                    mode=effective_mode,
+                    system_prompt=effective_prompt,
+                    on_event=emit,
+                    tool_call_interceptor=interceptor,
+                )
+                self.last_result = result
+                self._persist(goal, result, run_id=run_id)
+                episode_id = await self._remember_episode(goal, result)
+                if episode_id:
+                    self._run_to_episode[run_id] = episode_id
+                    if len(self._run_to_episode) > 1000:
+                        self._run_to_episode.pop(next(iter(self._run_to_episode)))
+
+                plan: Optional[PlanProposal] = None
+                execution_results: Optional[List[Dict[str, Any]]] = None
+                executed_inline = False
+                if interceptor is not None:
+                    plan = self._build_plan(run_id, goal, result, interceptor.intents)
+                    if effective_mode == "auto" and plan.high_impact_count == 0 and plan.intents:
+                        plan.requires_approval = False
+                        plan.status = "executing"
+                        if self.plan_store is not None:
+                            self.plan_store.save(plan)
+
+                        async def checkpoint(partial: List[Dict[str, Any]]) -> None:
+                            plan.execution_results = list(partial)
+                            if self.plan_store is not None:
+                                self.plan_store.checkpoint_execution(plan.id, partial)
+
+                        execution_results = await replay_plan(
+                            plan,
+                            self.registry.call,
+                            execution_context=ToolExecutionContext(
+                                run_id=run_id,
+                                mode="execute",
+                                approved=True,
+                                plan_id=plan.id,
+                            ),
+                            on_step=checkpoint,
+                        )
+                        plan.execution_results = execution_results
+                        plan.executed_at = datetime.now(timezone.utc).isoformat()
+                        plan.status = (
+                            "executed"
+                            if all(row.get("ok") for row in execution_results)
+                            else "executed_with_errors"
+                        )
+                        executed_inline = True
+                        if self.plan_store is not None:
+                            self.plan_store.update_status(
+                                plan.id,
+                                plan.status,
+                                execution_results=execution_results,
+                                executed_at=plan.executed_at,
+                            )
+                    elif effective_mode == "auto" and not plan.intents:
+                        plan.requires_approval = False
+                        plan.status = "executed"
+                        plan.executed_at = datetime.now(timezone.utc).isoformat()
+                        if self.plan_store is not None:
+                            self.plan_store.save(plan)
+                    elif self.plan_store is not None:
+                        self.plan_store.save(plan)
+
+                result.run_id = run_id
                 setattr(result, "episode_id", self._run_to_episode.get(run_id))
-                setattr(result, "recalled", [_recall_to_dict(r) for r in recalled])
+                setattr(result, "recalled", recalled_payload)
                 setattr(result, "mode", effective_mode)
                 setattr(result, "plan", plan.to_dict() if plan else None)
                 setattr(result, "executed_inline", executed_inline)
                 setattr(result, "execution_results", execution_results)
-            except Exception:
-                pass
-            return result
-        finally:
-            self.status = "idle"
-            self.harness.tool_call_interceptor = None
+                await emit({"type": "plan", "plan": plan.to_dict() if plan else None})
+                return result
+            finally:
+                self._active_runs = max(0, self._active_runs - 1)
+                self.status = "thinking" if self._active_runs else "idle"
 
     # ------------------------------------------------------------------
     async def run_streaming(
@@ -409,43 +560,26 @@ class DeepReasoningAgent:
         * ``final`` — once at the end, with the full result payload
         * ``error`` — on exception (terminal)
         """
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue(maxsize=64)
         SENTINEL = object()
 
         async def _push(event: Dict[str, Any]) -> None:
             await queue.put(event)
 
-        # Hook the harness's per-step events into our queue while
-        # also forwarding to the original broadcast (so the WS UI
-        # still sees them).
-        original_on_event = self.harness.on_event
-
-        async def _on_event(ev: Dict[str, Any]) -> None:
-            await _push(dict(ev))
-            if original_on_event is not None:
-                try:
-                    await original_on_event(ev)
-                except Exception as exc:
-                    logger.debug("broadcast event failed: %s", exc)
-
-        self.harness.on_event = _on_event
         run_id = uuid.uuid4().hex
         await _push({"type": "start", "goal": goal,
                      "mode": (mode or self.default_mode), "run_id": run_id})
 
         async def _runner() -> None:
             try:
-                # Match the body of run() but reuse the recall/plan
-                # plumbing. Easiest: monkey-patch run_id by capturing
-                # the result and re-emitting it.
-                result = await self.run(goal, context, mode=mode)
-                # Recall block already happened inside run(); surface it.
-                await _push({
-                    "type": "recall",
-                    "recalled": list(getattr(result, "recalled", []) or []),
-                })
+                result = await self.run(
+                    goal,
+                    context,
+                    mode=mode,
+                    run_id=run_id,
+                    event_callback=_push,
+                )
                 plan = getattr(result, "plan", None)
-                await _push({"type": "plan", "plan": plan})
                 await _push({
                     "type": "final",
                     "data": {
@@ -455,6 +589,12 @@ class DeepReasoningAgent:
                         "answer": result.answer,
                         "iterations": result.iterations,
                         "tool_calls": result.tool_calls,
+                        "requested_tool_calls": result.requested_tool_calls,
+                        "rejected_tool_calls": result.rejected_tool_calls,
+                        "successful_tool_calls": result.successful_tool_calls,
+                        "failed_tool_calls": result.failed_tool_calls,
+                        "cached_tool_calls": result.cached_tool_calls,
+                        "usage": result.usage,
                         "stopped_reason": result.stopped_reason,
                         "duration_ms": result.duration_ms,
                         "executed_inline": getattr(result, "executed_inline", False),
@@ -462,6 +602,8 @@ class DeepReasoningAgent:
                         "plan": plan,
                     },
                 })
+            except asyncio.CancelledError:
+                raise
             except Exception as exc:
                 logger.exception("run_streaming inner failure")
                 await _push({"type": "error", "error": str(exc)})
@@ -477,9 +619,6 @@ class DeepReasoningAgent:
                 yield ev
             await task
         finally:
-            # Always restore the original event hook even if the
-            # consumer abandons the iterator.
-            self.harness.on_event = original_on_event
             if not task.done():
                 task.cancel()
                 try:
@@ -595,7 +734,7 @@ class DeepReasoningAgent:
         plan = self.plan_store.get(plan_id)
         if plan is None:
             return None
-        if plan.status == "executed":
+        if plan.status in ("executed", "executed_with_errors"):
             return {
                 "plan_id": plan.id,
                 "status": "already_executed",
@@ -605,7 +744,41 @@ class DeepReasoningAgent:
         if plan.status == "rejected":
             return {"plan_id": plan.id, "status": "rejected"}
 
-        results = await replay_plan(plan, self.registry.call)
+        claim = self.plan_store.claim_for_execution(plan.id)
+        if claim == "already_executing":
+            current = self.plan_store.get(plan.id)
+            return {
+                "plan_id": plan.id,
+                "status": "already_executing",
+                "execution_results": current.execution_results if current else [],
+            }
+        if claim == "already_executed":
+            current = self.plan_store.get(plan.id)
+            return {
+                "plan_id": plan.id,
+                "status": "already_executed",
+                "execution_results": current.execution_results if current else [],
+                "executed_at": current.executed_at if current else None,
+            }
+        if claim == "rejected":
+            return {"plan_id": plan.id, "status": "rejected"}
+        if claim != "claimed":
+            return {"plan_id": plan.id, "status": claim}
+
+        async def checkpoint(partial: List[Dict[str, Any]]) -> None:
+            self.plan_store.checkpoint_execution(plan.id, partial)
+
+        results = await replay_plan(
+            plan,
+            self.registry.call,
+            execution_context=ToolExecutionContext(
+                run_id=plan.run_id,
+                mode="execute",
+                approved=True,
+                plan_id=plan.id,
+            ),
+            on_step=checkpoint,
+        )
         executed_at = datetime.now(timezone.utc).isoformat()
         all_ok = all(r.get("ok") for r in results)
         new_status = "executed" if all_ok else "executed_with_errors"
@@ -639,6 +812,12 @@ class DeepReasoningAgent:
                 "answer": result.answer,
                 "iterations": result.iterations,
                 "tool_calls": result.tool_calls,
+                "requested_tool_calls": result.requested_tool_calls,
+                "rejected_tool_calls": result.rejected_tool_calls,
+                "successful_tool_calls": result.successful_tool_calls,
+                "failed_tool_calls": result.failed_tool_calls,
+                "cached_tool_calls": result.cached_tool_calls,
+                "usage": result.usage,
                 "stopped_reason": result.stopped_reason,
                 "duration_ms": result.duration_ms,
                 "trace": [
@@ -665,6 +844,8 @@ class DeepReasoningAgent:
             "name": self.name,
             "status": self.status,
             "backend": self.llm.name,
+            "model": getattr(self.llm, "model", None) or getattr(self.llm, "_model", None),
+            "reasoning_effort": self.reasoning_effort,
             "tool_count": len(self.registry.names()),
             "last_run_at": self.last_run_at.isoformat() if self.last_run_at else None,
             "native_tools_enabled": self.native_tools is not None,
@@ -674,6 +855,11 @@ class DeepReasoningAgent:
             "recall_k": self.recall_k,
             "plan_store_enabled": self.plan_store is not None,
             "default_mode": self.default_mode,
+            "allow_direct_execute": self.allow_direct_execute,
+            "active_runs": self._active_runs,
+            "max_iterations": self.harness.max_iterations,
+            "max_total_tool_calls": self.harness.max_total_tool_calls,
+            "max_run_seconds": self.harness.max_run_seconds,
         }
 
 

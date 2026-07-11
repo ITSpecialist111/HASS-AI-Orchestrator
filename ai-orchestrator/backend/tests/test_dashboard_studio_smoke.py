@@ -106,7 +106,19 @@ def test_inject_live_shim_before_body_close():
     assert "%DASHBOARD_ID_JSON%" not in out
     assert '"abc123"' in out
     assert out.count("</body>") == 1
-    assert out.index("setInterval") < out.index("</body>")
+    assert "hass-dashboard-state" in out
+    assert "postMessage" in out
+    assert "fetch(" not in out
+    assert out.index("postMessage") < out.index("</body>")
+
+
+def test_inject_live_shim_uses_last_case_insensitive_body_close():
+    out = _inject_live_shim(
+        "<html><body><script>const sample='</body>';</script></BODY></html>",
+        "safe",
+    )
+    assert out.index("hass-dashboard-ready") > out.index("const sample")
+    assert out.lower().count("</body>") == 2
 
 
 def test_inject_live_shim_appends_when_no_body_tag():
@@ -161,7 +173,8 @@ async def test_generate_persists_html_and_meta(tmp_path):
     # Live shim was injected and references the dashboard id
     saved_html = (tmp_path / f"{meta.id}.html").read_text(encoding="utf-8")
     assert f'"{meta.id}"' in saved_html
-    assert "setInterval" in saved_html
+    assert "hass-dashboard-ready" in saved_html
+    assert "fetch(" not in saved_html
 
     # Chat factory was called with provider routing
     assert chat.calls, "chat provider was not invoked"

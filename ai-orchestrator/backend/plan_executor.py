@@ -19,6 +19,8 @@ agent or the LLM.
 from __future__ import annotations
 
 import json
+import hashlib
+import inspect
 import logging
 import re
 import sqlite3
@@ -165,6 +167,7 @@ class RecordedIntent:
     simulated_result: Dict[str, Any]
     iteration: int  # which harness iteration produced it
     timestamp: str
+    idempotency_key: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -208,6 +211,7 @@ class PlanProposal:
 # Dry-run interceptor
 # ---------------------------------------------------------------------------
 ToolCallable = Callable[[str, Dict[str, Any]], Awaitable[Dict[str, Any]]]
+ToolValidator = Callable[..., Awaitable[Optional[Dict[str, Any]]]]
 
 
 class DryRunInterceptor:
@@ -225,8 +229,10 @@ class DryRunInterceptor:
         classifier: Optional[ToolClassifier] = None,
         *,
         synthetic_payload: Optional[Dict[str, Any]] = None,
+        underlying_validate: Optional[ToolValidator] = None,
     ) -> None:
         self._call = underlying_call
+        self._validate = underlying_validate
         self.classifier = classifier or ToolClassifier()
         self._synthetic = synthetic_payload or {
             "ok": True,
@@ -242,10 +248,21 @@ class DryRunInterceptor:
         intents know which step produced them."""
         self._current_iteration = iteration
 
-    async def call(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        if self._validate is not None:
+            validation = self._validate(name, arguments, context)
+            if inspect.isawaitable(validation):
+                validation = await validation
+            if validation is not None:
+                return validation
         cls = self.classifier.classify(name, arguments)
         if not cls.is_mutating:
-            return await self._call(name, arguments)
+            return await _call_with_context(self._call, name, arguments, context)
 
         # Mutating: record + synthesise success.
         intent = RecordedIntent(
@@ -257,6 +274,7 @@ class DryRunInterceptor:
             simulated_result=dict(self._synthetic),
             iteration=self._current_iteration,
             timestamp=datetime.now(timezone.utc).isoformat(),
+            idempotency_key=_intent_key(name, arguments, len(self.intents) + 1),
         )
         self.intents.append(intent)
         logger.debug(
@@ -373,6 +391,45 @@ class PlanStore:
             )
         return cur.rowcount > 0
 
+    def claim_for_execution(self, plan_id: str) -> str:
+        """Atomically claim a pending plan for one executor.
+
+        Returns ``claimed``, ``already_executing``, ``already_executed``,
+        ``rejected``, or ``missing``. A process crash leaves the plan in
+        ``executing`` rather than silently replaying uncertain side effects.
+        """
+        with self._conn() as c:
+            cur = c.execute(
+                """UPDATE plans SET status = 'executing'
+                   WHERE id = ? AND status IN ('pending', 'approved')""",
+                (plan_id,),
+            )
+            if cur.rowcount > 0:
+                return "claimed"
+            row = c.execute("SELECT status FROM plans WHERE id = ?", (plan_id,)).fetchone()
+        if row is None:
+            return "missing"
+        status = str(row["status"])
+        if status == "executing":
+            return "already_executing"
+        if status in ("executed", "executed_with_errors"):
+            return "already_executed"
+        if status == "rejected":
+            return "rejected"
+        return status
+
+    def checkpoint_execution(
+        self,
+        plan_id: str,
+        execution_results: List[Dict[str, Any]],
+    ) -> bool:
+        """Persist completed replay steps while the plan remains executing."""
+        return self.update_status(
+            plan_id,
+            "executing",
+            execution_results=execution_results,
+        )
+
 
 def _row_to_plan(row: sqlite3.Row) -> PlanProposal:
     intents_raw = json.loads(row["intents_json"] or "[]")
@@ -402,6 +459,9 @@ def _row_to_plan(row: sqlite3.Row) -> PlanProposal:
 async def replay_plan(
     plan: PlanProposal,
     underlying_call: ToolCallable,
+    *,
+    execution_context: Optional[Any] = None,
+    on_step: Optional[Callable[[List[Dict[str, Any]]], Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Execute the recorded intents in order against the real tools.
 
@@ -426,10 +486,19 @@ async def replay_plan(
                 "skipped": True,
                 "duration_ms": 0,
             })
+            if on_step is not None:
+                callback_result = on_step(list(out))
+                if inspect.isawaitable(callback_result):
+                    await callback_result
             continue
         t0 = time.monotonic()
         try:
-            result = await underlying_call(intent.tool_name, intent.arguments)
+            result = await _call_with_context(
+                underlying_call,
+                intent.tool_name,
+                intent.arguments,
+                execution_context,
+            )
             ok = _result_ok(result)
         except Exception as exc:
             result = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
@@ -449,6 +518,10 @@ async def replay_plan(
                 "replay_plan: aborting after failed step #%d (%s)",
                 intent.sequence, intent.tool_name,
             )
+        if on_step is not None:
+            callback_result = on_step(list(out))
+            if inspect.isawaitable(callback_result):
+                await callback_result
     return out
 
 
@@ -483,3 +556,37 @@ def summarise_risk(intents: List[RecordedIntent]) -> str:
             parts.append(f"{n} {level}-impact")
     head = ", ".join(parts) if parts else f"{len(intents)} actions"
     return f"{head} action(s) across {len(intents)} step(s)."
+
+
+def _intent_key(name: str, arguments: Dict[str, Any], sequence: int) -> str:
+    payload = json.dumps(
+        {"sequence": sequence, "tool": name, "arguments": arguments},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+async def _call_with_context(
+    callable_obj: Callable[..., Any],
+    name: str,
+    arguments: Dict[str, Any],
+    context: Optional[Any],
+) -> Any:
+    try:
+        parameters = inspect.signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        parameters = {}
+    if "context" in parameters or any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in parameters.values()
+    ):
+        result = callable_obj(name, arguments, context=context)
+    elif len([
+        p for p in parameters.values()
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]) >= 3:
+        result = callable_obj(name, arguments, context)
+    else:
+        result = callable_obj(name, arguments)
+    return await result if inspect.isawaitable(result) else result

@@ -158,8 +158,13 @@ class NativeHATools:
     PROVIDER = "native_ha"
     PREFIX = ""  # tools already namespaced with ``ha_`` in their schemas
 
-    def __init__(self, ha_client: Any) -> None:
+    def __init__(
+        self,
+        ha_client: Any,
+        service_executor: Optional[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = None,
+    ) -> None:
         self.ha_client = ha_client
+        self.service_executor = service_executor
 
     # ---- registry interface -----------------------------------------------
     def tool_schemas(self) -> List[Dict[str, Any]]:
@@ -287,13 +292,21 @@ class NativeHATools:
             return {"ok": False, "error": "domain and service required"}
         entity_id = args.get("entity_id")
         extra = args.get("data") or {}
+        if self.service_executor is None:
+            return {
+                "ok": False,
+                "error": "safe_service_executor_unavailable",
+                "error_code": "safety_guard_unavailable",
+            }
         try:
-            result = await self.ha_client.call_service(
-                domain=domain, service=service, entity_id=entity_id, **extra
-            )
+            return await self.service_executor({
+                "domain": domain,
+                "service": service,
+                "entity_id": entity_id,
+                "service_data": extra,
+            })
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
-        return {"ok": True, "result": result}
 
     async def _t_ha_summarise_area(self, args: Dict[str, Any]) -> Dict[str, Any]:
         area = (args.get("area") or "").strip().lower()

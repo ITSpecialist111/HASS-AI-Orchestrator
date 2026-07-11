@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { Layout } from './components/Layout'
 import { AgentGrid } from './components/AgentGrid'
-import { AnalyticsCharts } from './components/AnalyticsCharts'
-import { AgentFactory } from './components/AgentFactory'
 import { DecisionStream } from './components/DecisionStream'
 import { ChatAssistant } from './components/ChatAssistant'
-import { VisualDashboard } from './components/VisualDashboard'
-import { DashboardStudio } from './components/DashboardStudio'
-import { ReasoningPanel } from './components/ReasoningPanel'
-import { PromptLibrary } from './components/PromptLibrary'
-import { TriggersPanel } from './components/TriggersPanel'
 import './index.css'
+
+const AnalyticsCharts = lazy(() => import('./components/AnalyticsCharts').then(m => ({ default: m.AnalyticsCharts })))
+const AgentFactory = lazy(() => import('./components/AgentFactory').then(m => ({ default: m.AgentFactory })))
+const VisualDashboard = lazy(() => import('./components/VisualDashboard').then(m => ({ default: m.VisualDashboard })))
+const DashboardStudio = lazy(() => import('./components/DashboardStudio').then(m => ({ default: m.DashboardStudio })))
+const ReasoningPanel = lazy(() => import('./components/ReasoningPanel').then(m => ({ default: m.ReasoningPanel })))
+const PromptLibrary = lazy(() => import('./components/PromptLibrary').then(m => ({ default: m.PromptLibrary })))
+const TriggersPanel = lazy(() => import('./components/TriggersPanel').then(m => ({ default: m.TriggersPanel })))
 
 function App() {
     const [agents, setAgents] = useState([])
@@ -171,7 +172,13 @@ function App() {
             onTabChange={setActiveTab}
             connected={connected}
         >
-            {renderContent()}
+            <Suspense fallback={(
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-sm text-slate-500">
+                    Loading workspace…
+                </div>
+            )}>
+                {renderContent()}
+            </Suspense>
             <ChatAssistant />
         </Layout>
     )

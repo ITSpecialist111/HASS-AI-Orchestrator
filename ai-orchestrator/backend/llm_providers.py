@@ -8,6 +8,7 @@ existing call sites to change much:
 * ``ollama``   — local Ollama daemon (default, unchanged behaviour).
 * ``openai``   — OpenAI Chat Completions (api.openai.com or any
                  OpenAI-compatible endpoint via ``OPENAI_BASE_URL``).
+* ``anthropic``— Claude API (current adaptive-thinking models supported).
 * ``github``   — GitHub Models (https://models.github.ai/inference,
                  OpenAI-compatible, auth = ``Bearer $GITHUB_TOKEN``).
 * ``foundry``  — Microsoft Foundry hosted agent / model endpoint
@@ -47,10 +48,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 PROVIDER_OLLAMA = "ollama"
 PROVIDER_OPENAI = "openai"
+PROVIDER_ANTHROPIC = "anthropic"
 PROVIDER_GITHUB = "github"
 PROVIDER_FOUNDRY = "foundry"
 
-KNOWN_PROVIDERS = {PROVIDER_OLLAMA, PROVIDER_OPENAI, PROVIDER_GITHUB, PROVIDER_FOUNDRY}
+KNOWN_PROVIDERS = {
+    PROVIDER_OLLAMA,
+    PROVIDER_OPENAI,
+    PROVIDER_ANTHROPIC,
+    PROVIDER_GITHUB,
+    PROVIDER_FOUNDRY,
+}
 
 
 def _strip(value: Optional[str]) -> str:
@@ -157,6 +165,29 @@ class _OpenAICompatibleChatProvider(ChatProvider):
         max_tokens: int = 1000,
         extra_options: Optional[Dict[str, Any]] = None,
     ) -> str:
+        if self.name == PROVIDER_OPENAI and model.startswith("gpt-5.6"):
+            system = "\n\n".join(
+                str(message.get("content") or "")
+                for message in messages
+                if message.get("role") == "system"
+            )
+            response_kwargs: Dict[str, Any] = {
+                "model": model,
+                "input": [message for message in messages if message.get("role") != "system"],
+                "max_output_tokens": max_tokens,
+                "reasoning": {
+                    "effort": os.getenv("REASONING_EFFORT", "medium"),
+                    "context": "current_turn",
+                },
+                "store": False,
+            }
+            if system:
+                response_kwargs["instructions"] = system
+            if extra_options:
+                response_kwargs.update(extra_options)
+            response = self._client.responses.create(**response_kwargs)
+            return (getattr(response, "output_text", "") or "").strip()
+
         kwargs: Dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -169,6 +200,69 @@ class _OpenAICompatibleChatProvider(ChatProvider):
         if not resp.choices:
             return ""
         return (resp.choices[0].message.content or "").strip()
+
+
+class _AnthropicChatProvider(ChatProvider):
+    """Simple text surface for current Claude models."""
+
+    name = PROVIDER_ANTHROPIC
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        default_model: str = "claude-opus-4-8",
+        effort: str = "medium",
+    ) -> None:
+        if not api_key:
+            raise RuntimeError("anthropic: api_key is required")
+        try:
+            import anthropic  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("anthropic: the 'anthropic' package is required") from exc
+        self._client = anthropic.Anthropic(api_key=api_key)
+        self.default_model = default_model
+        self.effort = effort
+
+    def chat(
+        self,
+        model: str,
+        messages: List[Dict[str, Any]],
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+        extra_options: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        selected_model = model or self.default_model
+        system = "\n\n".join(
+            str(message.get("content") or "")
+            for message in messages
+            if message.get("role") == "system"
+        )
+        conversation = [
+            message for message in messages if message.get("role") != "system"
+        ]
+        kwargs: Dict[str, Any] = {
+            "model": selected_model,
+            "max_tokens": max_tokens,
+            "messages": conversation,
+        }
+        if system:
+            kwargs["system"] = system
+        if any(token in selected_model for token in (
+            "opus-4-8", "opus-4-7", "opus-4-6", "sonnet-5", "sonnet-4-6", "fable-5"
+        )):
+            kwargs["output_config"] = {"effort": self.effort}
+        else:
+            kwargs["temperature"] = temperature
+        if extra_options:
+            kwargs.update(extra_options)
+        response = self._client.messages.create(**kwargs)
+        return "\n".join(
+            block.text
+            for block in response.content
+            if getattr(block, "type", None) == "text"
+        ).strip()
 
 
 class _FoundryChatProvider(ChatProvider):
@@ -258,6 +352,9 @@ def make_chat_provider(
     ollama_host: Optional[str] = None,
     openai_api_key: Optional[str] = None,
     openai_base_url: Optional[str] = None,
+    anthropic_api_key: Optional[str] = None,
+    anthropic_model: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,
     github_token: Optional[str] = None,
     foundry_endpoint: Optional[str] = None,
     foundry_api_key: Optional[str] = None,
@@ -278,6 +375,16 @@ def make_chat_provider(
             key = _strip(openai_api_key) or _strip(os.getenv("OPENAI_API_KEY"))
             base = _strip(openai_base_url) or _strip(os.getenv("OPENAI_BASE_URL")) or "https://api.openai.com/v1"
             return _OpenAICompatibleChatProvider(name=PROVIDER_OPENAI, api_key=key, base_url=base)
+
+        if name == PROVIDER_ANTHROPIC:
+            key = _strip(anthropic_api_key) or _strip(os.getenv("ANTHROPIC_API_KEY"))
+            model = _strip(anthropic_model) or _strip(os.getenv("ANTHROPIC_MODEL")) or "claude-opus-4-8"
+            effort = _strip(reasoning_effort) or _strip(os.getenv("REASONING_EFFORT")) or "medium"
+            return _AnthropicChatProvider(
+                api_key=key,
+                default_model=model,
+                effort=effort,
+            )
 
         if name == PROVIDER_GITHUB:
             token = _strip(github_token) or _strip(os.getenv("GITHUB_TOKEN")) or _strip(os.getenv("GITHUB_MODELS_TOKEN"))
@@ -315,6 +422,8 @@ def make_tool_backend(
     foundry_api_key: Optional[str] = None,
     foundry_bearer_token: Optional[str] = None,
     foundry_agent_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,
+    fallback_to_ollama: bool = True,
 ):
     """Resolve the tool-calling backend for the deep-reasoning harness.
 
@@ -327,6 +436,7 @@ def make_tool_backend(
         FoundryAgentBackend,
         GitHubModelsBackend,
         OllamaToolBackend,
+        OpenAIResponsesBackend,
         OpenAIToolBackend,
     )
 
@@ -336,6 +446,15 @@ def make_tool_backend(
         if name == PROVIDER_OPENAI:
             key = _strip(openai_api_key) or _strip(os.getenv("OPENAI_API_KEY"))
             base = _strip(openai_base_url) or _strip(os.getenv("OPENAI_BASE_URL")) or "https://api.openai.com/v1"
+            effort = _strip(reasoning_effort) or _strip(os.getenv("REASONING_EFFORT")) or "medium"
+            if model.startswith("gpt-5.6"):
+                return OpenAIResponsesBackend(
+                    model=model,
+                    api_key=key,
+                    base_url=base,
+                    effort=effort,
+                    store=os.getenv("OPENAI_STORE_RESPONSES", "false").lower() == "true",
+                )
             return OpenAIToolBackend(model=model, api_key=key, base_url=base, name=PROVIDER_OPENAI)
 
         if name == PROVIDER_GITHUB:
@@ -356,6 +475,8 @@ def make_tool_backend(
                 agent_id=agent_id or None,
             )
     except Exception as exc:
+        if not fallback_to_ollama:
+            raise RuntimeError(f"Tool backend {name} unavailable: {exc}") from exc
         logger.warning("Tool backend %s unavailable (%s); falling back to ollama", name, exc)
 
     return OllamaToolBackend(model=model, host=ollama_host)

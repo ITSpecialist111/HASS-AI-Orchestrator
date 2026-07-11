@@ -20,10 +20,11 @@ modern image generators:
   parallel so you can pick a favourite.
 * **Live data binding** — the LLM is asked to wrap every dynamic value
   in ``<span data-entity="…" data-attr="…">…</span>`` placeholders.
-  The studio injects a tiny polling shim into every saved dashboard so
-  values stay fresh *without* re-running the LLM.
+    The studio injects a tiny parent-message shim into every sandboxed
+    dashboard so values stay fresh *without* granting generated HTML
+    network access or re-running the LLM.
 * **Multi-provider** — uses :func:`llm_providers.make_chat_provider`,
-  so it works with Ollama, OpenAI, GitHub Models, and Microsoft
+  so it works with Ollama, OpenAI, Anthropic, GitHub Models, and Microsoft
   Foundry out of the box (Phase 9).
 * **Better grounding** — Home Assistant context is grouped by area +
   domain and summarised, not dumped as raw JSON, so the model sees the
@@ -167,8 +168,7 @@ Hard rules
    placeholder would do — you only see a snapshot, the viewer wants
    live data.
 6. Do NOT include ``<script>`` tags that fetch from the network
-   yourself. The studio injects a polling shim automatically; adding
-   your own fetch loops will cause double refreshes.
+    yourself. The trusted host sends live state into the sandbox.
 7. Background: prefer dark themes (``bg-slate-900``/``bg-zinc-950``)
    unless the user explicitly asks otherwise.
 """
@@ -190,7 +190,6 @@ _LIVE_SHIM_TEMPLATE = """
 <script>
 (function () {
   var DASHBOARD_ID = %DASHBOARD_ID_JSON%;
-  var REFRESH_MS = 15000;
   function applyState(map) {
     document.querySelectorAll('[data-entity]').forEach(function (el) {
       var eid = el.getAttribute('data-entity');
@@ -210,24 +209,26 @@ _LIVE_SHIM_TEMPLATE = """
       el.textContent = String(value);
     });
   }
-  function tick() {
-    fetch('api/studio/dashboards/' + DASHBOARD_ID + '/state', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j) applyState(j); })
-      .catch(function () { /* silent */ });
-  }
-  tick();
-  setInterval(tick, REFRESH_MS);
+    window.addEventListener('message', function (event) {
+        if (event.source !== window.parent) return;
+        var message = event.data || {};
+        if (message.type !== 'hass-dashboard-state') return;
+        if (message.dashboardId !== DASHBOARD_ID) return;
+        applyState(message.state || {});
+    });
+    window.parent.postMessage({ type: 'hass-dashboard-ready', dashboardId: DASHBOARD_ID }, '*');
 })();
 </script>
 """
 
 
 def _inject_live_shim(html: str, dashboard_id: str) -> str:
-    """Append the polling shim before ``</body>`` (or at end if missing)."""
+    """Append the parent-message shim before ``</body>`` or at the end."""
     shim = _LIVE_SHIM_TEMPLATE.replace("%DASHBOARD_ID_JSON%", json.dumps(dashboard_id))
-    if "</body>" in html:
-        return html.replace("</body>", shim + "\n</body>", 1)
+    matches = list(re.finditer(r"</body\s*>", html, flags=re.IGNORECASE))
+    if matches:
+        closing_body = matches[-1]
+        return html[:closing_body.start()] + shim + "\n" + html[closing_body.start():]
     return html + shim
 
 
@@ -265,7 +266,8 @@ class DashboardStudio:
         if self._default_model:
             return self._default_model
         return {
-            "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "openai": os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
+            "anthropic": os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8"),
             "github": os.getenv("GITHUB_MODEL", "gpt-4o-mini"),
             "foundry": os.getenv("FOUNDRY_MODEL", "gpt-4o"),
             "ollama": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),

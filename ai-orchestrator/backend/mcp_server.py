@@ -1,10 +1,17 @@
 import os
 import json
+import inspect
+import re
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, ValidationError
+
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:  # pragma: no cover
+    Draft202012Validator = None  # type: ignore[assignment]
 
 from ha_client import HAWebSocketClient
 
@@ -58,6 +65,9 @@ DEFAULT_HIGH_IMPACT_SERVICES = [
 ]
 
 DEFAULT_BLOCKED_DOMAINS = ["shell_command", "hassio", "script", "automation", "rest_command"]
+
+HA_NAME_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*$")
+HA_ENTITY_ID_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*\.[a-z0-9_]+$")
 
 # Service-level allowlist: only these domain.service pairs are permitted.
 # If empty, falls back to domain-level checks only.
@@ -333,7 +343,8 @@ class MCPServer:
         self,
         tool_name: str,
         parameters: Dict[str, Any],
-        agent_id: str = "unknown"
+        agent_id: str = "unknown",
+        context: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Execute a tool with safety checks and logging.
@@ -347,7 +358,11 @@ class MCPServer:
             Tool execution result
         """
         if tool_name not in self.tools:
-            return {"error": f"Unknown tool: {tool_name}"}
+            return {"ok": False, "error": f"Unknown tool: {tool_name}", "error_code": "unknown_tool"}
+
+        validation_error = self.validate_tool_call(tool_name, parameters, context)
+        if validation_error is not None:
+            return validation_error
         
         tool = self.tools[tool_name]
         
@@ -357,12 +372,19 @@ class MCPServer:
             "agent_id": agent_id,
             "tool": tool_name,
             "parameters": parameters,
-            "dry_run": self.dry_run
+            "dry_run": self.dry_run,
+            "run_id": _context_value(context, "run_id"),
+            "plan_id": _context_value(context, "plan_id"),
+            "approved": bool(_context_value(context, "approved", False)),
         }
         
         try:
             # Execute tool handler
-            result = await tool["handler"](parameters)
+            handler = tool["handler"]
+            if _accepts_context(handler):
+                result = await handler(parameters, context=context)
+            else:
+                result = await handler(parameters)
             log_entry["result"] = result
             log_entry["status"] = "success"
             
@@ -378,6 +400,80 @@ class MCPServer:
             self._save_log(agent_id, log_entry)
             
             return {"error": error_msg}
+
+    def validate_tool_call(
+        self,
+        tool_name: str,
+        parameters: Dict[str, Any],
+        context: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Validate schema and deployment safety policy without side effects."""
+        tool = self.tools.get(tool_name)
+        if tool is None:
+            return {"ok": False, "error": f"Unknown tool: {tool_name}", "error_code": "unknown_tool"}
+        if not isinstance(parameters, dict):
+            return {
+                "ok": False,
+                "error": "Tool parameters must be a JSON object.",
+                "error_code": "invalid_arguments",
+            }
+        schema = tool.get("parameters") or {}
+        if Draft202012Validator is not None and schema:
+            errors = sorted(
+                Draft202012Validator(schema).iter_errors(parameters),
+                key=lambda err: list(err.absolute_path),
+            )
+            if errors:
+                return {
+                    "ok": False,
+                    "error": f"Invalid arguments for {tool_name}: {errors[0].message}",
+                    "error_code": "invalid_arguments",
+                    "details": [
+                        {
+                            "path": ".".join(str(p) for p in err.absolute_path) or "$",
+                            "message": err.message,
+                        }
+                        for err in errors[:5]
+                    ],
+                }
+
+        try:
+            if tool_name == "set_temperature":
+                SetTemperatureParams(**parameters)
+            elif tool_name == "set_hvac_mode":
+                SetHVACModeParams(**parameters)
+        except ValidationError as exc:
+            return {
+                "ok": False,
+                "error": f"Safety validation failed for {tool_name}: {exc}",
+                "error_code": "safety_validation",
+            }
+
+        expected_domains = {
+            "set_temperature": "climate",
+            "get_climate_state": "climate",
+            "set_hvac_mode": "climate",
+            "turn_on_light": "light",
+            "turn_off_light": "light",
+            "set_brightness": "light",
+            "set_color_temp": "light",
+            "set_alarm_state": "alarm_control_panel",
+            "lock_door": "lock",
+            "unlock_door": "lock",
+            "enable_camera": "camera",
+        }
+        expected = expected_domains.get(tool_name)
+        entity_id = parameters.get("entity_id")
+        if expected and entity_id and not str(entity_id).startswith(f"{expected}."):
+            return {
+                "ok": False,
+                "error": f"{tool_name} requires an entity in the {expected} domain.",
+                "error_code": "invalid_entity_domain",
+            }
+
+        if tool_name == "call_ha_service":
+            return self._validate_service_request(parameters)
+        return None
     
     def _save_log(self, agent_id: str, log_entry: Dict):
         """Save tool execution log to file"""
@@ -561,54 +657,63 @@ class MCPServer:
         return {"action": "set_color_temp", "executed": True}
     
     # Security tool handlers (Phase 2)
-    async def _set_alarm_state(self, params: Dict) -> Dict:
+    async def _set_alarm_state(
+        self,
+        params: Dict,
+        context: Optional[Any] = None,
+    ) -> Dict:
         """Set alarm state handler"""
         entity_id = params["entity_id"]
         state = params["state"]
-        
-        if self.dry_run:
-            return {"action": "set_alarm_state", "state": state, "dry_run": True}
         
         service_map = {
             "armed_home": "alarm_arm_home",
             "armed_away": "alarm_arm_away",
             "disarmed": "alarm_disarm"
         }
-        
-        result = await self.ha_client.call_service(
-            domain="alarm_control_panel",
-            service=service_map[state],
-            entity_id=entity_id
+        return await self._call_ha_service(
+            {
+                "domain": "alarm_control_panel",
+                "service": service_map[state],
+                "entity_id": entity_id,
+                "service_data": {},
+            },
+            context=context,
         )
-        
-        return {"action": "set_alarm_state", "state": state, "executed": True}
     
-    async def _lock_door(self, params: Dict) -> Dict:
+    async def _lock_door(
+        self,
+        params: Dict,
+        context: Optional[Any] = None,
+    ) -> Dict:
         """Lock door handler"""
         entity_id = params["entity_id"]
-        
-        if self.dry_run:
-            return {"action": "lock_door", "entity_id": entity_id, "dry_run": True}
-        
-        result = await self.ha_client.call_service(
-            domain="lock",
-            service="lock",
-            entity_id=entity_id
+        return await self._call_ha_service(
+            {
+                "domain": "lock",
+                "service": "lock",
+                "entity_id": entity_id,
+                "service_data": {},
+            },
+            context=context,
         )
-        
-        return {"action": "lock_door", "executed": True}
     
-    async def _unlock_door(self, params: Dict) -> Dict:
-        """Unlock door handler - always requires approval"""
+    async def _unlock_door(
+        self,
+        params: Dict,
+        context: Optional[Any] = None,
+    ) -> Dict:
+        """Unlock a door through the central approval-aware service guard."""
         entity_id = params["entity_id"]
-        
-        # This should be caught by approval queue before execution
-        return {
-            "action": "unlock_door",
-            "entity_id": entity_id,
-            "requires_approval": True,
-            "message": "Door unlock requires human approval"
-        }
+        return await self._call_ha_service(
+            {
+                "domain": "lock",
+                "service": "unlock",
+                "entity_id": entity_id,
+                "service_data": {},
+            },
+            context=context,
+        )
     
     async def _enable_camera(self, params: Dict) -> Dict:
         """Enable camera handler"""
@@ -657,27 +762,120 @@ class MCPServer:
             "results": formatted_results
         }
 
+    def _validate_service_request(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Apply domain, service, entity and climate safety policy without I/O."""
+        domain = str(params.get("domain") or "").strip()
+        service = str(params.get("service") or "").strip()
+        entity_id = params.get("entity_id")
+        service_data = params.get("service_data")
+        if service_data is None:
+            service_data = params.get("data") or {}
+        if not domain or not service:
+            return {
+                "ok": False,
+                "error": "domain and service are required",
+                "error_code": "invalid_arguments",
+                "executed": False,
+            }
+        if not HA_NAME_PATTERN.fullmatch(domain) or not HA_NAME_PATTERN.fullmatch(service):
+            return {
+                "ok": False,
+                "error": "domain and service must use Home Assistant identifier syntax",
+                "error_code": "invalid_identifier",
+                "executed": False,
+            }
+        if not isinstance(service_data, dict):
+            return {
+                "ok": False,
+                "error": "service_data must be an object",
+                "error_code": "invalid_arguments",
+                "executed": False,
+            }
+
+        blocked_domains = get_env_list("BLOCKED_DOMAINS", DEFAULT_BLOCKED_DOMAINS)
+        if domain in blocked_domains:
+            return {
+                "ok": False,
+                "error": f"Access to domain '{domain}' is blocked for security reasons.",
+                "error_code": "blocked_domain",
+                "executed": False,
+            }
+        allowed_domains = get_env_list("ALLOWED_DOMAINS", DEFAULT_ALLOWED_DOMAINS)
+        if domain not in allowed_domains:
+            return {
+                "ok": False,
+                "error": f"Domain '{domain}' is not in the allowed list of safe domains.",
+                "error_code": "domain_not_allowed",
+                "executed": False,
+                "allowed_domains": allowed_domains,
+            }
+        if entity_id and not str(entity_id).startswith(f"{domain}."):
+            return {
+                "ok": False,
+                "error": f"Entity '{entity_id}' does not belong to domain '{domain}'.",
+                "error_code": "entity_domain_mismatch",
+                "executed": False,
+            }
+        if entity_id and not HA_ENTITY_ID_PATTERN.fullmatch(str(entity_id)):
+            return {
+                "ok": False,
+                "error": f"Entity '{entity_id}' has invalid Home Assistant identifier syntax.",
+                "error_code": "invalid_entity_id",
+                "executed": False,
+            }
+
+        service_full_name = f"{domain}.{service}"
+        allowed_services = get_env_list("ALLOWED_SERVICES", DEFAULT_ALLOWED_SERVICES)
+        if allowed_services and service_full_name not in allowed_services:
+            return {
+                "ok": False,
+                "error": f"Service '{service_full_name}' is not in the allowed services list.",
+                "error_code": "service_not_allowed",
+                "executed": False,
+            }
+
+        if domain == "climate" and service == "set_temperature":
+            try:
+                SetTemperatureParams(entity_id=entity_id, **service_data)
+            except ValidationError as exc:
+                return {
+                    "ok": False,
+                    "error": f"Safety validation failed for {service_full_name}: {exc}",
+                    "error_code": "safety_validation",
+                    "executed": False,
+                }
+        return None
+
     # Phase 5: Universal Tool Handler
-    async def _call_ha_service(self, params: Dict) -> Dict:
+    async def _call_ha_service(
+        self,
+        params: Dict,
+        context: Optional[Any] = None,
+    ) -> Dict:
         """Generic handler to call any HA service"""
         domain = params.get("domain")
         service = params.get("service")
         entity_id = params.get("entity_id")
         service_data = params.get("service_data", {})
-        
+
         # Fix: If service_data is empty, collect all non-reserved keys from params
         # This allows agents to send "flat" parameters for simpler tool usage
         if not service_data:
             reserved = ['domain', 'service', 'entity_id', 'service_data']
             service_data = {k: v for k, v in params.items() if k not in reserved}
-        
-        # Merge entity_id into service_data for the call
-        call_data = {"entity_id": entity_id, **service_data}
-        
+
+        validation_error = self._validate_service_request({
+            "domain": domain,
+            "service": service,
+            "entity_id": entity_id,
+            "service_data": service_data,
+        })
+        if validation_error is not None:
+            return validation_error
+
         if self.dry_run:
-            # In dry run, we might want to validate if the service actually exists via RAG or HA
-            # For now, we just log it.
             return {
+                "ok": True,
                 "action": "call_ha_service",
                 "domain": domain,
                 "service": service,
@@ -685,42 +883,17 @@ class MCPServer:
                 "executed": False,
                 "dry_run": True
             }
-            
-        # 1. Domain Guard: Block critical/dangerous domains
-        blocked_domains = get_env_list("BLOCKED_DOMAINS", DEFAULT_BLOCKED_DOMAINS)
-        if domain in blocked_domains:
-            return {
-                "error": f"Access to domain '{domain}' is blocked for security reasons.",
-                "executed": False
-            }
-            
-        # 2. Allowlist Check: Warn or block unknown domains
-        allowed_domains = get_env_list("ALLOWED_DOMAINS", DEFAULT_ALLOWED_DOMAINS)
-        if domain not in allowed_domains:
-            return {
-                "error": f"Domain '{domain}' is not in the allowed list of safe domains.",
-                "executed": False,
-                "allowed_domains": allowed_domains
-            }
 
-        # 2b. Service-level allowlist: if configured, only permit specific services
         service_full_name = f"{domain}.{service}"
-        allowed_services = get_env_list("ALLOWED_SERVICES", DEFAULT_ALLOWED_SERVICES)
-        if allowed_services and service_full_name not in allowed_services:
-            return {
-                "error": f"Service '{service_full_name}' is not in the allowed services list.",
-                "executed": False,
-            }
-
-        # 3. High-Impact Check: Redirect to Approval Queue
+        approved = bool(_context_value(context, "approved", False))
         high_impact_services = get_env_list("HIGH_IMPACT_SERVICES", DEFAULT_HIGH_IMPACT_SERVICES)
-        if service_full_name in high_impact_services:
+        if service_full_name in high_impact_services and not approved:
             if self.approval_queue:
                 # Create a description for the user
                 reason = f"Agent requested high-impact service: {service_full_name} on {entity_id}"
                 if service_data:
                     reason += f" with data: {json.dumps(service_data)}"
-                
+
                 await self.approval_queue.add_request(
                     agent_id="mcp_security_guard",
                     action_type=service_full_name,
@@ -734,24 +907,17 @@ class MCPServer:
                     reason=reason
                 )
                 return {
+                    "ok": True,
                     "action": "call_ha_service",
                     "status": "queued_for_approval",
                     "message": f"Service {service_full_name} requires manual approval as it is high-impact."
                 }
             else:
                 return {
+                    "ok": False,
                     "error": f"Service {service_full_name} requires approval, but approval queue is not available.",
-                    "executed": False
-                }
-
-        # 4. Cross-Validation: Check specific tool rules
-        if domain == "climate" and service == "set_temperature":
-            try:
-                # Validate using existing Pydantic model
-                SetTemperatureParams(entity_id=entity_id, **service_data)
-            except ValidationError as e:
-                return {
-                    "error": f"Safety validation failed for {service_full_name}: {str(e)}",
+                    "requires_approval": True,
+                    "message": f"Service {service_full_name} requires human approval.",
                     "executed": False
                 }
 
@@ -764,6 +930,7 @@ class MCPServer:
                 **service_data
             )
             return {
+                "ok": True,
                 "action": "call_ha_service",
                 "domain": domain,
                 "service": service,
@@ -771,7 +938,7 @@ class MCPServer:
                 "executed": True
             }
         except Exception as e:
-            return {"error": str(e), "executed": False}
+            return {"ok": False, "error": str(e), "executed": False}
 
     async def _log_message(self, params: Dict) -> Dict:
         """Log message handler"""
@@ -799,3 +966,22 @@ class MCPServer:
                 return {"error": f"Entity {entity_id} not found in registry"}
         except Exception as e:
             return {"error": str(e)}
+
+
+def _context_value(context: Optional[Any], name: str, default: Any = None) -> Any:
+    if context is None:
+        return default
+    if isinstance(context, dict):
+        return context.get(name, default)
+    return getattr(context, name, default)
+
+
+def _accepts_context(callable_obj: Any) -> bool:
+    try:
+        parameters = inspect.signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return False
+    return "context" in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )

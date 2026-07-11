@@ -16,6 +16,7 @@ from reasoning_harness import (
     ReasoningHarness,
     ToolCall,
     ToolRegistry,
+    ToolSemantics,
 )
 
 
@@ -115,6 +116,13 @@ async def test_harness_runs_parallel_tool_calls():
             },
         }],
         executor=slow_executor,
+        semantics=ToolSemantics(
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            parallel_safe=True,
+            impact_level="read",
+        ),
     )
 
     llm = ScriptedLLM([

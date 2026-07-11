@@ -1,3 +1,11 @@
+FROM node:22-alpine AS frontend-test
+
+WORKDIR /dashboard
+COPY ai-orchestrator/dashboard/package*.json ./
+RUN npm ci && npm audit --audit-level=high
+COPY ai-orchestrator/dashboard/ ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 # Set working directory
@@ -8,18 +16,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements and install dependencies
-COPY backend/requirements.txt backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Install test dependencies
-RUN pip install --no-cache-dir pytest pytest-asyncio
+# Copy and install the reproducible runtime + test dependency sets.
+COPY ai-orchestrator/backend/requirements*.txt backend/
+RUN pip install --no-cache-dir -r backend/requirements-dev.txt
 
 # Copy backend code
-COPY backend/ backend/
+COPY ai-orchestrator/backend/ backend/
 
 # Copy skills
-COPY skills/ skills/
+COPY ai-orchestrator/skills/ skills/
 
 # Set working directory to backend for pytest
 WORKDIR /app/backend
