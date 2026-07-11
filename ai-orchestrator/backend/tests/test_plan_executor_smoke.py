@@ -456,6 +456,26 @@ async def test_plan_mode_records_intents_without_firing(stubbed_agent_factory):
 
 
 @pytest.mark.asyncio
+async def test_read_only_plan_mode_does_not_enter_approval_queue(stubbed_agent_factory):
+    from reasoning_harness import LLMResponse
+
+    agent, plan_store, fired = stubbed_agent_factory([
+        LLMResponse(content="No changes are needed."),
+    ])
+
+    result = await agent.run("Read the current state only", mode="plan")
+
+    plan = getattr(result, "plan")
+    assert plan["mutating_count"] == 0
+    assert plan["requires_approval"] is False
+    assert plan["status"] == "executed"
+    assert plan["executed_at"] is not None
+    assert fired == []
+    assert plan_store.list(status="pending") == []
+    assert plan_store.get(plan["id"]).status == "executed"
+
+
+@pytest.mark.asyncio
 async def test_auto_mode_executes_inline_when_no_high_impact(stubbed_agent_factory):
     from reasoning_harness import LLMResponse, ToolCall
 

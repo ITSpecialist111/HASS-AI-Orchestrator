@@ -494,7 +494,15 @@ class DeepReasoningAgent:
                 executed_inline = False
                 if interceptor is not None:
                     plan = self._build_plan(run_id, goal, result, interceptor.intents)
-                    if effective_mode == "auto" and plan.high_impact_count == 0 and plan.intents:
+                    if not plan.intents:
+                        # A read-only run has nothing to approve or replay.
+                        # Persist it as completed for audit, never as pending.
+                        plan.requires_approval = False
+                        plan.status = "executed"
+                        plan.executed_at = datetime.now(timezone.utc).isoformat()
+                        if self.plan_store is not None:
+                            self.plan_store.save(plan)
+                    elif effective_mode == "auto" and plan.high_impact_count == 0:
                         plan.requires_approval = False
                         plan.status = "executing"
                         if self.plan_store is not None:
@@ -531,12 +539,6 @@ class DeepReasoningAgent:
                                 execution_results=execution_results,
                                 executed_at=plan.executed_at,
                             )
-                    elif effective_mode == "auto" and not plan.intents:
-                        plan.requires_approval = False
-                        plan.status = "executed"
-                        plan.executed_at = datetime.now(timezone.utc).isoformat()
-                        if self.plan_store is not None:
-                            self.plan_store.save(plan)
                     elif self.plan_store is not None:
                         self.plan_store.save(plan)
 

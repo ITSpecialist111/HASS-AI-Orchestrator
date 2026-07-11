@@ -1,6 +1,21 @@
 # Changelog
 <br>
 
+## [0.13.4] - 2026-07-11
+### Fixed — Read-only plan lifecycle
+- A second live test confirmed trusted tool semantics and real Home Assistant data, then found
+  plan-only runs with zero mutation intents were still persisted as `pending`.
+- Read-only runs are now persisted as completed (`executed`, with no execution calls) for audit
+  and never appear in Action center as if human approval were required.
+- Rejected the spurious read-only pending plan created during validation; no HA state changed.
+
+### Live verification
+- State probe: 2,696 entities across 44 domains in 171 ms on Home Assistant 2026.7.2.
+- Ollama Rapid run executed `ha_summarise_area` and `ha_search_entities` against real HA state:
+  2/2 tools succeeded, zero failures, no dry-run substitution, and no Pydantic error.
+- The living-room summary returned 38 entities; the `light` search returned 25 matches.
+- Full backend suite: 286 passing tests and 4 opt-in live MCP tests skipped.
+
 ## [0.13.3] - 2026-07-11
 ### Fixed — Trusted plan classification
 - Live post-deployment testing found `ha_summarise_area` was conservatively classified as a
