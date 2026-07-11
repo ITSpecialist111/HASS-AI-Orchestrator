@@ -467,6 +467,7 @@ class DeepReasoningAgent:
                         underlying_call=self.registry.call,
                         underlying_validate=self.registry.validate_call,
                         classifier=self.tool_classifier,
+                        semantics_resolver=self.registry.semantics,
                     )
 
                 result = await self.harness.run(

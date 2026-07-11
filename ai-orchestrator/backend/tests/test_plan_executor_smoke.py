@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import pytest
@@ -28,7 +29,8 @@ class TestToolClassifier:
     @pytest.mark.parametrize("name", [
         "list_entities", "get_state", "search_entities", "history_get",
         "render_template", "find_devices", "describe_area",
-        "hass_list_entities", "hass_get_state",
+        "hass_list_entities", "hass_get_state", "ha_summarise_area",
+        "ha_summarize_area",
     ])
     def test_read_only_tools_are_not_mutating(self, name):
         cls = self.c.classify(name, {})
@@ -86,6 +88,54 @@ async def test_interceptor_passes_read_only_calls_through():
     assert out == {"ok": True, "value": "real-data"}
     assert fired == ["list_entities"]
     assert intercept.intents == []
+
+
+@pytest.mark.asyncio
+async def test_interceptor_uses_trusted_registry_read_semantics():
+    fired: List[str] = []
+
+    async def underlying(name, args):
+        fired.append(name)
+        return {"ok": True, "summary": "ground truth"}
+
+    intercept = DryRunInterceptor(
+        underlying,
+        semantics_resolver=lambda name, args: SimpleNamespace(
+            read_only=True,
+            impact_level="read",
+        ),
+    )
+
+    result = await intercept.call("ha_summarise_area", {"area": "living room"})
+
+    assert result["summary"] == "ground truth"
+    assert fired == ["ha_summarise_area"]
+    assert intercept.intents == []
+
+
+@pytest.mark.asyncio
+async def test_interceptor_uses_trusted_registry_mutation_semantics():
+    fired: List[str] = []
+
+    async def underlying(name, args):
+        fired.append(name)
+        return {"ok": True}
+
+    intercept = DryRunInterceptor(
+        underlying,
+        semantics_resolver=lambda name, args: SimpleNamespace(
+            read_only=False,
+            impact_level="high",
+        ),
+    )
+
+    result = await intercept.call("get_but_actually_mutates", {})
+
+    assert result["dry_run"] is True
+    assert fired == []
+    assert len(intercept.intents) == 1
+    assert intercept.intents[0].impact_level == "high"
+    assert intercept.intents[0].classification_reason == "trusted tool registry semantics"
 
 
 @pytest.mark.asyncio
@@ -367,6 +417,7 @@ def stubbed_agent_factory(monkeypatch, tmp_path):
                 {"type": "function", "function": {"name": "list_entities", "parameters": {}}},
             ],
             executor=lambda name, args: agent._local_executor(name, args),
+            semantics_resolver=agent._local_semantics,
         )
         return agent, plan_store, fired
 

@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 READ_ONLY_PREFIXES: Tuple[str, ...] = (
     "list_", "get_", "search_", "read_", "query_", "find_",
     "describe_", "info_", "history_", "fetch_", "lookup_",
-    "render_template", "summary_",
+    "render_template", "summary_", "summarise_", "summarize_",
 )
 
 #: Substrings that *always* mean a mutating call regardless of prefix.
@@ -212,6 +212,7 @@ class PlanProposal:
 # ---------------------------------------------------------------------------
 ToolCallable = Callable[[str, Dict[str, Any]], Awaitable[Dict[str, Any]]]
 ToolValidator = Callable[..., Awaitable[Optional[Dict[str, Any]]]]
+ToolSemanticsResolver = Callable[[str, Dict[str, Any]], Any]
 
 
 class DryRunInterceptor:
@@ -230,9 +231,11 @@ class DryRunInterceptor:
         *,
         synthetic_payload: Optional[Dict[str, Any]] = None,
         underlying_validate: Optional[ToolValidator] = None,
+        semantics_resolver: Optional[ToolSemanticsResolver] = None,
     ) -> None:
         self._call = underlying_call
         self._validate = underlying_validate
+        self._semantics = semantics_resolver
         self.classifier = classifier or ToolClassifier()
         self._synthetic = synthetic_payload or {
             "ok": True,
@@ -261,6 +264,15 @@ class DryRunInterceptor:
             if validation is not None:
                 return validation
         cls = self.classifier.classify(name, arguments)
+        if self._semantics is not None:
+            semantics = self._semantics(name, arguments)
+            if bool(getattr(semantics, "read_only", False)):
+                return await _call_with_context(self._call, name, arguments, context)
+            cls = Classification(
+                True,
+                str(getattr(semantics, "impact_level", None) or cls.impact_level),
+                "trusted tool registry semantics",
+            )
         if not cls.is_mutating:
             return await _call_with_context(self._call, name, arguments, context)
 
