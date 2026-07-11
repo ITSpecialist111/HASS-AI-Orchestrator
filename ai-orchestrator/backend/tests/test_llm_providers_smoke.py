@@ -53,6 +53,37 @@ def test_make_chat_provider_default_returns_ollama(monkeypatch):
     assert provider.name == "ollama"
 
 
+def test_ollama_gemma_chat_uses_documented_thinking_and_sampling(monkeypatch):
+    captured: dict = {}
+
+    class _FakeClient:
+        def __init__(self, host):
+            captured["host"] = host
+
+        def chat(self, **kwargs):
+            captured["chat"] = kwargs
+            return {"message": {"content": "hello from gemma"}}
+
+    monkeypatch.setattr("ollama.Client", _FakeClient)
+    provider = llm_providers._OllamaChatProvider(host="http://ollama.test:11434")
+    output = provider.chat(
+        "gemma4:e4b",
+        [{"role": "user", "content": "ping"}],
+        temperature=0.2,
+        max_tokens=512,
+    )
+
+    assert output == "hello from gemma"
+    assert captured["chat"]["think"] is False
+    assert "think" not in captured["chat"]["options"]
+    assert captured["chat"]["options"] == {
+        "temperature": 1.0,
+        "num_predict": 512,
+        "top_p": 0.95,
+        "top_k": 64,
+    }
+
+
 def test_make_chat_provider_openai_without_key_falls_back(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)

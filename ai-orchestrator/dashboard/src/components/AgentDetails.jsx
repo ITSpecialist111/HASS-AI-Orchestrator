@@ -93,9 +93,9 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
 
     return (
         <div className="fixed inset-0 z-50 overflow-hidden">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transform transition-transform duration-300">
+            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col transform transition-transform duration-300" role="dialog" aria-modal="true" aria-label={`${agent.name} details`}>
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/50">
@@ -110,7 +110,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                                     className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xl font-bold text-white focus:outline-none focus:border-blue-500 w-full"
                                 />
                             ) : (
-                                <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
+                                <h2 id="agent-details-title" className="text-2xl font-bold text-white">{agent.name}</h2>
                             )}
 
                             <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">{agent.model}</span>
@@ -128,6 +128,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
                         <button
                             onClick={onClose}
                             className="p-2 text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                            aria-label="Close agent details"
                         >
                             <X size={24} />
                         </button>
@@ -136,7 +137,7 @@ const AgentDetails = ({ agent, onClose, onDelete }) => {
 
                 {/* Delete Confirmation Overlay */}
                 {showDeleteConfirm && (
-                    <div className="absolute inset-0 z-10 bg-slate-900/90 flex items-center justify-center p-6 backdrop-blur-sm">
+                    <div className="absolute inset-0 z-10 bg-slate-900/90 flex items-center justify-center p-6">
                         <div className="bg-slate-800 border border-red-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl">
                             <div className="flex flex-col items-center text-center">
                                 <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-4">

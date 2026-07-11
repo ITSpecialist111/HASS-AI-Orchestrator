@@ -1,4 +1,4 @@
-# AI Orchestrator 0.12
+# AI Orchestrator 0.13
 
 A local-first, deterministic AI control plane for Home Assistant.
 
@@ -6,9 +6,10 @@ A local-first, deterministic AI control plane for Home Assistant.
 
 AI Orchestrator observes the real home, reasons with local or cloud models, and turns model requests into validated, reviewable Home Assistant operations. The model proposes; application code enforces schemas, policy, budgets, ordering, approval, and replay.
 
-## What is authoritative in 0.12
+## What is authoritative in 0.13
 
 - **One reasoning kernel** for dashboard goals, chat, prompts, and proactive triggers.
+- **One local model** by default: `gemma4:e4b`, selectable per run as Rapid, Balanced, or Deep.
 - **Observation before action** with native entity, state, domain, service, and area tools.
 - **Plan → Approve → Execute** for mutations. Approved plans replay exact captured arguments without another model call.
 - **Deterministic tool scheduler**: read-only calls may run concurrently; any batch containing a mutation runs in model order.
@@ -19,6 +20,7 @@ AI Orchestrator observes the real home, reasons with local or cloud models, and 
 - **Human review** for high-impact plans and security services.
 - **Durable execution claims and per-step checkpoints** in SQLite, preventing concurrent double execution.
 - **Episodic memory**, built-in prompt workflows, cron/state triggers, external MCP, and Dashboard Studio remain supported.
+- **Human operations UI** organized around Home, Ask & Run, Plans, Automation, Insights, and Studio, with responsive mobile navigation and accessible focus states.
 
 Legacy cadence-based specialist loops and the legacy dashboard generator are disabled by default. They can be enabled for compatibility, but the deterministic kernel is the recommended runtime.
 
@@ -26,7 +28,7 @@ Legacy cadence-based specialist loops and the legacy dashboard generator are dis
 
 | Provider | Suggested model | Notes |
 |---|---|---|
-| `ollama` | A local tool-capable model | Default; home data remains local. |
+| `ollama` | `gemma4:e4b` | Default; explicit thinking and native tool calling while home data remains local. |
 | `openai` | `gpt-5.6-terra` | Uses the Responses API, persisted reasoning, and local encrypted-state replay with `store=false`. Use `gpt-5.6-sol` for maximum capability. |
 | `anthropic` | `claude-opus-4-8` | Uses strict tools, adaptive thinking, interleaved tool reasoning, and explicit effort. |
 | `github` | A model available to the GitHub Models account | OpenAI-compatible tool calling. |
@@ -34,26 +36,42 @@ Legacy cadence-based specialist loops and the legacy dashboard generator are dis
 
 Remote-provider misconfiguration fails the deep reasoner explicitly instead of silently sending a cloud model ID to Ollama. Other add-on services still start and report degraded health.
 
+### Local reasoning profiles
+
+All three profiles use the same Gemma E4B model and recommended sampling. Profiles only change explicit thinking and bounded runtime/output depth:
+
+| Profile | Thinking | Default effective ceilings |
+|---|---|---|
+| `rapid` | Off | 6 iterations, 12 total tools, 60 seconds |
+| `balanced` | On | 12 iterations, 30 total tools, 180 seconds |
+| `deep` | On | 20 iterations, 48 total tools, 420 seconds |
+
+Deployment-level settings remain hard ceilings. No profile can increase permission, bypass approval, reorder mutations, or weaken deterministic tool policy. Ollama's separate `message.thinking` field is intentionally excluded from traces and subsequent history.
+
 ## Recommended first-run configuration
 
 1. Leave `dry_run_mode: true`.
 2. Keep `reasoning_allow_direct_execute: false`.
 3. Choose `llm_provider` and set its model/credential fields.
-4. Keep `reasoning_effort: medium` initially; evaluate before raising it.
-5. Run read-only audits and plan-mode scenarios.
-6. Review plans in the Reasoning dashboard.
-7. Disable global dry-run only after the tool allowlists and entity targets are correct.
+4. Keep `reasoning_default_profile: balanced`; use Rapid for checks and Deep only for genuinely complex goals.
+5. Keep `reasoning_effort: medium` for cloud providers initially; evaluate before raising it.
+6. Run read-only audits and Plan-only scenarios.
+7. Review plans in the dedicated Plans workspace.
+8. Disable global dry-run only after the tool allowlists and entity targets are correct.
 
 Important defaults:
 
 ```yaml
 llm_provider: ollama
+deep_reasoning_model: gemma4:e4b
+reasoning_default_profile: balanced
 dry_run_mode: true
 enable_rag: true
 reasoning_effort: medium
-reasoning_max_tool_calls: 30
-reasoning_max_seconds: 180
-reasoning_llm_timeout: 120
+deep_reasoning_max_iterations: 20
+reasoning_max_tool_calls: 48
+reasoning_max_seconds: 420
+reasoning_llm_timeout: 240
 reasoning_tool_timeout: 30
 reasoning_max_concurrent_runs: 1
 reasoning_allow_direct_execute: false

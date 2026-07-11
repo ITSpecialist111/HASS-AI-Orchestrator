@@ -19,7 +19,7 @@ class ArchitectAgent:
         self, 
         ha_client: Any, 
         rag_manager: Optional[Any] = None,
-        model_name: str = "mistral:7b-instruct"
+        model_name: str = "gemma4:e4b"
     ):
         self._ha_provider = ha_client
         self.rag_manager = rag_manager
@@ -256,7 +256,7 @@ class ArchitectAgent:
         generated = {
             "id": agent_id,
             "name": name,
-            "model": "mistral:7b-instruct",
+            "model": "gemma4:e4b",
             "decision_interval": 120,
             "entities": found_entities,
             "instruction": user_prompt

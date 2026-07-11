@@ -122,11 +122,18 @@ class _OllamaChatProvider(ChatProvider):
         opts: Dict[str, Any] = {
             "temperature": temperature,
             "num_predict": max_tokens,
-            "think": False,
         }
+        if model.strip().lower().startswith("gemma4"):
+            opts.update({"temperature": 1.0, "top_p": 0.95, "top_k": 64})
         if extra_options:
             opts.update(extra_options)
-        resp = self._client.chat(model=model, messages=messages, options=opts, stream=False)
+        resp = self._client.chat(
+            model=model,
+            messages=messages,
+            options=opts,
+            think=False,
+            stream=False,
+        )
         msg = resp["message"] if isinstance(resp, dict) else getattr(resp, "message", {})
         content = msg.get("content") if isinstance(msg, dict) else getattr(msg, "content", "")
         return (content or "").strip()

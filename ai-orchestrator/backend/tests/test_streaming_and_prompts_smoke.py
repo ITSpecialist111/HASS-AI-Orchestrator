@@ -206,7 +206,7 @@ async def test_sse_endpoint_streams_events(agent_factory):
 
     from main import reasoning_stream, ReasoningRequest
 
-    response = await reasoning_stream(ReasoningRequest(goal="ping"))
+    response = await reasoning_stream(ReasoningRequest(goal="ping", profile="deep"))
     body_chunks: List[str] = []
     async for chunk in response.body_iterator:
         body_chunks.append(chunk if isinstance(chunk, str) else chunk.decode())
@@ -222,6 +222,7 @@ async def test_sse_endpoint_streams_events(agent_factory):
     )
     payload = json.loads(final_line[len("data:"):].strip())
     assert payload["data"]["answer"] == "hi"
+    assert payload["data"]["profile"] == "deep"
 
 
 @pytest.mark.asyncio
@@ -235,6 +236,19 @@ async def test_sse_endpoint_rejects_bad_mode():
     with pytest.raises(HTTPException) as exc:
         await reasoning_stream(ReasoningRequest(goal="x", mode="bogus"))
     assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_sse_endpoint_rejects_bad_profile():
+    from fastapi import HTTPException
+    from main import reasoning_stream, ReasoningRequest
+    import main as backend_main
+
+    backend_main.deep_reasoner = object()
+    with pytest.raises(HTTPException) as exc:
+        await reasoning_stream(ReasoningRequest(goal="x", profile="unbounded"))
+    assert exc.value.status_code == 400
+    assert "rapid|balanced|deep" in exc.value.detail
 
 
 @pytest.mark.asyncio

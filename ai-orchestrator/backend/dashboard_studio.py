@@ -270,8 +270,8 @@ class DashboardStudio:
             "anthropic": os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8"),
             "github": os.getenv("GITHUB_MODEL", "gpt-4o-mini"),
             "foundry": os.getenv("FOUNDRY_MODEL", "gpt-4o"),
-            "ollama": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
-        }.get(provider_name, "deepseek-r1:8b")
+            "ollama": os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b"),
+        }.get(provider_name, "gemma4:e4b")
 
     # ------------------------------------------------------------------
     # Home Assistant context

@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Wand2, Plus, Save, X, Lightbulb } from 'lucide-react';
 
-export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = false }) => {
+export const AgentFactory = ({
+    onAgentCreated,
+    onDismiss,
+    initialBlueprint,
+    startOpen = false,
+    launcher = true,
+}) => {
     const [isOpen, setIsOpen] = useState(startOpen);
     const [mode, setMode] = useState('prompt'); // prompt | review | loading
     const [prompt, setPrompt] = useState('');
@@ -83,6 +89,7 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                 setPrompt('');
                 setGeneratedConfig(null);
                 if (onAgentCreated) onAgentCreated();
+                if (onDismiss) onDismiss();
                 alert("Agent Saved! Restart add-on to activate.");
             } else {
                 const d = await res.json();
@@ -95,7 +102,13 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
         }
     };
 
+    const closeFactory = () => {
+        setIsOpen(false);
+        if (onDismiss) onDismiss();
+    };
+
     if (!isOpen) {
+        if (!launcher) return null;
         return (
             <button
                 onClick={() => setIsOpen(true)}
@@ -110,8 +123,8 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
     }
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="cp-modal-backdrop">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]" role="dialog" aria-modal="true" aria-labelledby="agent-factory-title">
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900 rounded-t-xl">
@@ -120,11 +133,11 @@ export const AgentFactory = ({ onAgentCreated, initialBlueprint, startOpen = fal
                             <Bot className="text-purple-400" size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">Agent Factory</h2>
+                            <h2 id="agent-factory-title" className="text-xl font-bold text-white">Agent Factory</h2>
                             <p className="text-sm text-slate-400">The Architect will design your agent.</p>
                         </div>
                     </div>
-                    <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-white">
+                    <button onClick={closeFactory} className="text-slate-500 hover:text-white" aria-label="Close agent factory">
                         <X size={24} />
                     </button>
                 </div>

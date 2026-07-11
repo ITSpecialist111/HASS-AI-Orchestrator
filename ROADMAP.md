@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.12.0 (Deterministic Agent Kernel)
+**Current Version**: v0.13.0 (Gemma Profiles & Human Control)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 
@@ -15,6 +15,14 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 -   [x] **Durable Plans**: Atomic execution claims, exact replay, trusted approval context, and per-step checkpoints.
 -   [x] **Frontier Provider Semantics**: GPT-5.6 Responses and Claude Opus 4.8 adaptive/strict tool support.
 -   [x] **Executable Evaluations**: Model-free safety contracts and a provider-neutral home scenario dataset.
+
+### 0.13 human control layer completed
+
+-   [x] **One Local Gemma Engine**: `gemma4:e4b` is the default local model across the runtime.
+-   [x] **Rapid / Balanced / Deep**: Explicit thinking and bounded run profiles without changing deterministic tool policy.
+-   [x] **Human Operations IA**: Home, Ask & Run, Plans, Automation, Insights, and Studio replace nine fragmented technical tabs.
+-   [x] **Responsive & Accessible UI**: Mobile drawer, 44 px controls, keyboard focus, ARIA semantics, light/dark Clawpilot tokens, and reduced motion.
+-   [x] **Thinking Privacy**: Private model thinking is separated from assistant output, history, traces, persistence, and operator views.
 
 ### Highest-priority path to 1.0
 
@@ -46,13 +54,13 @@ This roadmap outlines the strategic direction for the AI Orchestrator. It focuse
 
 ### 3. Mobile Companion App
 - **Goal**: A native-feeling mobile view for the Dashboard.
-- **Feature**: Responsive design updates for the React dashboard.
-- **Use Case**: Checking agent "thoughts" and approving decisions from your phone while away.
+- **Feature**: Responsive web control is complete in 0.13; native notifications/offline packaging remain future work.
+- **Use Case**: Checking grounded run activity and approving exact plans from your phone while away.
 
 ### 4. Chat Assistant (Completed v0.9.0) ✅
 - **Goal**: Talk to your house via the Dashboard.
 - **Feature**: Floating Action Button with Quick Actions and Chat Interface.
-- **Use Case**: *"Turn off the lights"* -> Orchestrator executes immediately.
+- **Use Case**: *"Turn off the lights"* → the authoritative kernel observes, validates, and executes or pauses according to policy.
 
 ### 5. Energy Optimization Agent
 - **Goal**: High ROI automation.

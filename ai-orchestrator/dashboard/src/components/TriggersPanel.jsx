@@ -1,5 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Zap, Plus, Trash2, Play, Clock, Activity, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    Activity,
+    Clock3,
+    Loader2,
+    Play,
+    Plus,
+    Trash2,
+    X,
+    Zap,
+} from 'lucide-react';
 
 const EMPTY_FORM = {
     name: '',
@@ -14,10 +23,6 @@ const EMPTY_FORM = {
     mode: 'auto',
 };
 
-/**
- * TriggersPanel — list, create, fire and inspect proactive triggers
- * (Phase 8 / Milestone F).
- */
 export function TriggersPanel() {
     const [triggers, setTriggers] = useState([]);
     const [fires, setFires] = useState([]);
@@ -29,31 +34,34 @@ export function TriggersPanel() {
 
     const refresh = useCallback(async () => {
         try {
-            const [tRes, fRes] = await Promise.all([
+            const [triggerResponse, fireResponse] = await Promise.all([
                 fetch('api/triggers'),
                 fetch('api/triggers/fires?limit=50'),
             ]);
-            if (!tRes.ok) throw new Error(`triggers ${tRes.status}`);
-            if (!fRes.ok) throw new Error(`fires ${fRes.status}`);
-            const tData = await tRes.json();
-            const fData = await fRes.json();
-            setTriggers(tData.triggers || tData || []);
-            setFires(fData.fires || fData || []);
-            setLoading(false);
-        } catch (e) {
-            setError(e.message);
+            if (!triggerResponse.ok) throw new Error(`Triggers: ${triggerResponse.status}`);
+            if (!fireResponse.ok) throw new Error(`History: ${fireResponse.status}`);
+            const triggerData = await triggerResponse.json();
+            const fireData = await fireResponse.json();
+            setTriggers(triggerData.triggers || triggerData || []);
+            setFires(fireData.fires || fireData || []);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setLoading(false);
         }
     }, []);
 
     useEffect(() => {
         refresh();
-        const id = setInterval(refresh, 5000);
-        return () => clearInterval(id);
+        const timer = window.setInterval(refresh, 5000);
+        return () => window.clearInterval(timer);
     }, [refresh]);
 
-    const submit = async () => {
+    const submit = async event => {
+        event.preventDefault();
         setBusy('create');
+        setError(null);
         try {
             const payload = { ...form };
             if (payload.type === 'cron') {
@@ -63,212 +71,122 @@ export function TriggersPanel() {
             } else {
                 delete payload.cron;
             }
-            const res = await fetch('api/triggers', {
+            const response = await fetch('api/triggers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            if (!res.ok) {
-                const body = await res.text();
-                throw new Error(`${res.status}: ${body}`);
-            }
+            if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
             setForm(EMPTY_FORM);
             setCreating(false);
             await refresh();
-        } catch (e) {
-            setError(e.message);
+        } catch (err) {
+            setError(err.message);
         } finally {
             setBusy(null);
         }
     };
 
-    const remove = async (id) => {
-        setBusy(`del-${id}`);
+    const invoke = async (id, action) => {
+        setBusy(`${action}-${id}`);
+        setError(null);
         try {
-            await fetch(`api/triggers/${id}`, { method: 'DELETE' });
+            const response = await fetch(`api/triggers/${id}${action === 'fire' ? '/fire' : ''}`, {
+                method: action === 'fire' ? 'POST' : 'DELETE',
+            });
+            if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
             await refresh();
+        } catch (err) {
+            setError(err.message);
         } finally {
             setBusy(null);
         }
     };
 
-    const fire = async (id) => {
-        setBusy(`fire-${id}`);
-        try {
-            await fetch(`api/triggers/${id}/fire`, { method: 'POST' });
-            await refresh();
-        } finally {
-            setBusy(null);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center gap-2 text-slate-500">
-                <Loader2 size={16} className="animate-spin" /> Loading triggers…
-            </div>
-        );
-    }
+    if (loading) return <div className="cp-empty-state"><Loader2 size={20} className="cp-spin" /> Loading proactive routines…</div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                        <Zap size={20} className="text-amber-400" /> Triggers
-                    </h2>
-                    <p className="text-slate-500 text-sm">
-                        Proactive cron and state-change triggers that wake the deep reasoner.
-                    </p>
+        <div className="cp-trigger-stack">
+            <section className="cp-card">
+                <div className="cp-section-heading">
+                    <div><span className="cp-eyebrow"><Zap size={13} /> Proactive goals</span><h2>Configured triggers</h2></div>
+                    <button className="cp-button cp-button--primary" type="button" onClick={() => setCreating(value => !value)}>
+                        {creating ? <X size={15} /> : <Plus size={15} />} {creating ? 'Close form' : 'New trigger'}
+                    </button>
                 </div>
-                <button
-                    onClick={() => setCreating(c => !c)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white"
-                >
-                    <Plus size={12} />
-                    New trigger
-                </button>
-            </div>
+                <p className="cp-section-intro">Triggers wake the reasoning kernel. They do not bypass the selected action policy or approval gates.</p>
+                {error && <div className="cp-alert is-danger" role="alert">{error}</div>}
 
-            {error && (
-                <div className="bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
-                    {error}
-                </div>
-            )}
-
-            {creating && (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Name">
-                            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200" />
-                        </Field>
-                        <Field label="Type">
-                            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200">
-                                <option value="cron">cron</option>
-                                <option value="state">state</option>
+                {creating && (
+                    <form className="cp-trigger-form" onSubmit={submit}>
+                        <Field label="Name"><input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} required /></Field>
+                        <Field label="Trigger type">
+                            <select value={form.type} onChange={event => setForm({ ...form, type: event.target.value })}>
+                                <option value="cron">Schedule</option>
+                                <option value="state">Entity state</option>
                             </select>
                         </Field>
                         {form.type === 'cron' ? (
-                            <Field label="Cron expression">
-                                <input value={form.cron} onChange={e => setForm({ ...form, cron: e.target.value })}
-                                    placeholder="@daily, @nightly, 0 9 * * 1-5"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200 font-mono" />
-                            </Field>
+                            <Field label="Schedule"><input value={form.cron} onChange={event => setForm({ ...form, cron: event.target.value })} placeholder="@daily or 0 9 * * 1-5" required /></Field>
                         ) : (
                             <>
-                                <Field label="Entity ID">
-                                    <input value={form.entity_id} onChange={e => setForm({ ...form, entity_id: e.target.value })}
-                                        placeholder="binary_sensor.front_door"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200 font-mono" />
-                                </Field>
-                                <Field label="State pattern">
-                                    <input value={form.state_pattern} onChange={e => setForm({ ...form, state_pattern: e.target.value })}
-                                        placeholder="on, off, ~^un (regex)"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200 font-mono" />
-                                </Field>
-                                <Field label="Sustained seconds">
-                                    <input type="number" value={form.sustained_seconds}
-                                        onChange={e => setForm({ ...form, sustained_seconds: Number(e.target.value) })}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200" />
-                                </Field>
+                                <Field label="Entity ID"><input value={form.entity_id} onChange={event => setForm({ ...form, entity_id: event.target.value })} placeholder="binary_sensor.front_door" required /></Field>
+                                <Field label="State pattern"><input value={form.state_pattern} onChange={event => setForm({ ...form, state_pattern: event.target.value })} placeholder="on, off, or ~^un" /></Field>
+                                <Field label="Must remain for (seconds)"><input type="number" min="0" value={form.sustained_seconds} onChange={event => setForm({ ...form, sustained_seconds: Number(event.target.value) })} /></Field>
                             </>
                         )}
-                        <Field label="Cooldown seconds">
-                            <input type="number" value={form.cooldown_seconds}
-                                onChange={e => setForm({ ...form, cooldown_seconds: Number(e.target.value) })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200" />
+                        <Field label="Cooldown (seconds)"><input type="number" min="0" value={form.cooldown_seconds} onChange={event => setForm({ ...form, cooldown_seconds: Number(event.target.value) })} /></Field>
+                        <Field label="Action policy">
+                            <select value={form.mode} onChange={event => setForm({ ...form, mode: event.target.value })}>
+                                <option value="auto">Auto-safe</option>
+                                <option value="plan">Plan only</option>
+                            </select>
                         </Field>
-                    </div>
-                    <Field label="Goal template">
-                        <textarea rows={2} value={form.goal_template}
-                            onChange={e => setForm({ ...form, goal_template: e.target.value })}
-                            placeholder="Investigate {entity_id} ({reason})"
-                            className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-sm text-slate-200 font-mono" />
-                    </Field>
-                    <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setCreating(false); setForm(EMPTY_FORM); }}
-                            className="px-3 py-1.5 rounded text-xs text-slate-400 hover:text-slate-200">
-                            Cancel
-                        </button>
-                        <button onClick={submit} disabled={busy === 'create'}
-                            className="px-3 py-1.5 rounded text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white disabled:bg-slate-800 disabled:text-slate-600">
-                            {busy === 'create' ? 'Saving…' : 'Save'}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="space-y-2">
-                {triggers.length === 0 && (
-                    <div className="text-slate-500 text-sm">No triggers configured yet.</div>
+                        <Field label="Goal" wide><textarea rows={3} value={form.goal_template} onChange={event => setForm({ ...form, goal_template: event.target.value })} placeholder="Investigate {entity_id} ({reason}) and prepare the safest response." required /></Field>
+                        <div className="cp-form-actions">
+                            <button className="cp-button cp-button--secondary" type="button" onClick={() => { setCreating(false); setForm(EMPTY_FORM); }}>Cancel</button>
+                            <button className="cp-button cp-button--primary" type="submit" disabled={busy === 'create'}>{busy === 'create' ? <Loader2 size={14} className="cp-spin" /> : <Plus size={14} />} Save trigger</button>
+                        </div>
+                    </form>
                 )}
-                {triggers.map(t => (
-                    <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${t.enabled ? 'bg-green-400' : 'bg-slate-600'}`} />
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm text-slate-200 truncate">{t.name}</span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-400">
-                                    {t.type}
-                                </span>
-                            </div>
-                            <div className="text-xs text-slate-500 font-mono truncate">
-                                {t.type === 'cron' ? t.cron : `${t.entity_id} = ${t.state_pattern || '*'}`}
-                                {t.sustained_seconds ? ` · sustain ${t.sustained_seconds}s` : ''}
-                                {` · cooldown ${t.cooldown_seconds}s`}
-                            </div>
-                        </div>
-                        <button onClick={() => fire(t.id)} disabled={busy === `fire-${t.id}`}
-                            className="p-1.5 rounded text-slate-400 hover:text-amber-400 hover:bg-slate-800"
-                            title="Fire now">
-                            {busy === `fire-${t.id}` ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                        </button>
-                        <button onClick={() => remove(t.id)} disabled={busy === `del-${t.id}`}
-                            className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800"
-                            title="Delete">
-                            <Trash2 size={14} />
-                        </button>
-                    </div>
-                ))}
-            </div>
 
-            <div>
-                <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-2">
-                    <Activity size={14} className="text-blue-400" /> Recent fires
-                </h3>
-                <div className="space-y-1">
-                    {fires.length === 0 && (
-                        <div className="text-slate-500 text-xs">No fires yet.</div>
-                    )}
-                    {fires.map(f => (
-                        <div key={f.id} className="bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs flex items-center gap-3">
-                            <Clock size={12} className="text-slate-500 shrink-0" />
-                            <span className="font-mono text-slate-500 shrink-0">
-                                {new Date(f.timestamp).toLocaleTimeString()}
-                            </span>
-                            <span className="font-mono text-slate-300 truncate">{f.trigger_id}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ml-auto shrink-0
-                                ${f.status === 'executed' ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                : f.status === 'awaiting_approval' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                : f.status === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                : 'bg-slate-800 text-slate-400'}`}>
-                                {f.status}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                {!triggers.length ? (
+                    <div className="cp-empty-state cp-empty-state--compact"><Zap size={22} /><div><strong>No proactive triggers yet</strong><span>Create one for schedules or meaningful state changes.</span></div></div>
+                ) : (
+                    <div className="cp-trigger-list">
+                        {triggers.map(trigger => (
+                            <article className="cp-trigger-row" key={trigger.id}>
+                                <span className={`cp-status-dot ${trigger.enabled ? 'is-success' : ''}`} />
+                                <div><strong>{trigger.name}</strong><small>{trigger.type === 'cron' ? trigger.cron : `${trigger.entity_id} → ${trigger.state_pattern || 'any state'}`} · {trigger.mode || 'auto'} policy</small></div>
+                                <span className="cp-pill">{trigger.type === 'cron' ? 'Schedule' : 'State'}</span>
+                                <button className="cp-icon-button" type="button" onClick={() => invoke(trigger.id, 'fire')} disabled={!!busy} aria-label={`Run ${trigger.name} now`} title="Run now">
+                                    {busy === `fire-${trigger.id}` ? <Loader2 size={15} className="cp-spin" /> : <Play size={15} />}
+                                </button>
+                                <button className="cp-icon-button is-danger" type="button" onClick={() => invoke(trigger.id, 'delete')} disabled={!!busy} aria-label={`Delete ${trigger.name}`} title="Delete trigger"><Trash2 size={15} /></button>
+                            </article>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            <section className="cp-card">
+                <div className="cp-section-heading"><div><span className="cp-eyebrow"><Activity size={13} /> Audit trail</span><h2>Recent trigger runs</h2></div></div>
+                {!fires.length ? <div className="cp-empty-state cp-empty-state--compact">No trigger runs recorded yet.</div> : (
+                    <div className="cp-list">
+                        {fires.map(fire => (
+                            <div className="cp-list-row" key={fire.id}>
+                                <span className="cp-list-icon"><Clock3 size={15} /></span>
+                                <span className="cp-list-main"><strong>{fire.trigger_id}</strong><small>{new Date(fire.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</small></span>
+                                <span className={`cp-pill ${fire.status === 'executed' ? 'is-success' : fire.status === 'error' ? 'is-danger' : fire.status === 'awaiting_approval' ? 'is-warning' : ''}`}>{String(fire.status || 'unknown').replaceAll('_', ' ')}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
         </div>
     );
 }
 
-function Field({ label, children }) {
-    return (
-        <label className="block">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">{label}</span>
-            {children}
-        </label>
-    );
+function Field({ label, wide = false, children }) {
+    return <label className={`cp-field ${wide ? 'is-wide' : ''}`}><span>{label}</span>{children}</label>;
 }

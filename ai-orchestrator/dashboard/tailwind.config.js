@@ -1,3 +1,6 @@
+const shadeKeys = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+const solidScale = value => Object.fromEntries(shadeKeys.map(key => [key, value]))
+
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -5,6 +8,71 @@ export default {
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
+        colors: {
+            transparent: 'transparent',
+            current: 'currentColor',
+            white: 'var(--cp-text)',
+            black: 'var(--cp-bg)',
+            slate: {
+                50: 'var(--cp-text)',
+                100: 'var(--cp-text)',
+                200: 'var(--cp-text)',
+                300: 'var(--cp-text-soft)',
+                400: 'var(--cp-text-soft)',
+                500: 'var(--cp-text-muted)',
+                600: 'var(--cp-border-strong)',
+                700: 'var(--cp-border)',
+                800: 'var(--cp-surface-soft)',
+                900: 'var(--cp-surface)',
+                950: 'var(--cp-bg-elevated)',
+            },
+            gray: {
+                50: 'var(--cp-text)',
+                100: 'var(--cp-text)',
+                200: 'var(--cp-text)',
+                300: 'var(--cp-text-soft)',
+                400: 'var(--cp-text-soft)',
+                500: 'var(--cp-text-muted)',
+                600: 'var(--cp-border-strong)',
+                700: 'var(--cp-border)',
+                800: 'var(--cp-surface-soft)',
+                900: 'var(--cp-surface)',
+                950: 'var(--cp-bg-elevated)',
+            },
+            purple: solidScale('var(--cp-accent)'),
+            blue: solidScale('var(--cp-accent)'),
+            green: solidScale('var(--cp-success)'),
+            emerald: solidScale('var(--cp-success)'),
+            red: solidScale('var(--cp-danger)'),
+            amber: solidScale('var(--cp-warning)'),
+            orange: solidScale('var(--cp-warning)'),
+            yellow: solidScale('var(--cp-warning)'),
+        },
+        fontFamily: {
+            sans: ['Segoe UI', 'Aptos', 'Calibri', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['Consolas', 'Courier New', 'Courier', 'monospace'],
+        },
+        boxShadow: {
+            sm: 'var(--cp-shadow)',
+            DEFAULT: 'var(--cp-shadow)',
+            md: 'var(--cp-shadow)',
+            lg: 'var(--cp-shadow)',
+            xl: 'var(--cp-shadow)',
+            '2xl': 'var(--cp-shadow)',
+            inner: 'none',
+            none: 'none',
+        },
+        backgroundImage: {
+            none: 'none',
+            'gradient-to-t': 'none',
+            'gradient-to-tr': 'none',
+            'gradient-to-r': 'none',
+            'gradient-to-br': 'none',
+            'gradient-to-b': 'none',
+            'gradient-to-bl': 'none',
+            'gradient-to-l': 'none',
+            'gradient-to-tl': 'none',
+        },
         extend: {},
     },
     plugins: [],

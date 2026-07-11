@@ -17,9 +17,11 @@ fi
 export OLLAMA_HOST=$(jq -r '.ollama_host // "http://localhost:11434"' $CONFIG_PATH)
 export DRY_RUN_MODE=$(jq -r '.dry_run_mode // true' $CONFIG_PATH)
 export LOG_LEVEL=$(jq -r '.log_level // "info"' $CONFIG_PATH | tr '[:lower:]' '[:upper:]')
-export ORCHESTRATOR_MODEL=$(jq -r '.orchestrator_model // "deepseek-r1:8b"' $CONFIG_PATH)
-export SMART_MODEL=$(jq -r '.smart_model // "deepseek-r1:8b"' $CONFIG_PATH)
-export FAST_MODEL=$(jq -r '.fast_model // "mistral:7b-instruct"' $CONFIG_PATH)
+export ORCHESTRATOR_MODEL=$(jq -r '.orchestrator_model // "gemma4:e4b"' $CONFIG_PATH)
+export SMART_MODEL=$(jq -r '.smart_model // "gemma4:e4b"' $CONFIG_PATH)
+export FAST_MODEL=$(jq -r '.fast_model // "gemma4:e4b"' $CONFIG_PATH)
+export DEEP_REASONING_MODEL=$(jq -r '.deep_reasoning_model // "gemma4:e4b"' $CONFIG_PATH)
+export REASONING_DEFAULT_PROFILE=$(jq -r '.reasoning_default_profile // "balanced"' $CONFIG_PATH)
 export DECISION_INTERVAL=$(jq -r '.decision_interval // 120' $CONFIG_PATH)
 export ENABLE_GPU=$(jq -r '.enable_gpu // false' $CONFIG_PATH)
 export ENABLE_RAG=$(jq -r '.enable_rag // true' $CONFIG_PATH)
@@ -60,6 +62,8 @@ echo "  Log Level: $LOG_LEVEL"
 echo "  Orchestrator Model: $ORCHESTRATOR_MODEL"
 echo "  Smart Model: $SMART_MODEL"
 echo "  Fast Model: $FAST_MODEL"
+echo "  Deep Reasoning Model: $DEEP_REASONING_MODEL"
+echo "  Default Reasoning Profile: $REASONING_DEFAULT_PROFILE"
 echo "  Decision Interval: ${DECISION_INTERVAL}s"
 echo "  GPU Enabled: $ENABLE_GPU"
 echo "  RAG Enabled: $ENABLE_RAG"
@@ -108,22 +112,27 @@ if { [[ "$OLLAMA_HOST" == *"localhost"* ]] || [[ "$OLLAMA_HOST" == *"127.0.0.1"*
         sleep 1
     done
     
-    # Pull heating model if not present
-    echo "=========================================="
-    echo "Checking for model: $SMART_MODEL"
-    echo "=========================================="
-    
-    if ! ollama list | grep -q "${SMART_MODEL%%:*}"; then
-        echo "Smart Model not found. Pulling $SMART_MODEL..."
-        ollama pull "$SMART_MODEL"
-    fi
-
-    if ! ollama list | grep -q "${FAST_MODEL%%:*}"; then
-        echo "Fast Model not found. Pulling $FAST_MODEL..."
-        ollama pull "$FAST_MODEL"
-        echo "Models pulled successfully!"
+    if [ "$LLM_PROVIDER" = "ollama" ]; then
+        # Pull each distinct configured model exactly once. Exact tag matching
+        # avoids treating another Gemma variant as the requested E4B artifact.
+        declare -A REQUIRED_MODELS=()
+        REQUIRED_MODELS["$SMART_MODEL"]=1
+        REQUIRED_MODELS["$FAST_MODEL"]=1
+        REQUIRED_MODELS["$ORCHESTRATOR_MODEL"]=1
+        REQUIRED_MODELS["$DEEP_REASONING_MODEL"]=1
+        for model in "${!REQUIRED_MODELS[@]}"; do
+            echo "=========================================="
+            echo "Checking for model: $model"
+            echo "=========================================="
+            if ! ollama list | awk 'NR > 1 {print $1}' | grep -Fxq "$model"; then
+                echo "Model not found. Pulling $model..."
+                ollama pull "$model"
+            else
+                echo "$model is available"
+            fi
+        done
     else
-        echo "Required models are available"
+        echo "Cloud LLM provider selected; skipping local generation-model pulls"
     fi
 fi
 

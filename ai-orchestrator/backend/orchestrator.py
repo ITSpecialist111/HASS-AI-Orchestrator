@@ -73,7 +73,7 @@ class Orchestrator:
         mcp_server,
         approval_queue,
         agents: Dict[str, any],
-        model_name: str = "deepseek-r1:8b",
+        model_name: str = "gemma4:e4b",
         planning_interval: int = 120,
         ollama_host: str = "http://localhost:11434",
         gemini_api_key: Optional[str] = None,
@@ -88,7 +88,7 @@ class Orchestrator:
             mcp_server: MCP server for tool execution
             approval_queue: ApprovalQueue instance
             agents: Dict of {agent_id: agent_instance}
-            model_name: Ollama model for planning (default: deepseek-r1:8b)
+            model_name: Ollama model for planning (default: gemma4:e4b)
             planning_interval: Seconds between planning cycles
             ollama_host: Host URL for Ollama API
             gemini_api_key: Optional Google AI API Key

@@ -47,10 +47,12 @@ from reasoning_harness import (
     HarnessResult,
     LLMBackend,
     OllamaToolBackend,
+    REASONING_PROFILES,
     ReasoningHarness,
     ToolExecutionContext,
     ToolRegistry,
     ToolSemantics,
+    resolve_reasoning_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -122,7 +124,7 @@ class DeepReasoningAgent:
         local_mcp: Any,
         external_mcp: Optional[ExternalMCPClient] = None,
         ha_client: Optional[Any] = None,
-        ollama_model: str = "qwen2.5:14b-instruct",
+        ollama_model: str = "gemma4:e4b",
         ollama_host: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
         anthropic_model: str = "claude-opus-4-8",
@@ -153,6 +155,7 @@ class DeepReasoningAgent:
         plan_store: Optional[PlanStore] = None,
         tool_classifier: Optional[ToolClassifier] = None,
         default_mode: str = "auto",
+        default_profile: str = "balanced",
     ) -> None:
         self.agent_id = agent_id
         self.name = name
@@ -178,6 +181,7 @@ class DeepReasoningAgent:
         if default_mode not in ("auto", "plan", "execute"):
             raise ValueError("default_mode must be one of auto|plan|execute")
         self.default_mode = default_mode
+        self.default_profile = resolve_reasoning_profile(default_profile).name
         self.status = "idle"
         self.last_run_at: Optional[datetime] = None
         self.last_result: Optional[HarnessResult] = None
@@ -205,7 +209,11 @@ class DeepReasoningAgent:
             except Exception as exc:
                 raise RuntimeError(f"Anthropic backend unavailable: {exc}") from exc
         elif resolved == PROVIDER_OLLAMA:
-            self.llm = OllamaToolBackend(model=ollama_model, host=ollama_host)
+            self.llm = OllamaToolBackend(
+                model=ollama_model,
+                host=ollama_host,
+                default_profile=self.default_profile,
+            )
             logger.info("DeepReasoningAgent using Ollama backend (%s)", ollama_model)
         else:
             model_for_provider = (
@@ -403,6 +411,7 @@ class DeepReasoningAgent:
         context: Optional[Dict[str, Any]] = None,
         *,
         mode: Optional[str] = None,
+        profile: Optional[str] = None,
         run_id: Optional[str] = None,
         event_callback: Optional[Any] = None,
     ) -> HarnessResult:
@@ -422,6 +431,9 @@ class DeepReasoningAgent:
             raise ValueError(
                 "direct execute mode is disabled; use auto/plan and execute the persisted plan"
             )
+        effective_profile = resolve_reasoning_profile(
+            profile or self.default_profile
+        ).name
 
         run_id = run_id or uuid.uuid4().hex
 
@@ -462,10 +474,12 @@ class DeepReasoningAgent:
                     context=context,
                     run_id=run_id,
                     mode=effective_mode,
+                    profile=effective_profile,
                     system_prompt=effective_prompt,
                     on_event=emit,
                     tool_call_interceptor=interceptor,
                 )
+                setattr(result, "profile", effective_profile)
                 self.last_result = result
                 self._persist(goal, result, run_id=run_id)
                 episode_id = await self._remember_episode(goal, result)
@@ -529,6 +543,7 @@ class DeepReasoningAgent:
                 setattr(result, "episode_id", self._run_to_episode.get(run_id))
                 setattr(result, "recalled", recalled_payload)
                 setattr(result, "mode", effective_mode)
+                setattr(result, "profile", effective_profile)
                 setattr(result, "plan", plan.to_dict() if plan else None)
                 setattr(result, "executed_inline", executed_inline)
                 setattr(result, "execution_results", execution_results)
@@ -545,6 +560,7 @@ class DeepReasoningAgent:
         context: Optional[Dict[str, Any]] = None,
         *,
         mode: Optional[str] = None,
+        profile: Optional[str] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Run a reasoning goal and yield incremental events.
 
@@ -553,7 +569,7 @@ class DeepReasoningAgent:
 
         * ``start`` — once, with ``{"goal", "mode", "run_id"}``
         * ``recall`` — once after memory recall, with ``{"recalled": [...]}``
-        * ``thought`` — per harness iteration, with the LLM thinking
+        * ``thought`` — per harness iteration, with operator-facing model output
         * ``tool_call`` — for each executed tool call
         * ``plan`` — once after the run, with the proposed plan dict
           (``None`` in execute mode)
@@ -562,13 +578,21 @@ class DeepReasoningAgent:
         """
         queue: asyncio.Queue = asyncio.Queue(maxsize=64)
         SENTINEL = object()
+        effective_profile = resolve_reasoning_profile(
+            profile or self.default_profile
+        ).name
 
         async def _push(event: Dict[str, Any]) -> None:
             await queue.put(event)
 
         run_id = uuid.uuid4().hex
-        await _push({"type": "start", "goal": goal,
-                     "mode": (mode or self.default_mode), "run_id": run_id})
+        await _push({
+            "type": "start",
+            "goal": goal,
+            "mode": (mode or self.default_mode),
+            "profile": effective_profile,
+            "run_id": run_id,
+        })
 
         async def _runner() -> None:
             try:
@@ -576,6 +600,7 @@ class DeepReasoningAgent:
                     goal,
                     context,
                     mode=mode,
+                    profile=effective_profile,
                     run_id=run_id,
                     event_callback=_push,
                 )
@@ -586,6 +611,7 @@ class DeepReasoningAgent:
                         "run_id": getattr(result, "run_id", run_id),
                         "episode_id": getattr(result, "episode_id", None),
                         "mode": getattr(result, "mode", "execute"),
+                        "profile": getattr(result, "profile", effective_profile),
                         "answer": result.answer,
                         "iterations": result.iterations,
                         "tool_calls": result.tool_calls,
@@ -809,6 +835,7 @@ class DeepReasoningAgent:
                 "agent_id": self.agent_id,
                 "run_id": run_id,
                 "goal": goal,
+                "profile": getattr(result, "profile", self.default_profile),
                 "answer": result.answer,
                 "iterations": result.iterations,
                 "tool_calls": result.tool_calls,
@@ -839,6 +866,29 @@ class DeepReasoningAgent:
 
     # ------------------------------------------------------------------
     def info(self) -> Dict[str, Any]:
+        profiles: List[Dict[str, Any]] = []
+        for profile in REASONING_PROFILES.values():
+            row = profile.to_dict()
+            row.update({
+                "max_iterations": min(profile.max_iterations, self.harness.max_iterations),
+                "max_tool_calls_per_turn": min(
+                    profile.max_tool_calls_per_turn,
+                    self.harness.max_tool_calls_per_turn,
+                ),
+                "max_total_tool_calls": min(
+                    profile.max_total_tool_calls,
+                    self.harness.max_total_tool_calls,
+                ),
+                "max_run_seconds": min(
+                    profile.max_run_seconds,
+                    self.harness.max_run_seconds,
+                ),
+                "llm_timeout_seconds": min(
+                    profile.llm_timeout_seconds,
+                    self.harness.llm_timeout_seconds,
+                ),
+            })
+            profiles.append(row)
         return {
             "agent_id": self.agent_id,
             "name": self.name,
@@ -855,6 +905,8 @@ class DeepReasoningAgent:
             "recall_k": self.recall_k,
             "plan_store_enabled": self.plan_store is not None,
             "default_mode": self.default_mode,
+            "default_profile": self.default_profile,
+            "profiles": profiles,
             "allow_direct_execute": self.allow_direct_execute,
             "active_runs": self._active_runs,
             "max_iterations": self.harness.max_iterations,

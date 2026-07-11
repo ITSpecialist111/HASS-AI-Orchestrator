@@ -1,7 +1,7 @@
 agents:
   - id: "heating"
     name: "Heating Manager"
-    model: "mistral:7b-instruct"
+    model: "gemma4:e4b"
     decision_interval: 120
     entities: []  # populated from env vars for backward compatibility if needed, or specific list here
     instruction: |
@@ -10,7 +10,7 @@ agents:
       
   - id: "cooling"
     name: "Cooling Manager"
-    model: "mistral:7b-instruct"
+    model: "gemma4:e4b"
     decision_interval: 120
     instruction: |
       Keep temperature below 25C. 
@@ -18,7 +18,7 @@ agents:
       
   - id: "lighting"
     name: "Lighting Manager"
-    model: "phi3.5:3.8b"
+    model: "gemma4:e4b"
     decision_interval: 60
     instruction: |
       Manage lights based on occupancy and time of day.
@@ -26,7 +26,7 @@ agents:
       
   - id: "security"
     name: "Security Manager"
-    model: "mistral:7b-instruct"
+    model: "gemma4:e4b"
     decision_interval: 180
     instruction: |
       Monitor locks and sensors.
@@ -36,7 +36,7 @@ agents:
   # Example of a new custom agent
   # - id: "pool_manager"
   #   name: "Pool Guy"
-  #   model: "mistral:7b-instruct"
+  #   model: "gemma4:e4b"
   #   decision_interval: 3600
   #   entities: 
   #     - switch.pool_pump
@@ -44,11 +44,3 @@ agents:
   #   instruction: |
   #     Run the pool pump for 8 hours/day.
   #     Ensure temp is above 20C before heating.
-
-  - id: "custom_agent"
-    name: "Custom Agent"
-    model: "mistral:7b-instruct"
-    decision_interval: 120
-    entities:
-      - climate.ethan
-    instruction: "I want you to monitor ethans room temp this shouold be 10 degrees all the time"

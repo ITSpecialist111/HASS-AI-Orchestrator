@@ -20,7 +20,7 @@ class LightingAgent(BaseAgent):
         mcp_server,
         ha_client,
         lighting_entities: List[str],
-        model_name: str = "phi3.5:3.8b",
+        model_name: str = "gemma4:e4b",
         decision_interval: int = 60
     ):
         """

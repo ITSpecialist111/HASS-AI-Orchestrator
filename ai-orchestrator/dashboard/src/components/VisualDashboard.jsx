@@ -83,7 +83,7 @@ export const VisualDashboard = () => {
 
                 {/* Overlay Hint */}
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700 text-[10px] text-slate-400 flex items-center gap-2">
+                    <div className="bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-700 text-[10px] text-slate-400 flex items-center gap-2">
                         <Zap size={10} className="text-amber-500" /> Use Chat to customize this view
                     </div>
                 </div>

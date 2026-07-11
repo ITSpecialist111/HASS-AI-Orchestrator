@@ -1,6 +1,56 @@
 # Changelog
 <br>
 
+## [0.13.0] - 2026-07-11
+### Added — Gemma profiles and human control
+- `gemma4:e4b` is now the single local default across the deep reasoner, orchestrator,
+  specialist templates, architect, and Dashboard Studio.
+- Added immutable `rapid`, `balanced`, and `deep` run profiles. Rapid disables model thinking;
+  Balanced and Deep enable Ollama's documented top-level `think` parameter. All use Gemma's
+  recommended `temperature=1.0`, `top_p=0.95`, and `top_k=64` sampling.
+- Added profile-aware output, iteration, tool, wall-clock, and model-call limits. Deployment
+  settings remain hard ceilings.
+- REST, SSE, reusable prompts, run results, diagnostics, and persisted decision records now
+  carry the selected profile.
+- Added focused contracts for Ollama request shape, thinking privacy, profile caps, API
+  validation, and deterministic mutation order.
+
+### Human interface
+- Replaced nine equally weighted technical tabs with Home, Ask & Run, Plans, Automation,
+  Insights, and Studio around the operator's real journey.
+- Added a primary goal composer, system-health summary, pending-review surface, human activity
+  feed, and responsive specialist coverage on Home.
+- Ask & Run now streams live progress, supports Rapid/Balanced/Deep selection, cancellation,
+  Auto-safe/Plan-only policy, curated workflows, outcome metrics, and exact-plan actions.
+- Added a durable Plans workspace with risk summaries, ordered intent disclosure, technical
+  parameters, approve/reject controls, filters, and history.
+- Rebuilt agents, triggers, analytics, activity, settings, and Quick Ask around outcome language
+  rather than raw implementation tabs.
+- Added responsive drawer navigation, mobile layouts, keyboard focus, ARIA roles/labels,
+  reduced-motion support, error surfaces, reconnecting WebSockets, and safe DOM-only fatal errors.
+- Adopted the exact Clawpilot light/dark theme variables, Segoe UI/Aptos typography, rose accent,
+  and variable-mapped legacy Tailwind palette. Removed gradients and glass effects.
+
+### Safety and privacy
+- Profiles tune model depth only; schema validation, read/write scheduling, mutation ordering,
+  retries, deduplication, allowlists, approvals, and checkpointed replay are unchanged.
+- Ollama's separate private thinking field is never copied into assistant content, later history,
+  traces, persisted decisions, or the dashboard.
+- Quick Ask now calls the authoritative reasoning API directly instead of a separate UI path.
+
+### Changed / Breaking
+- Local model defaults change from the previous Qwen/DeepSeek/Mistral mix to `gemma4:e4b`.
+  The Ollama artifact is approximately 9.6 GB; verify storage and runtime memory before upgrade.
+- Default deployment ceilings are now 20 iterations, 48 total tool calls, 420 seconds per run,
+  and 240 seconds per model call so Deep has room while Rapid/Balanced retain lower profile caps.
+- Added `reasoning_default_profile` (`rapid|balanced|deep`, default `balanced`).
+- New installs no longer include the repository's accidental room-specific custom agent.
+  Existing persistent `/config/agents.yaml` files are preserved.
+
+### Verification
+- Backend suite: 272 passing tests, with live external-MCP tests still opt-in.
+- React 19 / Vite 8 production build passes; desktop and 390 px mobile views were validated.
+
 ## [0.12.0] - 2026-07-11
 ### Added — Deterministic 2026 agent kernel
 - One provider-neutral reasoning kernel is now authoritative for chat, goals, prompts, and triggers.

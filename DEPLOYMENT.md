@@ -1,140 +1,106 @@
-# 🚀 AI Orchestrator - Production Deployment Guide (v0.9.8)
+# AI Orchestrator 0.13 deployment guide
 
-## ✅ System Status: COMPLETE
-This deployment package includes the full **Phase 6** feature set:
-- **Universal Agents**: Create agents for *any* integration.
-- **Agent Factory**: No-Code "Wizard" to generate agents via chat.
-- **RAG Brain**: Long-term memory & PDF manual ingestion (Context Awareness).
-- **Space Ops Dashboard**: Real-time analytics, status grid, and knowledge visualization.
-- **Orchestrator**: Multi-agent coordination with conflict resolution.
+This guide covers the Home Assistant add-on release that uses `gemma4:e4b` as its single local reasoning model, exposes Rapid/Balanced/Deep profiles, and keeps all physical actions inside the deterministic tool and plan kernel.
 
----
+## Install from the add-on repository
 
-## 📦 Installation Options
+1. Open **Settings → Add-ons → Add-on Store** in Home Assistant.
+2. Open **Repositories** from the three-dot menu.
+3. Add `https://github.com/ITSpecialist111/HASS-AI-Orchestrator`.
+4. Install **AI Orchestrator**.
+5. Open **Configuration** before the first start.
+6. Keep `dry_run_mode: true` and `reasoning_allow_direct_execute: false`.
+7. Start the add-on and open its ingress UI.
 
-### Option 1: Repository Install (Recommended)
+The first local-model start can take time. The E4B Ollama artifact is approximately 9.6 GB, in addition to Python, frontend, embedding, decision, and dashboard storage.
 
-This is the easiest way to install and get automatic updates.
-
-#### 1. Add Repository
-1. Open Home Assistant.
-2. Go to **Settings > Add-ons > Add-on Store**.
-3. Click **⋮** (three dots) > **Repositories**.
-4. Add URL: `https://github.com/ITSpecialist111/HASS-AI-Orchestrator`
-5. Click **Add**.
-
-#### 2. Install Add-on
-#### 2. Version Check
-Ensure you are installing **v0.9.8** or later.
-#### 2. Models
-1. Ensure your **Ollama** server is running.
-2. Pull the mandatory models:
-   ```bash
-   ollama pull deepseek-r1:8b    # Smart Reasoning / Orchestrator
-   ollama pull mistral:7b-instruct # Fast Execution
-   ollama pull nomic-embed-text  # RAG Embeddings (Mandatory)
-   ```
-   
-#### 3. Installation
-1. Go to **Settings > Add-ons > Add-on Store**.
-
-#### 3. Configuration
-Configure the add-on in the "Configuration" tab:
+## Recommended local configuration
 
 ```yaml
-ollama_host: "http://localhost:11434" # Or external IP
-dry_run_mode: true                    # Keep TRUE for first run!
-log_level: "info"
-ha_access_token: "YOUR_LONG_LIVED_TOKEN_HERE" 
+ollama_host: http://localhost:11434
+llm_provider: ollama
 
-# Model Selection (v0.8.60+)
-orchestrator_model: "deepseek-r1:8b"  # The "Brain" (Planning)
-smart_model: "deepseek-r1:8b"         # Complex Agents (Reasoning)
-fast_model: "mistral:7b-instruct"     # Fast Agents (Execution)
+orchestrator_model: gemma4:e4b
+smart_model: gemma4:e4b
+fast_model: gemma4:e4b
+deep_reasoning_model: gemma4:e4b
+reasoning_default_profile: balanced
+
+dry_run_mode: true
+reasoning_allow_direct_execute: false
+deep_reasoning_max_iterations: 20
+reasoning_max_tool_calls: 48
+reasoning_max_seconds: 420
+reasoning_llm_timeout: 240
+reasoning_tool_timeout: 30
+reasoning_max_concurrent_runs: 1
+
+enable_legacy_autonomous_loops: false
+enable_legacy_dashboard_loop: false
+enable_rag: true
+disable_telemetry: true
 ```
 
-#### 4. Start
-Click **Start**. Monitor the **Log** tab.
+When `ollama_host` points to localhost, the add-on starts Ollama and pulls each distinct configured model exactly once. Exact model tags are checked, so another Gemma variant does not satisfy `gemma4:e4b` accidentally.
 
-### 🛡️ Security Features (New in v0.9.5)
-The AI Orchestrator now enforces strict tool safety:
-1.  **Configurable Allowlists**: Define exactly which domains and services the AI can access.
-2.  **Explicit Blocks**: Hard-block dangerous domains like `automation` and `script`.
-3.  **Physical Limits**: Protect hardware with user-defined temperature bounds and change limits.
-4.  **Human Approval**: Any high-impact service (e.g., locks) will wait for your approval in the dashboard queue.
+For an external Ollama host, pull the model on that server:
 
-### Option 2: Manual Install (Legacy)
-1. Copy the `ai-orchestrator` folder to `/addons/` on your HA host.
-2. Restart Supervisor.
-3. Install via Local Add-ons list.
-
----
-
-## 🎮 Getting Started (Dashboard)
-
-Navigate to: `http://homeassistant.local:8999`
-
-### 1. The Dashboard
-- **Live Ops**: See your agents (Heating, Security, etc.) pulsing when they "think".
-- **Analytics**: View decision history charts.
-- **Knowledge**: Watch the "Brain" icon light up when agents read manuals.
-
-### 2. Creating Your First Agent (No-Code)
-1. Click the **(+) New Agent** button (bottom right).
-2. Valid "Suggested" agents based on your devices will appear.
-3. **Or Chat**: "Make a bot that turns on the porch light at sunset."
-4. The **Architect** will draft a plan.
-5. Click **Approve & Deploy**.
-6. Restart the add-on to activate the new agent.
-
-### 3. Advanced Configuration (YAML)
-For power users, edit `agents.yaml` in the `/addon_configs` (or mapped) directory:
-
-```yaml
-agents:
-  - id: "my_custom_agent"
-    name: "Lab Manager"
-    entities: [sensor.lab_temp, switch.3d_printer]
-    instruction: "Turn off printer if temp > 30C."
+```text
+ollama pull gemma4:e4b
 ```
 
----
+RAG can also pull its embedding model on first use.
 
-## 🧠 Adding Knowledge (RAG)
-To make your agents smarter, drop PDF manuals or Markdown files into:
-`/addon_configs/ai-orchestrator/manuals/` (or `/data/manuals` depending on mapping).
+## Reasoning profiles
 
-The system automatically ingests them on startup. Agents will search these files before making decisions.
+| Profile | Thinking | Default effective ceiling | Recommended use |
+|---|---|---|---|
+| Rapid | Off | 6 iterations / 12 tools / 60 seconds | State checks and simple routines |
+| Balanced | On | 12 iterations / 30 tools / 180 seconds | Normal multi-step home goals |
+| Deep | On | 20 iterations / 48 tools / 420 seconds | Complex diagnosis across systems |
 
----
+The deployment settings are hard ceilings. Profiles do not alter tool schemas, domain policy, mutation order, approval gates, retries, deduplication, or exact-plan replay.
 
-## 🧪 Verification Checklist
+## Home Assistant authentication
 
-### ✅ Startup
-- [ ] Dashboard Loads (Green "Connected" badge).
-- [ ] "Architect Agent initialized" in logs.
+The add-on prefers the Supervisor proxy when `SUPERVISOR_TOKEN` is available. A Home Assistant Long-Lived Access Token can be supplied with `ha_access_token` when direct Core access is required. Never place tokens in prompts, agent instructions, entity names, or logs.
 
-### ✅ RAG
-- [ ] Drop a dummy PDF in `/data/manuals`.
-- [ ] Restart. Log should say "Ingesting...".
+## First-run verification
 
-### ✅ Factory
-- [ ] Create a "Test Agent" via the Dashboard Wizard.
-- [ ] Verify it appears in `agents.yaml`.
+1. Confirm the Home page reports a live Home Assistant connection.
+2. Open **Ask & Run** and verify `ollama / gemma4:e4b` is shown.
+3. Select **Rapid** and run: “Audit the home for unavailable entities. Do not change anything.”
+4. Confirm every entity ID came from a discovery/state tool.
+5. Select **Balanced**, choose **Plan only**, and request a low-risk light change.
+6. Open **Plans** and inspect the exact tool, entity, arguments, and impact classification.
+7. Exercise approve/reject while global dry-run remains on.
+8. Review allowed/blocked domains, high-impact services, and temperature limits before considering live tools.
+9. Test routine lighting before climate, locks, alarms, cameras, or covers.
 
----
+## Upgrading from 0.12
 
-## ⚠️ Safety & Production
-1. **Dry Run**: Keep `dry_run_mode: true` initially. Agents will *log* actions but not execute them.
-2. **Go Live**: Set `dry_run_mode: false` in config when confident.
-3. **Approval Queue**: High-impact actions (unlocking doors) require manual approval via the API/Dashboard (Phase 2 feature).
+- The manifest changes local defaults from Qwen/DeepSeek/Mistral to `gemma4:e4b`.
+- Existing persistent `/config/agents.yaml` is retained; it is never overwritten on upgrade.
+- New installs receive Gemma E4B specialist defaults.
+- The dashboard navigation changes to Home, Ask & Run, Plans, Automation, Insights, and Studio.
+- The API adds optional `profile: rapid|balanced|deep` to run, stream, and workflow requests.
+- Back up `/data/chroma`, plan/trigger databases, and generated dashboards before any major add-on update.
 
----
-**Technical Support**:
-Check `/data/logs/orchestrator.log` for detailed debugging.
+## Safety boundary
 
-### Ingress / Blank Dashboard Issues
-If you see a blank dashboard:
-1.  **Check Logs**: Look for `DEBUG REQUEST`. If you see `/hassio/ingress/...`, the path fix is working.
-2.  **Hard Refresh**: `Ctrl+F5` to clear browser cache of old JS files.
-3.  **MIME Types**: Ensure your HA host isn't blocking `.js` files (rare, but possible).
+- Direct execute mode remains off by default.
+- Auto mode executes only plans that local impact policy does not require a human to approve.
+- High-impact plans pause in the Plans workspace.
+- Approval replays the stored tool calls and arguments; the model is not asked to generate them again.
+- Home Assistant accepting a service call is not yet proof of the physical outcome. Post-action state verification remains a pre-1.0 milestone.
+
+## Troubleshooting
+
+- **Model pull is slow:** check free storage, add-on logs, and network access to the Ollama registry.
+- **External Ollama cannot connect:** use a host address reachable from the add-on container, not the Home Assistant browser's `localhost`.
+- **Dashboard is blank after update:** hard refresh the ingress page and verify the built frontend assets are present in add-on logs.
+- **Home Assistant is disconnected:** verify Supervisor access or the Long-Lived Access Token and direct Core URL.
+- **Plans endpoint is unavailable:** confirm the plan store initialized and `/data` is writable.
+- **A run reaches a budget:** use a narrower goal or deliberately choose a deeper profile; do not raise all ceilings without representative testing.
+
+See [README.md](README.md) for architecture, privacy, provider behavior, evaluation, and the road to 1.0.

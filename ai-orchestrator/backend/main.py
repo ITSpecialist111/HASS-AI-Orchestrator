@@ -106,6 +106,7 @@ from factory_router import router as factory_router
 from ingress_middleware import IngressMiddleware
 from external_mcp import ExternalMCPClient
 from agents.deep_reasoning_agent import DeepReasoningAgent
+from reasoning_harness import REASONING_PROFILES
 from memory_store import MemoryStore
 from native_prompts import NativePromptLibrary
 from plan_executor import PlanStore
@@ -270,7 +271,7 @@ async def lifespan(app: FastAPI):
     # default; current cloud models are selected only when their provider is.
     mcp_server_url_opt = ""
     mcp_server_token_opt = ""
-    deep_reasoning_model_opt = "qwen2.5:14b-instruct"
+    deep_reasoning_model_opt = "gemma4:e4b"
     anthropic_api_key_opt = ""
     anthropic_model_opt = "claude-opus-4-8"
     llm_provider_opt = "ollama"
@@ -284,12 +285,13 @@ async def lifespan(app: FastAPI):
     foundry_bearer_token_opt = ""
     foundry_model_opt = ""
     foundry_agent_id_opt = ""
-    deep_reasoning_max_iter_opt = 12
-    reasoning_max_tool_calls_opt = 30
-    reasoning_max_seconds_opt = 180
-    reasoning_llm_timeout_opt = 120
+    deep_reasoning_max_iter_opt = 20
+    reasoning_max_tool_calls_opt = 48
+    reasoning_max_seconds_opt = 420
+    reasoning_llm_timeout_opt = 240
     reasoning_tool_timeout_opt = 30
     reasoning_effort_opt = "medium"
+    reasoning_default_profile_opt = "balanced"
     reasoning_max_concurrent_opt = 1
     reasoning_allow_direct_execute_opt = False
     enable_legacy_autonomous_opt = False
@@ -313,15 +315,18 @@ async def lifespan(app: FastAPI):
                 # Deep reasoning / external MCP options (Phase 7)
                 mcp_server_url_opt = opts.get("mcp_server_url", "").strip()
                 mcp_server_token_opt = opts.get("mcp_server_token", "").strip()
-                deep_reasoning_model_opt = opts.get("deep_reasoning_model", "qwen2.5:14b-instruct")
+                deep_reasoning_model_opt = opts.get("deep_reasoning_model", "gemma4:e4b")
                 anthropic_api_key_opt = opts.get("anthropic_api_key", "").strip()
                 anthropic_model_opt = opts.get("anthropic_model", "claude-opus-4-8").strip()
-                deep_reasoning_max_iter_opt = int(opts.get("deep_reasoning_max_iterations", 12) or 12)
-                reasoning_max_tool_calls_opt = int(opts.get("reasoning_max_tool_calls", 30) or 30)
-                reasoning_max_seconds_opt = int(opts.get("reasoning_max_seconds", 180) or 180)
-                reasoning_llm_timeout_opt = int(opts.get("reasoning_llm_timeout", 120) or 120)
+                deep_reasoning_max_iter_opt = int(opts.get("deep_reasoning_max_iterations", 20) or 20)
+                reasoning_max_tool_calls_opt = int(opts.get("reasoning_max_tool_calls", 48) or 48)
+                reasoning_max_seconds_opt = int(opts.get("reasoning_max_seconds", 420) or 420)
+                reasoning_llm_timeout_opt = int(opts.get("reasoning_llm_timeout", 240) or 240)
                 reasoning_tool_timeout_opt = int(opts.get("reasoning_tool_timeout", 30) or 30)
                 reasoning_effort_opt = opts.get("reasoning_effort", "medium").strip()
+                reasoning_default_profile_opt = opts.get(
+                    "reasoning_default_profile", "balanced"
+                ).strip()
                 reasoning_max_concurrent_opt = int(opts.get("reasoning_max_concurrent_runs", 1) or 1)
                 reasoning_allow_direct_execute_opt = bool(opts.get("reasoning_allow_direct_execute", False))
                 enable_legacy_autonomous_opt = bool(opts.get("enable_legacy_autonomous_loops", False))
@@ -373,13 +378,14 @@ async def lifespan(app: FastAPI):
         foundry_agent_id_opt = os.getenv("FOUNDRY_AGENT_ID", "")
         mcp_server_url_opt = os.getenv("MCP_SERVER_URL", "")
         mcp_server_token_opt = os.getenv("MCP_SERVER_TOKEN", "")
-        deep_reasoning_model_opt = os.getenv("DEEP_REASONING_MODEL", "qwen2.5:14b-instruct")
-        deep_reasoning_max_iter_opt = int(os.getenv("DEEP_REASONING_MAX_ITERATIONS", "12"))
-        reasoning_max_tool_calls_opt = int(os.getenv("REASONING_MAX_TOOL_CALLS", "30"))
-        reasoning_max_seconds_opt = int(os.getenv("REASONING_MAX_SECONDS", "180"))
-        reasoning_llm_timeout_opt = int(os.getenv("REASONING_LLM_TIMEOUT", "120"))
+        deep_reasoning_model_opt = os.getenv("DEEP_REASONING_MODEL", "gemma4:e4b")
+        deep_reasoning_max_iter_opt = int(os.getenv("DEEP_REASONING_MAX_ITERATIONS", "20"))
+        reasoning_max_tool_calls_opt = int(os.getenv("REASONING_MAX_TOOL_CALLS", "48"))
+        reasoning_max_seconds_opt = int(os.getenv("REASONING_MAX_SECONDS", "420"))
+        reasoning_llm_timeout_opt = int(os.getenv("REASONING_LLM_TIMEOUT", "240"))
         reasoning_tool_timeout_opt = int(os.getenv("REASONING_TOOL_TIMEOUT", "30"))
         reasoning_effort_opt = os.getenv("REASONING_EFFORT", "medium")
+        reasoning_default_profile_opt = os.getenv("REASONING_DEFAULT_PROFILE", "balanced")
         reasoning_max_concurrent_opt = int(os.getenv("REASONING_MAX_CONCURRENT_RUNS", "1"))
         reasoning_allow_direct_execute_opt = os.getenv("REASONING_ALLOW_DIRECT_EXECUTE", "false").lower() == "true"
         enable_legacy_autonomous_opt = os.getenv("ENABLE_LEGACY_AUTONOMOUS_LOOPS", "false").lower() == "true"
@@ -492,6 +498,8 @@ async def lifespan(app: FastAPI):
         "ANTHROPIC_API_KEY": locals().get("anthropic_api_key_opt", ""),
         "ANTHROPIC_MODEL": locals().get("anthropic_model_opt", ""),
         "REASONING_EFFORT": locals().get("reasoning_effort_opt", ""),
+        "DEEP_REASONING_MODEL": locals().get("deep_reasoning_model_opt", ""),
+        "REASONING_DEFAULT_PROFILE": locals().get("reasoning_default_profile_opt", ""),
         "GITHUB_TOKEN": locals().get("github_token_opt", ""),
         "GITHUB_MODEL": locals().get("github_model_opt", ""),
         "FOUNDRY_ENDPOINT": locals().get("foundry_endpoint_opt", ""),
@@ -554,7 +562,7 @@ async def lifespan(app: FastAPI):
                     ha_client=lambda: ha_client,
                     entities=entities,
                     rag_manager=rag_manager,
-                    model_name=agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "mistral:7b-instruct")),
+                    model_name=agent_cfg.get('model', os.getenv("DEFAULT_MODEL", "gemma4:e4b")),
                     decision_interval=agent_cfg.get('decision_interval', 120),
                     broadcast_func=broadcast_to_dashboard,
                     knowledge=agent_cfg.get('knowledge', "")
@@ -574,14 +582,14 @@ async def lifespan(app: FastAPI):
     print(f"✓ Initialized {len(agents)} agents: {', '.join(agents.keys())}")
     
     # 6. Initialize Orchestrator
-    # Use the configured model (default: mistral:7b-instruct) for the orchestrator too,
+    # Use the configured Gemma model for the orchestrator too,
     # since the user might only have one model available on the remote Ollama.
     orchestrator = Orchestrator(
         ha_client=lambda: ha_client,
         mcp_server=mcp_server,
         approval_queue=approval_queue,
         agents=agents,
-        model_name=os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
+        model_name=os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b"),
         planning_interval=int(os.getenv("DECISION_INTERVAL", "120")),
         ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         gemini_api_key=gemini_api_key_opt or os.getenv("GEMINI_API_KEY"),
@@ -612,7 +620,7 @@ async def lifespan(app: FastAPI):
     # 9. Initialize External MCP client + Deep Reasoning Agent (Phase 7)
     mcp_url = locals().get("mcp_server_url_opt", "") or os.getenv("MCP_SERVER_URL", "")
     mcp_token = locals().get("mcp_server_token_opt", "") or os.getenv("MCP_SERVER_TOKEN", "")
-    deep_model = locals().get("deep_reasoning_model_opt", "") or os.getenv("DEEP_REASONING_MODEL", "qwen2.5:14b-instruct")
+    deep_model = locals().get("deep_reasoning_model_opt", "") or os.getenv("DEEP_REASONING_MODEL", "gemma4:e4b")
     anthropic_key = locals().get("anthropic_api_key_opt", "") or os.getenv("ANTHROPIC_API_KEY", "")
     anthropic_model = locals().get("anthropic_model_opt", "") or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
     max_iter = int(locals().get("deep_reasoning_max_iter_opt", 12) or 12)
@@ -680,10 +688,11 @@ async def lifespan(app: FastAPI):
             memory_store=memory_store,
             plan_store=plan_store,
             default_mode=os.getenv("REASONING_DEFAULT_MODE", "auto"),
+            default_profile=reasoning_default_profile_opt,
         )
         app.state.deep_reasoner = deep_reasoner
         orchestrator.deep_reasoner = deep_reasoner
-        print(f"✓ Deep Reasoning Agent initialized (backend={deep_reasoner.llm.name}, tools={len(deep_reasoner.registry.names())}, memory={'on' if memory_store and memory_store.enabled else 'off'}, plans={'on' if plan_store else 'off'}, mode={deep_reasoner.default_mode})")
+        print(f"✓ Deep Reasoning Agent initialized (backend={deep_reasoner.llm.name}, model={deep_model}, profile={deep_reasoner.default_profile}, tools={len(deep_reasoner.registry.names())}, memory={'on' if memory_store and memory_store.enabled else 'off'}, plans={'on' if plan_store else 'off'}, mode={deep_reasoner.default_mode})")
     except Exception as e:
         print(f"⚠️ Failed to initialize Deep Reasoning Agent: {e}")
 
@@ -834,6 +843,7 @@ class ReasoningRequest(BaseModel):
     goal: str
     context: Optional[Dict] = None
     mode: Optional[str] = None  # "auto" | "plan" | "execute"
+    profile: Optional[str] = None  # "rapid" | "balanced" | "deep"
 
 
 def validate_reasoning_mode(mode: Optional[str]) -> None:
@@ -843,6 +853,14 @@ def validate_reasoning_mode(mode: Optional[str]) -> None:
         raise HTTPException(
             status_code=403,
             detail="direct execute mode is disabled; use auto/plan and approve the persisted plan",
+        )
+
+
+def validate_reasoning_profile(profile: Optional[str]) -> None:
+    if profile is not None and profile.strip().lower() not in REASONING_PROFILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"profile must be one of {'|'.join(REASONING_PROFILES)}",
         )
 
 
@@ -866,11 +884,18 @@ async def reasoning_run(req: ReasoningRequest):
     if not req.goal or not req.goal.strip():
         raise HTTPException(status_code=400, detail="goal must not be empty")
     validate_reasoning_mode(req.mode)
-    result = await deep_reasoner.run(req.goal, req.context, mode=req.mode)
+    validate_reasoning_profile(req.profile)
+    result = await deep_reasoner.run(
+        req.goal,
+        req.context,
+        mode=req.mode,
+        profile=req.profile,
+    )
     return {
         "run_id": getattr(result, "run_id", None),
         "episode_id": getattr(result, "episode_id", None),
         "mode": getattr(result, "mode", "execute"),
+        "profile": getattr(result, "profile", deep_reasoner.default_profile),
         "plan": getattr(result, "plan", None),
         "executed_inline": getattr(result, "executed_inline", False),
         "execution_results": getattr(result, "execution_results", None),
@@ -913,10 +938,16 @@ async def reasoning_stream(req: ReasoningRequest):
     if not req.goal or not req.goal.strip():
         raise HTTPException(status_code=400, detail="goal must not be empty")
     validate_reasoning_mode(req.mode)
+    validate_reasoning_profile(req.profile)
 
     async def _gen():
         try:
-            async for event in deep_reasoner.run_streaming(req.goal, req.context, mode=req.mode):
+            async for event in deep_reasoner.run_streaming(
+                req.goal,
+                req.context,
+                mode=req.mode,
+                profile=req.profile,
+            ):
                 payload = json.dumps(event, default=str)
                 yield f"event: {event.get('type', 'message')}\ndata: {payload}\n\n"
         except Exception as exc:
@@ -983,6 +1014,7 @@ async def reasoning_prompts():
 class PromptRunRequest(BaseModel):
     arguments: Optional[Dict[str, Any]] = None
     mode: Optional[str] = None
+    profile: Optional[str] = None
     extra_context: Optional[Dict[str, Any]] = None
     stream: bool = False
 
@@ -1041,6 +1073,7 @@ async def reasoning_prompt_run(name: str, req: PromptRunRequest):
     if not deep_reasoner:
         raise HTTPException(status_code=503, detail="Deep reasoning agent not ready")
     validate_reasoning_mode(req.mode)
+    validate_reasoning_profile(req.profile)
     rendered = await _render_any_prompt(name, req.arguments or {})
     if not rendered.get("ok"):
         err = rendered.get("error", "render_failed")
@@ -1061,7 +1094,12 @@ async def reasoning_prompt_run(name: str, req: PromptRunRequest):
     if req.stream:
         async def _gen():
             try:
-                async for event in deep_reasoner.run_streaming(goal, context, mode=req.mode):
+                async for event in deep_reasoner.run_streaming(
+                    goal,
+                    context,
+                    mode=req.mode,
+                    profile=req.profile,
+                ):
                     payload = json.dumps(event, default=str)
                     yield f"event: {event.get('type', 'message')}\ndata: {payload}\n\n"
             except Exception as exc:
@@ -1075,11 +1113,17 @@ async def reasoning_prompt_run(name: str, req: PromptRunRequest):
             headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
         )
 
-    result = await deep_reasoner.run(goal, context, mode=req.mode)
+    result = await deep_reasoner.run(
+        goal,
+        context,
+        mode=req.mode,
+        profile=req.profile,
+    )
     return {
         "run_id": getattr(result, "run_id", None),
         "prompt": name,
         "mode": getattr(result, "mode", "execute"),
+        "profile": getattr(result, "profile", deep_reasoner.default_profile),
         "answer": result.answer,
         "iterations": result.iterations,
         "tool_calls": result.tool_calls,
@@ -1656,9 +1700,18 @@ async def get_config():
     return {
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         "dry_run_mode": mcp_server.dry_run if mcp_server else True,
-        "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "deepseek-r1:8b"),
-        "smart_model": os.getenv("SMART_MODEL", "deepseek-r1:8b"),
-        "fast_model": os.getenv("FAST_MODEL", "mistral:7b-instruct"),
+        "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b"),
+        "smart_model": os.getenv("SMART_MODEL", "gemma4:e4b"),
+        "fast_model": os.getenv("FAST_MODEL", "gemma4:e4b"),
+        "deep_reasoning_model": (
+            getattr(deep_reasoner.llm, "model", None)
+            or getattr(deep_reasoner.llm, "_model", None)
+            or os.getenv("DEEP_REASONING_MODEL", "gemma4:e4b")
+            if deep_reasoner else os.getenv("DEEP_REASONING_MODEL", "gemma4:e4b")
+        ),
+        "reasoning_default_profile": (
+            deep_reasoner.default_profile if deep_reasoner else "balanced"
+        ),
         "version": VERSION,
         "gemini_active": orchestrator._genai_client is not None if orchestrator else False,
         "use_gemini_for_dashboard": orchestrator.use_gemini_for_dashboard if orchestrator else False,

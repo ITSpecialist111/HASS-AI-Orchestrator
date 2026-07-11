@@ -1,9 +1,9 @@
 # Graham's AI Orchestrator
 
-[![Version](https://img.shields.io/badge/version-v0.12.0-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.12.0)
+[![Version](https://img.shields.io/badge/version-v0.13.0-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5)
 ![Agent Kernel](https://img.shields.io/badge/agent%20kernel-deterministic-8B5CF6)
-![Tests](https://img.shields.io/badge/backend%20tests-266%20passing-22C55E)
+![Tests](https://img.shields.io/badge/backend%20tests-272%20passing-22C55E)
 
 ## A reasoning and policy layer for the intelligent home
 
@@ -29,10 +29,10 @@ The long-term goal is not another voice-controlled remote and not a chatbot bolt
 
 ### At a glance
 
-- **Today:** investigate live HA state, create exact plans, approve and replay actions, run proactive goals, recall prior episodes, use local/cloud models, and monitor everything from the dashboard.
+- **Today:** run local `gemma4:e4b` in Rapid, Balanced, or Deep mode; investigate live HA state; create exact plans; approve and replay actions; run proactive goals; recall prior episodes; and operate everything from a human-centred dashboard.
 - **Safety posture:** dry-run by default, direct execution disabled, sensitive services gated, generated dashboards sandboxed, and mutation replay checkpointed.
 - **Next:** native Assist/voice integration, post-action state verification, filtered real-time events, and a temporal model of the home.
-- **Latest test release:** [v0.12.0 — Deterministic Agent Kernel](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.12.0).
+- **Latest test release:** [v0.13.0 — Gemma Profiles & Human Control](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0).
 
 ### Contents
 
@@ -151,22 +151,19 @@ Optional RAG and episodic memory use ChromaDB plus local Ollama embeddings to st
 
 Similar past episodes can be recalled before a new run. Feedback changes their future weighting; it does not silently rewrite execution policy.
 
-### Build and monitor from the dashboard
+### Operate from a human-centred dashboard
 
 The React dashboard includes:
 
 | Surface | Purpose |
 |---|---|
-| **Live Ops** | Agent status, assigned entities, and smart suggestions |
-| **Decision Stream** | Real-time visibility into decisions and tool activity |
-| **Deep Reasoning** | Run goals in safe Auto or Plan-only mode and inspect the trace |
-| **Plan Review** | Review risk, approve exact plans, reject plans, and inspect results |
-| **Prompt Library** | Run reusable workflows such as home audit, security check, and energy optimization |
-| **Triggers** | Configure cron/state reasoning triggers and inspect fire history |
-| **Agent Factory** | Create specialist agent profiles from natural-language instructions |
-| **Dashboard Studio** | Generate, iterate, compare, pin, and live-update visual dashboards |
-| **Analytics** | Review activity and agent performance summaries |
-| **Chat Assistant** | Send natural-language goals through the authoritative reasoning kernel |
+| **Home** | Connection health, specialist coverage, pending reviews, recent outcomes, and a primary goal composer |
+| **Ask & Run** | Select Rapid, Balanced, or Deep; stream grounded progress; cancel safely; and inspect outcomes |
+| **Plans** | Review risk and exact captured arguments, then approve or reject deterministic replay |
+| **Automation** | Manage specialist agents, create blueprints, and configure cron/state triggers |
+| **Insights** | Read a responsive activity feed, disclose technical payloads on demand, and review performance |
+| **Studio** | Generate, iterate, compare, pin, and live-update visual dashboards |
+| **Quick Ask** | Run compact Rapid/Balanced goals through the same authoritative kernel from any page |
 
 Generated Dashboard Studio HTML runs in an opaque sandbox under a restrictive Content Security Policy. Trusted React code obtains Home Assistant state and passes snapshots into the frame; generated code cannot call same-origin APIs.
 
@@ -180,7 +177,7 @@ Consider this request:
 
 The runtime flow is:
 
-1. **Receive the goal** from chat, the Reasoning panel, a reusable prompt, or a trigger.
+1. **Receive the goal and profile** from Quick Ask, Ask & Run, a reusable prompt, or a trigger.
 2. **Recall relevant experience** if episodic memory is enabled.
 3. **Expose a curated tool surface** to the selected model.
 4. **Observe ground truth** by discovering downstairs entities and reading current state.
@@ -202,7 +199,7 @@ sequenceDiagram
     participant P as Plan Store
     participant H as Home Assistant
 
-    U->>K: Goal + mode + context
+    U->>K: Goal + profile + mode + context
     K->>M: Instructions + curated tools
     M-->>K: Observation tool calls
     K->>T: Validate schema and policy
@@ -357,7 +354,7 @@ The generic native `ha_call_service` path is deliberately not exposed to the rea
 
 ### Important limitation
 
-Version 0.12 records whether Home Assistant accepted a service call, but it does not yet re-observe every affected entity to prove the physical outcome. **Post-action outcome verification is the next major reliability milestone.**
+Version 0.13 records whether Home Assistant accepted a service call, but it does not yet re-observe every affected entity to prove the physical outcome. **Post-action outcome verification is the next major reliability milestone.**
 
 ---
 
@@ -367,7 +364,7 @@ AI Orchestrator is provider-neutral at the kernel boundary.
 
 | Provider | Suggested starting point | Integration behavior |
 |---|---|---|
-| `ollama` | A local model with reliable native tool calling | Default and most private option; also supplies local embeddings when RAG is enabled |
+| `ollama` | `gemma4:e4b` | Default and most private option; explicit thinking, native tools, and local embeddings when RAG is enabled |
 | `openai` | `gpt-5.6-terra` | Uses the Responses API, explicit reasoning effort, and local replay of encrypted reasoning items with provider storage disabled by default |
 | `anthropic` | `claude-opus-4-8` | Uses strict tools, adaptive thinking, interleaved reasoning between tools, and signed content-block continuity |
 | `github` | A tool-capable model available to the account | Uses GitHub Models' OpenAI-compatible interface |
@@ -375,12 +372,25 @@ AI Orchestrator is provider-neutral at the kernel boundary.
 
 Remote deep-reasoner misconfiguration fails explicitly instead of silently changing provider or sending a cloud model name to Ollama.
 
-### Choosing a profile
+### One local Gemma, three reasoning profiles
 
-- Start with **Ollama** when privacy and local operation are the priority.
-- Start with **GPT-5.6 Terra** for a cloud balance of capability and cost.
-- Use **GPT-5.6 Sol** or **Claude Opus 4.8** for the most demanding investigations after evaluating representative home scenarios.
-- Keep `reasoning_effort: medium` initially. Higher effort is not automatically safer or better.
+The local default is Ollama's `gemma4:e4b`: the official E4B variant in Gemma 4's roughly 8B-total parameter class. The Ollama artifact is approximately 9.6 GB and advertises a 128K context window. Runtime memory also depends on context and hardware, so field-test it on the target Home Assistant host before disabling dry-run.
+
+Every profile keeps Gemma's recommended sampling (`temperature=1.0`, `top_p=0.95`, `top_k=64`) and the same deterministic tool kernel:
+
+| Profile | Model thinking | Effective default ceiling | Use it for |
+|---|---:|---:|---|
+| **Rapid** | Off | 6 iterations, 12 tools, 60 seconds | Status checks, direct questions, simple routines |
+| **Balanced** | On | 12 iterations, 30 tools, 180 seconds | Everyday planning and multi-step home goals |
+| **Deep** | On | 20 iterations, 48 tools, 420 seconds | Complex diagnosis and multi-system investigations |
+
+Ollama returns thinking separately from assistant content. Private scratch reasoning is deliberately excluded from normal history, persisted traces, and the human UI. Operators see observations, guarded tool calls, exact plans, and outcomes instead.
+
+Profiles change model/runtime depth only. They **never** relax schema validation, mutation ordering, retries, deduplication, allowlists, approval requirements, or checkpointed replay.
+
+Official references: [Gemma 4 model card](https://ai.google.dev/gemma/docs/core/model_card_4), [Gemma function calling](https://ai.google.dev/gemma/docs/capabilities/function-calling), [Ollama Gemma 4 library](https://ollama.com/library/gemma4), [Ollama thinking](https://docs.ollama.com/capabilities/thinking), and [Ollama tool calling](https://docs.ollama.com/capabilities/tool-calling).
+
+Cloud providers remain available. Start with GPT-5.6 Terra for a cloud balance of capability and cost, or evaluate GPT-5.6 Sol / Claude Opus 4.8 on representative home scenarios. Higher effort is not automatically safer or better.
 
 ---
 
@@ -421,9 +431,11 @@ dry_run_mode: true
 enable_rag: true
 
 reasoning_effort: medium
-reasoning_max_tool_calls: 30
-reasoning_max_seconds: 180
-reasoning_llm_timeout: 120
+deep_reasoning_model: gemma4:e4b
+reasoning_default_profile: balanced
+reasoning_max_tool_calls: 48
+reasoning_max_seconds: 420
+reasoning_llm_timeout: 240
 reasoning_tool_timeout: 30
 reasoning_max_concurrent_runs: 1
 
@@ -434,13 +446,13 @@ enable_legacy_dashboard_loop: false
 
 ### Recommended first test
 
-1. Confirm the health endpoint and dashboard report the selected provider and model.
-2. Run a read-only goal:
+1. Confirm Home shows a live connection and Ask & Run reports `ollama / gemma4:e4b`.
+2. Select **Rapid** and run a read-only goal:
 
    > Audit the home for unavailable entities. Do not change anything.
 
 3. Inspect the reasoning trace and verify discovered entity IDs are real.
-4. Run a plan-only goal:
+4. Select **Balanced**, choose **Plan only**, and run:
 
    > Plan how to turn on the kitchen lights at 30% brightness. Do not execute it.
 
@@ -558,7 +570,7 @@ The scorer uses deterministic assertions for mutations, approvals, tool budgets,
 
 ### Verified release baseline
 
-- **266 backend tests passing**;
+- **272 backend tests passing**;
 - **4 opt-in live external-MCP tests skipped** when no live server is configured;
 - frontend clean install and production build passing;
 - frontend dependency audit reporting **0 vulnerabilities**;
@@ -634,7 +646,7 @@ ai-orchestrator/
 
 ## Current status and road to 1.0
 
-Version 0.12 is a major runtime foundation, not the finished vision. The project remains pre-1.0 while it gains live-home evidence and first-class Home Assistant surfaces.
+Version 0.13 adds one coherent local reasoning engine and a human control layer on top of the 0.12 deterministic foundation. The project remains pre-1.0 while it gains live-home evidence and first-class Home Assistant surfaces.
 
 ### Highest-priority next steps
 
@@ -655,7 +667,7 @@ See [ROADMAP.md](ROADMAP.md) for the wider product direction.
 - Active model conversations are not yet resumed across a process restart; persisted plans are durable.
 - An interrupted `executing` plan is intentionally not replayed automatically because a command may already have reached a physical device.
 - Service-call success is not yet the same as verified device outcome.
-- Native Home Assistant Assist/voice integration is planned but not included in 0.12.
+- Native Home Assistant Assist/voice integration is planned but not included in 0.13.
 - Real model quality depends on the chosen model, available context, entity naming, and the deployment's tool policy.
 - Generated dashboards are isolated, but their visual quality still depends on the selected model.
 - Legacy agent profiles remain in the product, while their periodic autonomous loops are disabled by default.
@@ -665,10 +677,11 @@ See [ROADMAP.md](ROADMAP.md) for the wider product direction.
 ## Documentation
 
 - [Add-on configuration and operator guide](ai-orchestrator/README.md)
+- [Gemma E4B profile and human UI design record](GEMMA_UI_0_13.md)
 - [2026 architecture review, research, and breaking changes](MODERNIZATION_2026.md)
 - [Product roadmap](ROADMAP.md)
 - [Testing guide](TESTING.md)
 - [Changelog](CHANGELOG.md)
-- [v0.12.0 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.12.0)
+- [v0.13.0 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0)
 
 Issues, field-test results, model comparisons, and Home Assistant deployment feedback are welcome in the [GitHub issue tracker](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/issues).

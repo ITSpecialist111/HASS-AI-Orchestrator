@@ -20,7 +20,7 @@ class SecurityAgent(BaseAgent):
         mcp_server,
         ha_client,
         security_entities: List[str],
-        model_name: str = "mistral:7b-instruct",
+        model_name: str = "gemma4:e4b",
         decision_interval: int = 180
     ):
         """

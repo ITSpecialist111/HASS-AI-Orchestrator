@@ -29,7 +29,7 @@ class BaseAgent(ABC):
         ha_client, #: Union[HAWebSocketClient, Callable[[], HAWebSocketClient]]
         skills_path: str,
         rag_manager: Optional[Any] = None,
-        model_name: str = "mistral:7b-instruct",
+        model_name: str = "gemma4:e4b",
         decision_interval: int = 120,
         broadcast_func: Optional[Any] = None
     ):

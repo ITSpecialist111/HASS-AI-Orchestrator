@@ -23,7 +23,7 @@ class UniversalAgent(BaseAgent):
         ha_client: HAWebSocketClient,
         entities: List[str],
         rag_manager: Optional[Any] = None,
-        model_name: str = "mistral:7b-instruct",
+        model_name: str = "gemma4:e4b",
         decision_interval: int = 120,
         broadcast_func: Optional[Any] = None,
         knowledge: str = ""

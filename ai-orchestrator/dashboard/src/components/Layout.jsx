@@ -1,137 +1,148 @@
 
-import React from 'react';
-import { LayoutDashboard, Activity, BarChart3, Bot, Settings, Server, Heart, Brain, Sparkles, Zap, Wand2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+    BarChart3,
+    Brain,
+    CheckSquare,
+    Home,
+    Menu,
+    Moon,
+    Settings,
+    Sun,
+    Wand2,
+    X,
+    Zap,
+} from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
 
-export function Layout({ children, activeTab, onTabChange, connected, version = "v0.9.15" }) {
+const NAV_ITEMS = [
+    { id: 'home', label: 'Home', hint: 'Status and priorities', icon: Home },
+    { id: 'run', label: 'Ask & run', hint: 'Set a goal', icon: Brain },
+    { id: 'review', label: 'Plans', hint: 'Review exact actions', icon: CheckSquare },
+    { id: 'automation', label: 'Automation', hint: 'Agents and triggers', icon: Zap },
+    { id: 'insights', label: 'Insights', hint: 'Activity and outcomes', icon: BarChart3 },
+    { id: 'studio', label: 'Studio', hint: 'Human dashboards', icon: Wand2 },
+];
+
+export function Layout({
+    children,
+    activeView,
+    onViewChange,
+    connected,
+    pendingCount = 0,
+    version = 'v0.13.0',
+}) {
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState(null);
-
     const [appVersion, setAppVersion] = useState(version);
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
 
-    // Load config for settings modal and version
     useEffect(() => {
         fetch('api/config')
             .then(res => res.json())
             .then(data => {
                 setConfig(data);
-                if (data.version) setAppVersion("v" + data.version);
+                if (data.version) setAppVersion(`v${data.version}`);
             })
-            .catch(err => console.error("Failed to load config", err));
-    }, [showSettings]); // Also fetch on settings open, but ideally on mount too
-
-    // Initial fetch
-    useEffect(() => {
-        fetch('api/config')
-            .then(res => res.json())
-            .then(data => {
-                if (data.version) setAppVersion("v" + data.version);
-            })
-            .catch(e => console.error("Ver check failed", e));
+            .catch(() => {});
     }, []);
 
-    const menuItems = [
-        { id: 'live', label: 'Command Centre', icon: LayoutDashboard },
-        { id: 'stream', label: 'Decision Stream', icon: Activity },
-        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        { id: 'factory', label: 'Agent Factory', icon: Bot },
-        { id: 'visual', label: 'Visual Dashboard', icon: Server },
-        { id: 'studio', label: 'Dashboard Studio', icon: Wand2 },
-        { id: 'reasoning', label: 'Deep Reasoning', icon: Brain },
-        { id: 'prompts', label: 'Prompt Library', icon: Sparkles },
-        { id: 'triggers', label: 'Triggers', icon: Zap },
-    ];
+    useEffect(() => {
+        const closeOnEscape = event => {
+            if (event.key === 'Escape') setMobileOpen(false);
+        };
+        window.addEventListener('keydown', closeOnEscape);
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, []);
+
+    const navigate = id => {
+        onViewChange(id);
+        setMobileOpen(false);
+    };
+
+    const toggleTheme = () => {
+        const next = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        setTheme(next);
+    };
 
     return (
-        <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden selection:bg-purple-500/30">
-            {/* Sidebar */}
-            <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 transition-all duration-300">
-                {/* Brand */}
-                <div className="p-6 flex items-center gap-3 border-b border-slate-800/50">
-                    <div className="bg-gradient-to-br from-purple-600 to-blue-600 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-purple-900/20 shrink-0">
-                        AI
-                    </div>
-                    <div>
-                        <h1 className="font-bold text-lg tracking-tight leading-none">Orchestrator</h1>
-                        <span className="text-xs text-slate-500 font-medium">Command Node</span>
-                    </div>
+        <div className="cp-app-shell">
+            <header className="cp-mobile-header">
+                <button className="cp-icon-button" type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
+                    <Menu size={21} />
+                </button>
+                <button className="cp-mobile-brand" type="button" onClick={() => navigate('home')}>
+                    <span className="cp-brand-mark">H</span>
+                    <span>Home Orchestrator</span>
+                </button>
+                <span className={`cp-status-dot ${connected ? 'is-success' : 'is-danger'}`} aria-label={connected ? 'Connected' : 'Disconnected'} />
+            </header>
+
+            {mobileOpen && <button className="cp-drawer-backdrop" type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
+
+            <aside className={`cp-sidebar ${mobileOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
+                <div className="cp-sidebar-brand">
+                    <button className="cp-brand" type="button" onClick={() => navigate('home')}>
+                        <span className="cp-brand-mark">H</span>
+                        <span>
+                            <strong>Home Orchestrator</strong>
+                            <small>Human control layer</small>
+                        </span>
+                    </button>
+                    <button className="cp-icon-button cp-drawer-close" type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
+                        <X size={19} />
+                    </button>
                 </div>
 
-                {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {menuItems.map((item) => {
+                <nav className="cp-nav">
+                    <span className="cp-nav-label">Workspace</span>
+                    {NAV_ITEMS.map(item => {
                         const Icon = item.icon;
-                        const isActive = activeTab === item.id;
+                        const isActive = activeView === item.id;
                         return (
                             <button
                                 key={item.id}
-                                onClick={() => {
-                                    if (item.isLink) {
-                                        // Handle Ingress pathing: Derive absolute URL from current relative base
-                                        // Robust normalization: remove all trailing and leading slashes from parts before joining
-                                        const cleanPath = window.location.pathname.replace(/\/+$/, '');
-                                        const cleanItemUrl = item.url.replace(/^\/+/, '');
-                                        const url = `${window.location.origin}${cleanPath}/${cleanItemUrl}`;
-                                        window.open(url, '_blank');
-                                    } else {
-                                        onTabChange(item.id);
-                                    }
-                                }}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group
-                  ${isActive
-                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.15)]'
-                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                                    }`}
+                                type="button"
+                                className={`cp-nav-item ${isActive ? 'is-active' : ''}`}
+                                onClick={() => navigate(item.id)}
+                                aria-current={isActive ? 'page' : undefined}
                             >
-                                <Icon size={18} className={isActive ? 'text-purple-400' : 'text-slate-500 group-hover:text-slate-300'} />
-                                {item.label}
+                                <Icon size={18} />
+                                <span><strong>{item.label}</strong><small>{item.hint}</small></span>
+                                {item.id === 'review' && pendingCount > 0 && <em>{pendingCount}</em>}
                             </button>
                         );
                     })}
                 </nav>
 
-                <div className="p-4 bg-slate-950/30 border-t border-slate-800 text-xs">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-slate-500 font-mono">{appVersion}</span>
-                        <button
-                            onClick={() => setShowSettings(true)}
-                            className="text-slate-600 hover:text-slate-400 transition-colors p-1 hover:bg-slate-800 rounded"
-                            title="Settings"
-                        >
-                            <Settings size={14} />
-                        </button>
+                <div className="cp-sidebar-footer">
+                    <div className="cp-runtime-status">
+                        <span className={`cp-status-dot ${connected ? 'is-success' : 'is-danger'}`} />
+                        <span><strong>{connected ? 'System connected' : 'Connection lost'}</strong><small>{connected ? 'Live updates enabled' : 'Attempting to reconnect'}</small></span>
                     </div>
-
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors duration-300
-            ${connected
-                            ? 'bg-green-500/5 border-green-500/20 text-green-400'
-                            : 'bg-red-500/5 border-red-500/20 text-red-500'
-                        }`}>
-                        <div className="relative flex items-center justify-center w-2 h-2">
-                            <div className={`absolute w-full h-full rounded-full opacity-75 animate-ping ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                            <div className={`relative w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        </div>
-                        <span className="font-semibold tracking-wide">{connected ? 'SYSTEM ONLINE' : 'DISCONNECTED'}</span>
+                    <div className="cp-sidebar-actions">
+                        <button className="cp-icon-button" type="button" onClick={toggleTheme} aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+                            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+                        </button>
+                        <button className="cp-settings-button" type="button" onClick={() => setShowSettings(true)}>
+                            <Settings size={17} /><span>Settings</span>
+                        </button>
+                        <span className="cp-version">{appVersion}</span>
                     </div>
                 </div>
             </aside>
 
-            {/* Main Content Area */}
-            <main className="flex-1 overflow-y-auto bg-slate-950/50 relative">
-                {/* Top Gradient Line */}
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/20 to-transparent"></div>
-
-                <div className="max-w-[1600px] mx-auto p-6 md:p-8">
-                    {children}
-                </div>
+            <main className="cp-main" id="main-content">
+                <div className="cp-content">{children}</div>
             </main>
 
-            {/* Settings Modal */}
             {showSettings && (
                 <SettingsModal
                     onClose={() => setShowSettings(false)}
                     currentConfig={config}
+                    onUpdate={setConfig}
                 />
             )}
         </div>

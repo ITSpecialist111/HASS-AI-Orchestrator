@@ -61,6 +61,111 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class ReasoningProfile:
+    """Immutable model and run policy selected for one reasoning run.
+
+    Profiles tune how much model-side reasoning and runtime budget a goal
+    receives. They never relax schema validation, approval gates, tool
+    ordering, retries, deduplication, or any other deterministic policy.
+    """
+
+    name: str
+    label: str
+    description: str
+    think: bool
+    temperature: float
+    top_p: float
+    top_k: int
+    num_predict: int
+    max_iterations: int
+    max_tool_calls_per_turn: int
+    max_total_tool_calls: int
+    max_run_seconds: float
+    llm_timeout_seconds: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "label": self.label,
+            "description": self.description,
+            "thinking": self.think,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "max_output_tokens": self.num_predict,
+            "max_iterations": self.max_iterations,
+            "max_tool_calls_per_turn": self.max_tool_calls_per_turn,
+            "max_total_tool_calls": self.max_total_tool_calls,
+            "max_run_seconds": self.max_run_seconds,
+            "llm_timeout_seconds": self.llm_timeout_seconds,
+        }
+
+
+# Gemma 4's recommended generation sampling is shared by all profiles.
+# Speed/depth comes from explicit thinking and bounded output/runtime budgets,
+# not from weakening the deterministic action kernel.
+REASONING_PROFILES: Dict[str, ReasoningProfile] = {
+    "rapid": ReasoningProfile(
+        name="rapid",
+        label="Rapid",
+        description="Fast state checks and simple, low-latency routines.",
+        think=False,
+        temperature=1.0,
+        top_p=0.95,
+        top_k=64,
+        num_predict=1024,
+        max_iterations=6,
+        max_tool_calls_per_turn=3,
+        max_total_tool_calls=12,
+        max_run_seconds=60.0,
+        llm_timeout_seconds=45.0,
+    ),
+    "balanced": ReasoningProfile(
+        name="balanced",
+        label="Balanced",
+        description="Thoughtful everyday planning with bounded latency.",
+        think=True,
+        temperature=1.0,
+        top_p=0.95,
+        top_k=64,
+        num_predict=3072,
+        max_iterations=12,
+        max_tool_calls_per_turn=5,
+        max_total_tool_calls=30,
+        max_run_seconds=180.0,
+        llm_timeout_seconds=120.0,
+    ),
+    "deep": ReasoningProfile(
+        name="deep",
+        label="Deep",
+        description="Extended analysis for complex, multi-system goals.",
+        think=True,
+        temperature=1.0,
+        top_p=0.95,
+        top_k=64,
+        num_predict=4096,
+        max_iterations=40,
+        max_tool_calls_per_turn=6,
+        max_total_tool_calls=200,
+        max_run_seconds=1800.0,
+        llm_timeout_seconds=600.0,
+    ),
+}
+
+
+def resolve_reasoning_profile(profile: Optional[str]) -> ReasoningProfile:
+    """Return a validated profile, defaulting to ``balanced``."""
+
+    name = (profile or "balanced").strip().lower()
+    resolved = REASONING_PROFILES.get(name)
+    if resolved is None:
+        raise ValueError(
+            f"profile must be one of {'|'.join(REASONING_PROFILES)}"
+        )
+    return resolved
+
+
 @dataclass
 class ToolCall:
     id: str
@@ -106,6 +211,7 @@ class HarnessResult:
     stopped_reason: str = "final"
     duration_ms: int = 0
     run_id: Optional[str] = None
+    profile: Optional[str] = None
     requested_tool_calls: int = 0
     rejected_tool_calls: int = 0
     successful_tool_calls: int = 0
@@ -153,15 +259,12 @@ class LLMBackend(Protocol):
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse: ...
 
 
 class OllamaToolBackend:
-    """Ollama 0.4+ native tool-calling backend.
-
-    Models known to handle tool calling well: ``qwen2.5:14b-instruct``,
-    ``qwen2.5:7b-instruct``, ``llama3.1:8b-instruct``, ``mistral-nemo``.
-    """
+    """Ollama native tool-calling backend, tuned for ``gemma4:e4b``."""
 
     name = "ollama"
 
@@ -169,14 +272,20 @@ class OllamaToolBackend:
         self,
         model: str,
         host: Optional[str] = None,
-        temperature: float = 0.2,
-        num_predict: int = 1500,
+        temperature: float = 1.0,
+        top_p: float = 0.95,
+        top_k: int = 64,
+        num_predict: int = 3072,
+        default_profile: str = "balanced",
     ) -> None:
         import ollama  # local import keeps module importable without ollama
 
         self.model = model
         self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
         self.num_predict = num_predict
+        self.default_profile = resolve_reasoning_profile(default_profile).name
         self._client = ollama.AsyncClient(host=host or os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 
     async def chat(
@@ -185,11 +294,25 @@ class OllamaToolBackend:
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse:
+        selected = resolve_reasoning_profile(profile or self.default_profile)
+        temperature = selected.temperature if profile else self.temperature
+        top_p = selected.top_p if profile else self.top_p
+        top_k = selected.top_k if profile else self.top_k
+        num_predict = selected.num_predict if profile else self.num_predict
         kwargs: Dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "options": {"temperature": self.temperature, "num_predict": self.num_predict},
+            "options": {
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+                "num_predict": num_predict,
+            },
+            # Ollama exposes thinking as a top-level chat parameter. Keep it
+            # out of ``options`` so the SDK sends the documented wire shape.
+            "think": selected.think,
             "stream": False,
         }
         if tools:
@@ -217,12 +340,16 @@ class OllamaToolBackend:
             "input_tokens": _get_value(resp, "prompt_eval_count", 0),
             "output_tokens": _get_value(resp, "eval_count", 0),
         })
+        # Ollama returns model reasoning separately as ``message.thinking``.
+        # It is intentionally not copied into content/history/traces: the
+        # operator sees actions and outcomes, while subsequent turns receive
+        # only protocol-required assistant content and tool calls.
         return LLMResponse(
             content=content.strip(),
             tool_calls=calls,
             raw=resp,
             usage=usage,
-            stop_reason=_get_value(msg, "done_reason", None),
+            stop_reason=_get_value(resp, "done_reason", None),
         )
 
 
@@ -263,6 +390,7 @@ class AnthropicBackend:
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse:
         # Convert OpenAI-style tools → Anthropic tool schema.
         anthropic_tools = []
@@ -384,6 +512,7 @@ class OpenAIToolBackend:
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse:
         kwargs: Dict[str, Any] = {
             "model": self.model,
@@ -494,6 +623,7 @@ class OpenAIResponsesBackend:
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse:
         state = continuation if isinstance(continuation, Mapping) else {}
         consumed = int(state.get("consumed_messages", 0) or 0)
@@ -649,6 +779,7 @@ class FoundryAgentBackend:
         tools: List[Dict[str, Any]],
         *,
         continuation: Any = None,
+        profile: Optional[str] = None,
     ) -> LLMResponse:
         if self._agent_id:
             return await self._chat_hosted_agent(messages)
@@ -999,11 +1130,36 @@ class ReasoningHarness:
         *,
         run_id: Optional[str] = None,
         mode: str = "execute",
+        profile: Optional[str] = None,
         system_prompt: Optional[str] = None,
         on_event: Optional[EventCallback] = None,
         tool_call_interceptor: Optional[Any] = None,
     ) -> HarnessResult:
         started = time.monotonic()
+        selected_profile = resolve_reasoning_profile(profile) if profile else None
+        effective_max_iterations = min(
+            self.max_iterations,
+            selected_profile.max_iterations if selected_profile else self.max_iterations,
+        )
+        effective_max_tool_calls_per_turn = min(
+            self.max_tool_calls_per_turn,
+            selected_profile.max_tool_calls_per_turn
+            if selected_profile else self.max_tool_calls_per_turn,
+        )
+        effective_max_total_tool_calls = min(
+            self.max_total_tool_calls,
+            selected_profile.max_total_tool_calls
+            if selected_profile else self.max_total_tool_calls,
+        )
+        effective_max_run_seconds = min(
+            self.max_run_seconds,
+            selected_profile.max_run_seconds if selected_profile else self.max_run_seconds,
+        )
+        effective_llm_timeout_seconds = min(
+            self.llm_timeout_seconds,
+            selected_profile.llm_timeout_seconds
+            if selected_profile else self.llm_timeout_seconds,
+        )
         run_id = run_id or uuid.uuid4().hex
         event_callback = on_event if on_event is not None else self.on_event
         interceptor = (
@@ -1035,10 +1191,10 @@ class ReasoningHarness:
         schemas = self.tools.schemas()
         execution_context = ToolExecutionContext(run_id=run_id, mode=mode)
 
-        for iteration in range(1, self.max_iterations + 1):
+        for iteration in range(1, effective_max_iterations + 1):
             step_started = time.monotonic()
             elapsed = time.monotonic() - started
-            if elapsed >= self.max_run_seconds:
+            if elapsed >= effective_max_run_seconds:
                 return self._build_result(
                     answer="The reasoning run reached its wall-clock budget before completion.",
                     trace=trace,
@@ -1052,6 +1208,7 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
             if _estimate_messages_chars(messages) > self.max_context_chars:
@@ -1071,6 +1228,7 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
 
@@ -1080,15 +1238,20 @@ class ReasoningHarness:
                 except Exception:
                     pass
             try:
-                remaining = max(0.1, self.max_run_seconds - elapsed)
+                remaining = max(0.1, effective_max_run_seconds - elapsed)
                 response = await asyncio.wait_for(
-                    self._call_llm(messages, schemas, continuation),
-                    timeout=min(self.llm_timeout_seconds, remaining),
+                    self._call_llm(
+                        messages,
+                        schemas,
+                        continuation,
+                        selected_profile.name if selected_profile else None,
+                    ),
+                    timeout=min(effective_llm_timeout_seconds, remaining),
                 )
             except asyncio.TimeoutError:
                 logger.error("LLM call timed out at iteration %d", iteration)
                 return self._build_result(
-                    answer=f"LLM timeout after {min(self.llm_timeout_seconds, remaining):g}s.",
+                    answer=f"LLM timeout after {min(effective_llm_timeout_seconds, remaining):g}s.",
                     trace=trace,
                     iterations=iteration - 1,
                     tool_calls=total_tool_calls,
@@ -1100,6 +1263,7 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
             except asyncio.CancelledError:
@@ -1123,6 +1287,7 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
 
@@ -1132,6 +1297,7 @@ class ReasoningHarness:
                 "type": "thought",
                 "run_id": run_id,
                 "iteration": iteration,
+                "profile": selected_profile.name if selected_profile else None,
                 "content": response.content,
                 "usage": response.usage,
             }, event_callback)
@@ -1155,15 +1321,16 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
 
             all_calls = response.tool_calls
             requested_tool_calls += len(all_calls)
-            remaining_tool_budget = max(0, self.max_total_tool_calls - total_tool_calls)
+            remaining_tool_budget = max(0, effective_max_total_tool_calls - total_tool_calls)
             accepted_count = min(
                 len(all_calls),
-                self.max_tool_calls_per_turn,
+                effective_max_tool_calls_per_turn,
                 remaining_tool_budget,
             )
             calls = all_calls[:accepted_count]
@@ -1267,6 +1434,7 @@ class ReasoningHarness:
                     successful=successful_tool_calls,
                     failed=failed_tool_calls,
                     cached=cached_tool_calls,
+                    profile=selected_profile.name if selected_profile else None,
                     usage=usage,
                 )
 
@@ -1274,7 +1442,7 @@ class ReasoningHarness:
         return self._build_result(
             answer="Maximum reasoning iterations reached without a final answer.",
             trace=trace,
-            iterations=self.max_iterations,
+            iterations=effective_max_iterations,
             tool_calls=total_tool_calls,
             stopped_reason="max_iterations",
             started=started,
@@ -1284,6 +1452,7 @@ class ReasoningHarness:
             successful=successful_tool_calls,
             failed=failed_tool_calls,
             cached=cached_tool_calls,
+            profile=selected_profile.name if selected_profile else None,
             usage=usage,
         )
 
@@ -1292,9 +1461,15 @@ class ReasoningHarness:
         messages: List[Dict[str, Any]],
         schemas: List[Dict[str, Any]],
         continuation: Any,
+        profile: Optional[str],
     ) -> LLMResponse:
+        kwargs: Dict[str, Any] = {}
         if _accepts_keyword(self.llm.chat, "continuation"):
-            return await self.llm.chat(messages, schemas, continuation=continuation)
+            kwargs["continuation"] = continuation
+        if profile and _accepts_keyword(self.llm.chat, "profile"):
+            kwargs["profile"] = profile
+        if kwargs:
+            return await self.llm.chat(messages, schemas, **kwargs)
         # Compatibility for small scripted test/custom backends written against
         # the original two-argument protocol.
         return await self.llm.chat(messages, schemas)
@@ -1455,6 +1630,7 @@ class ReasoningHarness:
         successful: int,
         failed: int,
         cached: int,
+        profile: Optional[str],
         usage: Dict[str, int],
     ) -> HarnessResult:
         return HarnessResult(
@@ -1465,6 +1641,7 @@ class ReasoningHarness:
             stopped_reason=stopped_reason,
             duration_ms=int((time.monotonic() - started) * 1000),
             run_id=run_id,
+            profile=profile,
             requested_tool_calls=requested,
             rejected_tool_calls=rejected,
             successful_tool_calls=successful,
