@@ -1,6 +1,20 @@
 # Changelog
 <br>
 
+## [0.13.6] - 2026-07-11
+### Fixed — RAG startup compatibility
+- Live post-update logs found optional Home Assistant entity-registry ingestion still checking
+  the removed `ClientConnection.open` property from older WebSockets releases.
+- Knowledge ingestion now trusts `HAWebSocketClient.connected` plus the presence of the active
+  socket, matching the WebSockets 16 lifecycle already used by the main client.
+- The ingestion regression now uses a WebSockets 16-shaped connection object without `.open`,
+  preventing this startup failure from returning.
+
+### Verification
+- Focused RAG and Home Assistant connection suite: 17 passing tests.
+- v0.13.5 had already passed the complete 290-test backend suite, Vite production build, npm
+  audit, and live UI acceptance pass; this patch changes only the failed background ingestion gate.
+
 ## [0.13.5] - 2026-07-11
 ### Fixed — UI reliability and dashboard recovery
 - Completed a live acceptance pass across Home, Ask & Run, Action center, Automation,

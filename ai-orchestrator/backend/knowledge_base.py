@@ -39,10 +39,11 @@ class KnowledgeBase:
         # We check self.ha.ws because self.ha.connected is the state we want
         wait_count = 0
         while True:
-            # Check if self.ha.ws is not None AND open
-            # Check if self.ha is ready
             client = self.ha
-            if client and client.connected and client.ws and client.ws.open:
+            # ``HAWebSocketClient.connected`` is the authoritative lifecycle
+            # signal. websockets 16's ClientConnection no longer exposes the
+            # legacy ``.open`` property.
+            if client and client.connected and client.ws is not None:
                 break
                 
             if wait_count % 10 == 0:
@@ -55,12 +56,13 @@ class KnowledgeBase:
 
         try:
             # Final check before proceed
-            if not self.ha or not (self.ha.ws and self.ha.ws.open):
+            client = self.ha
+            if not client or not client.connected or client.ws is None:
                 logger.error("❌ Knowledge Base ingestion aborted: Home Assistant not reachable.")
                 return
 
             # Get all states
-            states = await self.ha.get_states(timeout=300.0)
+            states = await client.get_states(timeout=300.0)
             
             # Check if states is a list (dump of all states) or single dict
             # HA WS `get_states` usually returns a list

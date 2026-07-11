@@ -86,8 +86,9 @@ async def test_knowledge_base_ingest_registry(rag_manager):
     """Test HA Entity Registry ingestion"""
     mock_ha = NonCallableMagicMock()
     mock_ha.connected = True
-    mock_ha.ws = MagicMock()
-    mock_ha.ws.open = True
+    # Match websockets 16's ClientConnection: a live object without the
+    # removed legacy ``open`` property.
+    mock_ha.ws = object()
     mock_ha.get_states = AsyncMock(return_value=[
         {
             "entity_id": "light.living_room",
