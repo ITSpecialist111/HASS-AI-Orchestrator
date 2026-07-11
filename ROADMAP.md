@@ -1,6 +1,6 @@
 # 🗺️ AI Orchestrator - Product Roadmap
 
-**Current Version**: v0.13.0 (Gemma Profiles & Human Control)
+**Current Version**: v0.13.1 (Defender-Inspired Control Portal)
 
 This roadmap outlines the strategic direction for the AI Orchestrator. It focuses on evolving from a "text-based automation manager" to a fully multi-modal, voice-interactive home presence.
 

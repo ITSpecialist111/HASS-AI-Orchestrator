@@ -1,6 +1,6 @@
 # Graham's AI Orchestrator
 
-[![Version](https://img.shields.io/badge/version-v0.13.0-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0)
+[![Version](https://img.shields.io/badge/version-v0.13.1-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5)
 ![Agent Kernel](https://img.shields.io/badge/agent%20kernel-deterministic-8B5CF6)
 ![Tests](https://img.shields.io/badge/backend%20tests-272%20passing-22C55E)
@@ -32,7 +32,7 @@ The long-term goal is not another voice-controlled remote and not a chatbot bolt
 - **Today:** run local `gemma4:e4b` in Rapid, Balanced, or Deep mode; investigate live HA state; create exact plans; approve and replay actions; run proactive goals; recall prior episodes; and operate everything from a human-centred dashboard.
 - **Safety posture:** dry-run by default, direct execution disabled, sensitive services gated, generated dashboards sandboxed, and mutation replay checkpointed.
 - **Next:** native Assist/voice integration, post-action state verification, filtered real-time events, and a temporal model of the home.
-- **Latest test release:** [v0.13.0 — Gemma Profiles & Human Control](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0).
+- **Latest test release:** [v0.13.1 — Defender-Inspired Control Portal](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1).
 
 ### Contents
 
@@ -159,10 +159,10 @@ The React dashboard includes:
 |---|---|
 | **Home** | Connection health, specialist coverage, pending reviews, recent outcomes, and a primary goal composer |
 | **Ask & Run** | Select Rapid, Balanced, or Deep; stream grounded progress; cancel safely; and inspect outcomes |
-| **Plans** | Review risk and exact captured arguments, then approve or reject deterministic replay |
+| **Action center** | Review risk and exact captured arguments, then approve or reject deterministic replay |
 | **Automation** | Manage specialist agents, create blueprints, and configure cron/state triggers |
-| **Insights** | Read a responsive activity feed, disclose technical payloads on demand, and review performance |
-| **Studio** | Generate, iterate, compare, pin, and live-update visual dashboards |
+| **Advanced insights** | Read a responsive activity feed, disclose technical payloads on demand, and review performance |
+| **Dashboard Studio** | Generate, iterate, compare, pin, and live-update visual dashboards |
 | **Quick Ask** | Run compact Rapid/Balanced goals through the same authoritative kernel from any page |
 
 Generated Dashboard Studio HTML runs in an opaque sandbox under a restrictive Content Security Policy. Trusted React code obtains Home Assistant state and passes snapshots into the frame; generated code cannot call same-origin APIs.
@@ -682,6 +682,7 @@ See [ROADMAP.md](ROADMAP.md) for the wider product direction.
 - [Product roadmap](ROADMAP.md)
 - [Testing guide](TESTING.md)
 - [Changelog](CHANGELOG.md)
+- [v0.13.1 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1)
 - [v0.13.0 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0)
 
 Issues, field-test results, model comparisons, and Home Assistant deployment feedback are welcome in the [GitHub issue tracker](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/issues).

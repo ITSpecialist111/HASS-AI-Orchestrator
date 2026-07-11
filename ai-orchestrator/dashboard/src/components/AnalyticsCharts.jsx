@@ -41,7 +41,7 @@ export const AnalyticsCharts = ({ dailyData = [], performanceData = {} }) => {
                                     <Bar
                                         key={agentId}
                                         dataKey={agentId}
-                                        fill="var(--cp-accent)"
+                                        fill="var(--cp-link)"
                                         fillOpacity={Math.max(0.35, 1 - index * 0.12)}
                                         name={agentId.charAt(0).toUpperCase() + agentId.slice(1)}
                                         stackId="activity"

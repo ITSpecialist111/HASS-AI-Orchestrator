@@ -1,6 +1,30 @@
 # Changelog
 <br>
 
+## [0.13.1] - 2026-07-11
+### Changed — Microsoft Defender-inspired portal theme
+- Rebuilt the shared application shell around the Microsoft Defender portal's visual patterns:
+  a dark global product header, simulation/live-control banner, grouped left navigation,
+  collapsible icon rail, breadcrumb command bar, and compact utility actions.
+- Replaced the warm rounded-card treatment with a flatter operational canvas, Defender blue
+  interaction states, light gray navigation, squared panels, divider-led card headers, denser
+  metrics, command-bar controls, and tab-underlines.
+- Applied the same portal language across Home, Ask & Run, Action center, Automation,
+  Advanced insights, Dashboard Studio, settings, Quick Ask, and retained legacy overlays.
+- Added a responsive Defender-style drawer while preserving the compact global header and
+  breadcrumb hierarchy on mobile.
+- Refined dark mode to preserve the same information hierarchy and status semantics.
+
+### Compatibility
+- Visual-only patch: API contracts, Gemma profiles, deterministic tools, approval behavior,
+  plans, triggers, memory, and execution policy are unchanged from 0.13.0.
+
+### Verification
+- Backend suite remains green: 272 passing tests and 4 opt-in live MCP tests skipped.
+- React 19 / Vite 8 production build passes.
+- Desktop expanded/collapsed navigation, dark theme, Action center, Ask & Run, and 390 px
+  mobile layouts were visually validated.
+
 ## [0.13.0] - 2026-07-11
 ### Added — Gemma profiles and human control
 - `gemma4:e4b` is now the single local default across the deep reasoner, orchestrator,

@@ -2889,3 +2889,1064 @@ iframe {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Microsoft Defender-inspired portal shell and visual language
+   ------------------------------------------------------------------------- */
+
+:root {
+  --ms-accent: var(--cp-link);
+  --ms-canvas: var(--cp-bg-elevated);
+  --ms-nav: var(--cp-surface-soft);
+  --ms-card: var(--cp-surface);
+  --ms-divider: var(--cp-border);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ms-accent) 22%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ms-accent);
+  outline-offset: 1px;
+}
+
+.cp-app-shell {
+  display: block;
+  background: var(--ms-canvas);
+}
+
+.ms-global-header {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 90;
+  display: grid;
+  width: 100%;
+  height: 48px;
+  grid-template-columns: minmax(280px, 1fr) auto minmax(280px, 1fr);
+  align-items: center;
+  background: var(--cp-text);
+  color: var(--cp-surface);
+}
+
+html[data-theme="dark"] .ms-global-header {
+  background: var(--cp-surface);
+  border-bottom: 1px solid var(--cp-border);
+  color: var(--cp-text);
+}
+
+.ms-global-brand,
+.ms-global-actions {
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+
+.ms-global-actions {
+  justify-self: end;
+}
+
+.ms-app-launcher,
+.ms-product-name,
+.ms-global-actions button {
+  display: inline-flex;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+}
+
+.ms-app-launcher {
+  width: 48px;
+}
+
+.ms-app-launcher:hover,
+.ms-global-actions button:hover {
+  background: color-mix(in srgb, var(--cp-surface) 12%, transparent);
+}
+
+html[data-theme="dark"] .ms-app-launcher:hover,
+html[data-theme="dark"] .ms-global-actions button:hover {
+  background: var(--cp-surface-soft);
+}
+
+.ms-product-name {
+  gap: 9px;
+  padding: 0 12px 0 4px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.ms-product-name strong {
+  font-weight: 600;
+}
+
+.ms-mode-banner {
+  min-width: 132px;
+  align-self: stretch;
+  justify-self: center;
+  padding: 13px 22px 0;
+  border-bottom: 3px solid transparent;
+  color: var(--cp-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ms-mode-banner.is-simulation {
+  background: var(--cp-warning);
+}
+
+.ms-mode-banner.is-live {
+  background: var(--cp-success);
+}
+
+html[data-theme="dark"] .ms-mode-banner {
+  color: var(--cp-bg-elevated);
+}
+
+.ms-global-actions button {
+  position: relative;
+  width: 42px;
+}
+
+.ms-notification-count {
+  position: absolute;
+  top: 7px;
+  right: 5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  background: var(--cp-danger);
+  border: 1px solid var(--cp-surface);
+  border-radius: 999px;
+  color: var(--cp-surface);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+}
+
+html[data-theme="dark"] .ms-notification-count {
+  border-color: var(--cp-border);
+  color: var(--cp-text);
+}
+
+.ms-user-avatar {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 12px 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.cp-sidebar {
+  inset: 48px auto 0 0;
+  z-index: 60;
+  width: 252px;
+  background: var(--ms-nav);
+  border-color: var(--ms-divider);
+  overflow-x: hidden;
+  transition: width 160ms ease, transform 160ms ease;
+}
+
+.cp-sidebar-brand {
+  min-height: 44px;
+  padding: 0;
+  background: var(--ms-nav);
+  border-color: var(--ms-divider);
+}
+
+.cp-nav-collapse {
+  display: flex;
+  width: 100%;
+  height: 43px;
+  align-items: center;
+  gap: 13px;
+  padding: 0 16px;
+  background: transparent;
+  border: 0;
+  color: var(--cp-text-muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.cp-nav-collapse:hover {
+  background: var(--cp-surface);
+  color: var(--cp-text);
+}
+
+.cp-nav {
+  gap: 0;
+  padding: 6px 0 16px;
+  overflow-x: hidden;
+}
+
+.cp-nav-label {
+  margin-top: 12px;
+  padding: 6px 16px 5px;
+  color: var(--cp-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cp-nav-label:first-child {
+  margin-top: 0;
+}
+
+.cp-nav-item {
+  position: relative;
+  min-height: 40px;
+  grid-template-columns: 20px 1fr auto;
+  gap: 11px;
+  padding: 6px 14px 6px 16px;
+  border: 0;
+  border-radius: 0;
+  color: var(--cp-text);
+  font-size: 13px;
+}
+
+.cp-nav-item:hover {
+  background: var(--cp-surface);
+}
+
+.cp-nav-item.is-active {
+  background: var(--cp-surface);
+  box-shadow: inset 3px 0 0 var(--ms-accent);
+  color: var(--cp-text);
+}
+
+.cp-nav-item.is-active svg {
+  color: var(--ms-accent);
+}
+
+.cp-nav-item strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cp-nav-item small {
+  display: none;
+}
+
+.cp-nav-item em {
+  min-width: 18px;
+  padding: 1px 5px;
+  background: var(--cp-danger);
+  color: var(--cp-surface);
+  font-size: 9px;
+}
+
+html[data-theme="dark"] .cp-nav-item em {
+  color: var(--cp-text);
+}
+
+.cp-sidebar-footer {
+  padding: 10px 14px 12px;
+  background: var(--ms-nav);
+}
+
+.cp-runtime-status {
+  gap: 8px;
+  padding: 7px 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.cp-runtime-status strong {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.cp-runtime-status small {
+  font-size: 9px;
+}
+
+.cp-version {
+  display: block;
+  padding: 5px 2px 0 18px;
+  color: var(--cp-text-muted);
+  font-size: 9px;
+}
+
+.cp-app-shell.is-nav-collapsed .cp-sidebar {
+  width: 52px;
+}
+
+.cp-app-shell.is-nav-collapsed .cp-nav-collapse {
+  justify-content: center;
+  padding: 0;
+}
+
+.cp-app-shell.is-nav-collapsed .cp-nav-collapse span,
+.cp-app-shell.is-nav-collapsed .cp-nav-label,
+.cp-app-shell.is-nav-collapsed .cp-nav-item span,
+.cp-app-shell.is-nav-collapsed .cp-nav-item em,
+.cp-app-shell.is-nav-collapsed .cp-sidebar-footer {
+  display: none;
+}
+
+.cp-app-shell.is-nav-collapsed .cp-nav-item {
+  display: flex;
+  width: 52px;
+  justify-content: center;
+  padding: 0;
+}
+
+.cp-app-shell.is-nav-collapsed .cp-main {
+  width: calc(100% - 52px);
+  margin-left: 52px;
+}
+
+.cp-main {
+  width: calc(100% - 252px);
+  min-height: 100vh;
+  margin-left: 252px;
+  padding-top: 48px;
+  background: var(--ms-canvas);
+  transition: width 160ms ease, margin-left 160ms ease;
+}
+
+.ms-command-bar {
+  position: sticky;
+  top: 48px;
+  z-index: 35;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  background: var(--cp-surface);
+  border-bottom: 1px solid var(--ms-divider);
+}
+
+.ms-breadcrumb,
+.ms-command-actions,
+.ms-command-actions button {
+  display: flex;
+  align-items: center;
+}
+
+.ms-breadcrumb {
+  gap: 5px;
+  color: var(--cp-text-muted);
+  font-size: 11px;
+}
+
+.ms-breadcrumb strong {
+  color: var(--cp-text);
+  font-weight: 600;
+}
+
+.ms-command-actions {
+  align-self: stretch;
+  gap: 4px;
+}
+
+.ms-command-actions button {
+  gap: 6px;
+  height: 100%;
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  color: var(--cp-text-muted);
+  font-size: 11px;
+}
+
+.ms-command-actions button:hover {
+  background: var(--cp-surface-soft);
+  color: var(--ms-accent);
+}
+
+.cp-content {
+  max-width: 1510px;
+  padding: 24px 32px 72px;
+}
+
+.cp-page,
+.cp-page--wide {
+  max-width: 1420px;
+  gap: 16px;
+}
+
+.cp-home-page > .cp-metric-grid {
+  order: 1;
+}
+
+.cp-home-page > .cp-command-card {
+  order: 2;
+}
+
+.cp-home-page > .cp-two-column {
+  order: 3;
+}
+
+.cp-home-page > .cp-card {
+  order: 4;
+}
+
+.cp-page-header {
+  gap: 20px;
+  padding: 2px 0 6px;
+}
+
+.cp-page-header h1 {
+  margin-top: 3px;
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.cp-page-header p {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.cp-eyebrow {
+  color: var(--ms-accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.cp-card,
+.cp-command-card,
+.cp-run-composer,
+.cp-active-run,
+.cp-result-card,
+.cp-workflow-library,
+.cp-plan-card,
+.cp-performance-card,
+.cp-agent-card,
+.cp-add-card,
+.cp-workflow-card,
+.cp-activity-item,
+.cp-modal,
+.cp-chat {
+  background: var(--ms-card);
+  border-color: var(--ms-divider);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.cp-card,
+.cp-active-run,
+.cp-result-card,
+.cp-workflow-library {
+  padding: 16px;
+}
+
+.cp-card > .cp-section-heading:first-child,
+.cp-workflow-library > .cp-section-heading:first-child {
+  margin: -16px -16px 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ms-divider);
+}
+
+.cp-section-heading {
+  margin-bottom: 12px;
+}
+
+.cp-section-heading h2 {
+  margin-top: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.cp-section-intro {
+  font-size: 11px;
+}
+
+.cp-command-card {
+  padding: 0;
+  background: var(--ms-card);
+  border-color: var(--ms-divider);
+}
+
+.cp-command-copy {
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ms-divider);
+}
+
+.cp-command-copy h2 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.cp-command-copy p {
+  font-size: 11px;
+}
+
+.cp-command-form {
+  padding: 14px 14px 8px;
+}
+
+.cp-suggestion-row {
+  margin: 0;
+  padding: 0 14px 14px;
+}
+
+.cp-command-form textarea,
+.cp-run-composer textarea,
+.cp-field input,
+.cp-field textarea,
+.cp-field select,
+.cp-chat-form input {
+  border-color: var(--cp-border-strong);
+  border-radius: 2px;
+}
+
+.cp-suggestion-row button:hover,
+.cp-chat-suggestions button:hover,
+.cp-agent-card:hover,
+.cp-add-card:hover,
+.cp-filter-button.is-active {
+  border-color: var(--ms-accent);
+  color: var(--ms-accent);
+}
+
+.cp-add-card > span {
+  background: color-mix(in srgb, var(--ms-accent) 9%, transparent);
+  color: var(--ms-accent);
+}
+
+.cp-switch.is-on > span {
+  background: var(--ms-accent);
+}
+
+.cp-chat-profile button.is-active {
+  color: var(--ms-accent);
+}
+
+.cp-command-form textarea:focus,
+.cp-run-composer textarea:focus,
+.cp-field input:focus,
+.cp-field textarea:focus,
+.cp-field select:focus,
+.cp-chat-form input:focus {
+  border-color: var(--ms-accent);
+  outline: 1px solid var(--ms-accent);
+}
+
+.cp-button {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cp-button--large {
+  min-height: 36px;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+.cp-button--primary {
+  background: var(--ms-accent);
+  border-color: var(--ms-accent);
+  color: var(--cp-surface);
+}
+
+html[data-theme="dark"] .cp-button--primary {
+  color: var(--cp-text);
+}
+
+.cp-button--primary:hover:not(:disabled) {
+  background: var(--ms-accent);
+  border-color: var(--ms-accent);
+  filter: brightness(0.9);
+}
+
+.cp-button--secondary {
+  border-color: var(--cp-border-strong);
+  border-radius: 2px;
+}
+
+.cp-text-button,
+.cp-detail-toggle {
+  color: var(--ms-accent);
+}
+
+.cp-icon-button,
+.cp-settings-button,
+.cp-filter-button {
+  border-radius: 2px;
+}
+
+.cp-icon-tile,
+.cp-metric-icon,
+.cp-list-icon,
+.cp-plan-risk,
+.cp-agent-icon,
+.cp-activity-icon,
+.cp-setting-icon,
+.cp-profile-icon {
+  background: color-mix(in srgb, var(--ms-accent) 9%, transparent);
+  border-color: color-mix(in srgb, var(--ms-accent) 25%, var(--cp-border));
+  border-radius: 2px;
+  color: var(--ms-accent);
+}
+
+.cp-metric-grid {
+  gap: 10px;
+}
+
+.cp-metric-card {
+  min-height: 76px;
+  padding: 12px;
+  background: var(--ms-card);
+  border-color: var(--ms-divider);
+  border-radius: 2px;
+}
+
+.cp-metric-card--action:hover {
+  border-color: var(--ms-accent);
+}
+
+.cp-metric-card strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cp-metric-card span:not(.cp-metric-icon) {
+  font-size: 10px;
+}
+
+.cp-two-column {
+  gap: 12px;
+}
+
+.cp-list-row {
+  min-height: 52px;
+  padding: 8px 2px;
+}
+
+.cp-agent-summary,
+.cp-trigger-row,
+.cp-intent-list > li,
+.cp-agent-card-meta,
+.cp-agent-card-note,
+.cp-answer,
+.cp-inline-plan,
+.cp-plan-explanation,
+.cp-technical-detail > div,
+.cp-activity-detail,
+.cp-intent-list details,
+.cp-runtime-facts,
+.cp-runtime-facts dl div,
+.cp-setting-card,
+.cp-workflow-result {
+  border-radius: 2px;
+}
+
+.cp-agent-summary {
+  background: var(--cp-surface);
+}
+
+.cp-pill {
+  min-height: 20px;
+  border-radius: 2px;
+  font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.cp-health-chip,
+.cp-model-chip {
+  min-height: 34px;
+  border-radius: 2px;
+}
+
+.cp-empty-state {
+  min-height: 126px;
+  background: var(--cp-surface-soft);
+  border: 1px solid var(--ms-divider);
+  border-radius: 2px;
+}
+
+.cp-empty-state--compact {
+  min-height: 68px;
+}
+
+.cp-alert,
+.cp-global-alert {
+  border-radius: 2px;
+}
+
+.cp-segmented {
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ms-divider);
+  border-radius: 0;
+}
+
+.cp-segmented button {
+  min-height: 35px;
+  padding: 7px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-weight: 500;
+}
+
+.cp-segmented button.is-active,
+.cp-segmented button[aria-selected="true"],
+.cp-segmented button[aria-checked="true"] {
+  background: transparent;
+  border-color: var(--ms-accent);
+  color: var(--ms-accent);
+}
+
+.cp-profile-grid {
+  gap: 8px;
+}
+
+.cp-profile-card {
+  min-height: 100px;
+  background: var(--cp-surface);
+  border-radius: 2px;
+}
+
+.cp-profile-card.is-selected {
+  background: color-mix(in srgb, var(--ms-accent) 7%, var(--cp-surface));
+  border-color: var(--ms-accent);
+  box-shadow: inset 3px 0 0 var(--ms-accent);
+}
+
+.cp-profile-card em {
+  color: var(--ms-accent);
+}
+
+.cp-composer-section {
+  padding: 16px;
+}
+
+.cp-composer-footer {
+  padding: 12px 16px;
+  background: var(--cp-surface-soft);
+}
+
+.cp-section-label > span {
+  background: color-mix(in srgb, var(--ms-accent) 9%, transparent);
+  border-color: var(--ms-accent);
+  color: var(--ms-accent);
+}
+
+.cp-run-orb {
+  background: color-mix(in srgb, var(--ms-accent) 9%, transparent);
+  border-color: var(--ms-accent);
+  color: var(--ms-accent);
+}
+
+.cp-timeline-icon,
+.cp-intent-number {
+  border-radius: 2px;
+  color: var(--ms-accent);
+}
+
+.cp-plan-list,
+.cp-activity-feed,
+.cp-trigger-list {
+  gap: 6px;
+}
+
+.cp-plan-summary {
+  min-height: 66px;
+  padding: 12px 14px;
+}
+
+.cp-plan-summary:hover,
+.cp-activity-summary:hover,
+.cp-workflow-summary:hover {
+  background: var(--cp-surface-soft);
+}
+
+.cp-plan-details {
+  background: var(--cp-surface);
+}
+
+.cp-activity-summary {
+  min-height: 62px;
+}
+
+.cp-agent-grid {
+  gap: 8px;
+}
+
+.cp-agent-card,
+.cp-add-card {
+  min-height: 154px;
+  background: var(--cp-surface);
+}
+
+.cp-chart {
+  height: 280px;
+}
+
+.cp-trigger-form,
+.cp-settings-grid {
+  background: var(--cp-surface-soft);
+  border-radius: 2px;
+}
+
+.cp-modal-backdrop {
+  background: var(--cp-overlay);
+}
+
+.cp-modal-header,
+.cp-modal-footer,
+.cp-chat-header,
+.cp-chat-form {
+  background: var(--cp-surface);
+}
+
+.cp-modal-header {
+  min-height: 52px;
+  padding: 11px 14px;
+}
+
+.cp-modal-footer {
+  min-height: 52px;
+}
+
+.cp-chat-launcher {
+  width: 46px;
+  height: 46px;
+  background: var(--ms-accent);
+  border-color: var(--ms-accent);
+  color: var(--cp-surface);
+  box-shadow: none;
+}
+
+.cp-chat-launcher:hover {
+  background: var(--ms-accent);
+  filter: brightness(0.9);
+}
+
+.cp-chat-launcher.is-open {
+  background: var(--cp-surface);
+  border-color: var(--cp-border-strong);
+  color: var(--cp-text);
+  filter: none;
+}
+
+html[data-theme="dark"] .cp-chat-launcher {
+  color: var(--cp-text);
+}
+
+.cp-chat-message.is-user,
+.cp-chat-form button {
+  background: var(--ms-accent);
+  border-color: var(--ms-accent);
+  color: var(--cp-surface);
+}
+
+html[data-theme="dark"] .cp-chat-message.is-user,
+html[data-theme="dark"] .cp-chat-form button {
+  color: var(--cp-text);
+}
+
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl {
+  border-radius: 2px !important;
+}
+
+.shadow-sm,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl {
+  box-shadow: none !important;
+}
+
+.text-blue-300,
+.text-blue-400,
+.text-blue-500,
+.text-purple-300,
+.text-purple-400,
+.text-purple-500 {
+  color: var(--ms-accent) !important;
+}
+
+.border-blue-500,
+.border-purple-500 {
+  border-color: var(--ms-accent) !important;
+}
+
+.bg-blue-400,
+.bg-blue-500,
+.bg-blue-600,
+.bg-purple-500,
+.bg-purple-600 {
+  background-color: var(--ms-accent) !important;
+}
+
+html:not([data-theme="dark"]) .text-white {
+  color: var(--cp-surface) !important;
+}
+
+html[data-theme="dark"] .text-white {
+  color: var(--cp-text) !important;
+}
+
+@media (max-width: 820px) {
+  .ms-global-header {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .ms-product-name strong {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ms-mode-banner {
+    min-width: 0;
+    padding: 14px 12px 0;
+    font-size: 10px;
+  }
+
+  .ms-user-avatar {
+    display: none;
+  }
+
+  .cp-sidebar,
+  .cp-app-shell.is-nav-collapsed .cp-sidebar {
+    width: min(280px, calc(100vw - 40px));
+    transform: translateX(-105%);
+  }
+
+  .cp-sidebar.is-open,
+  .cp-app-shell.is-nav-collapsed .cp-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .cp-app-shell.is-nav-collapsed .cp-nav-collapse {
+    justify-content: flex-start;
+    padding: 0 16px;
+  }
+
+  .cp-app-shell.is-nav-collapsed .cp-nav-collapse span,
+  .cp-app-shell.is-nav-collapsed .cp-nav-label,
+  .cp-app-shell.is-nav-collapsed .cp-nav-item span,
+  .cp-app-shell.is-nav-collapsed .cp-sidebar-footer {
+    display: block;
+  }
+
+  .cp-app-shell.is-nav-collapsed .cp-nav-item {
+    display: grid;
+    width: 100%;
+    justify-content: initial;
+    padding: 6px 14px 6px 16px;
+  }
+
+  .cp-drawer-backdrop {
+    top: 48px;
+    z-index: 55;
+  }
+
+  .cp-main,
+  .cp-app-shell.is-nav-collapsed .cp-main {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ms-command-bar {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  .ms-command-actions button:not(:first-child) {
+    display: none;
+  }
+
+  .cp-content {
+    padding: 18px 16px 72px;
+  }
+
+  .cp-page-header {
+    flex-direction: row;
+  }
+}
+
+@media (max-width: 580px) {
+  .ms-global-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ms-mode-banner {
+    display: none;
+  }
+
+  .ms-global-actions button:first-child {
+    display: none;
+  }
+
+  .ms-product-name {
+    padding-right: 4px;
+  }
+
+  .ms-product-name strong {
+    font-size: 12px;
+  }
+
+  .ms-command-actions {
+    display: none;
+  }
+
+  .ms-command-bar {
+    min-height: 38px;
+  }
+
+  .cp-content {
+    padding-top: 14px;
+  }
+
+  .cp-page-header {
+    flex-direction: column;
+  }
+
+  .cp-page-header h1 {
+    font-size: 23px;
+  }
+
+  .cp-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cp-command-card,
+  .cp-card,
+  .cp-active-run,
+  .cp-result-card,
+  .cp-workflow-library {
+    padding: 12px;
+  }
+
+  .cp-command-card {
+    padding: 0;
+  }
+
+  .cp-card > .cp-section-heading:first-child,
+  .cp-workflow-library > .cp-section-heading:first-child {
+    margin: -12px -12px 12px;
+  }
+}

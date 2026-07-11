@@ -53,7 +53,7 @@ export function HomeOverview({
     };
 
     return (
-        <div className="cp-page">
+        <div className="cp-page cp-home-page">
             <header className="cp-page-header">
                 <div>
                     <div className="cp-eyebrow"><House size={14} /> Home operations</div>

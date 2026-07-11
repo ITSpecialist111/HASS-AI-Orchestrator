@@ -20,7 +20,7 @@ AI Orchestrator observes the real home, reasons with local or cloud models, and 
 - **Human review** for high-impact plans and security services.
 - **Durable execution claims and per-step checkpoints** in SQLite, preventing concurrent double execution.
 - **Episodic memory**, built-in prompt workflows, cron/state triggers, external MCP, and Dashboard Studio remain supported.
-- **Human operations UI** organized around Home, Ask & Run, Plans, Automation, Insights, and Studio, with responsive mobile navigation and accessible focus states.
+- **Microsoft Defender-inspired operations UI** organized around Home, Ask & Run, Action center, Automation, Advanced insights, and Dashboard Studio, with a dark product header, grouped navigation, command bar, responsive drawer, and accessible focus states.
 
 Legacy cadence-based specialist loops and the legacy dashboard generator are disabled by default. They can be enabled for compatibility, but the deterministic kernel is the recommended runtime.
 

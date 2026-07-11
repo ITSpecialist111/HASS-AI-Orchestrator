@@ -1,8 +1,8 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.13.0",
+    "version": "0.13.1",
     "slug": "ai-orchestrator",
-    "description": "Human-centred Home Assistant orchestration with Gemma 4 E4B reasoning profiles, deterministic guarded tools, durable plans, memory, triggers, and streaming",
+    "description": "Microsoft Defender-inspired Home Assistant control portal with Gemma 4 E4B profiles, deterministic guarded tools, durable plans, memory, triggers, and streaming",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
     "arch": [
         "amd64",
