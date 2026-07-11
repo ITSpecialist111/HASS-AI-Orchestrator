@@ -65,6 +65,8 @@ Important defaults:
 llm_provider: ollama
 deep_reasoning_model: gemma4:e4b
 reasoning_default_profile: balanced
+ha_url: ""                  # optional; requires ha_access_token when set
+ha_access_token: ""         # blank uses the injected Supervisor token
 dry_run_mode: true
 enable_rag: true
 reasoning_effort: medium

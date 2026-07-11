@@ -28,6 +28,7 @@ function App() {
     const [plansError, setPlansError] = useState(null)
     const [reasoningInfo, setReasoningInfo] = useState(null)
     const [connected, setConnected] = useState(false)
+    const [homeAssistantConnected, setHomeAssistantConnected] = useState(false)
     const [activeView, setActiveView] = useState(initialView)
     const [draftGoal, setDraftGoal] = useState('')
     const [suggestions, setSuggestions] = useState([])
@@ -94,6 +95,15 @@ function App() {
         } catch (_) { setReasoningInfo(null) }
     }, [requestJson])
 
+    const fetchHealth = useCallback(async () => {
+        try {
+            const data = await requestJson('api/health')
+            setHomeAssistantConnected(!!data.home_assistant?.connected)
+        } catch (_) {
+            setHomeAssistantConnected(false)
+        }
+    }, [requestJson])
+
     useEffect(() => {
         fetchAgents()
         fetchDecisions()
@@ -101,7 +111,8 @@ function App() {
         fetchSuggestions()
         fetchPlans()
         fetchReasoningInfo()
-    }, [fetchAgents, fetchAnalytics, fetchDecisions, fetchPlans, fetchReasoningInfo, fetchSuggestions])
+        fetchHealth()
+    }, [fetchAgents, fetchAnalytics, fetchDecisions, fetchHealth, fetchPlans, fetchReasoningInfo, fetchSuggestions])
 
     useEffect(() => {
         const onHashChange = () => {
@@ -171,6 +182,11 @@ function App() {
         return () => window.clearInterval(timer)
     }, [fetchPlans])
 
+    useEffect(() => {
+        const timer = window.setInterval(fetchHealth, 10000)
+        return () => window.clearInterval(timer)
+    }, [fetchHealth])
+
     const pendingPlans = useMemo(
         () => plans.filter(plan => ['pending', 'approved', 'executing'].includes(plan.status)),
         [plans],
@@ -188,7 +204,7 @@ function App() {
                     agents={agents}
                     decisions={decisions}
                     pendingPlans={pendingPlans}
-                    connected={connected}
+                    connected={connected && homeAssistantConnected}
                     reasoningInfo={reasoningInfo}
                     onStartGoal={startGoal}
                     onNavigate={navigate}
@@ -226,7 +242,7 @@ function App() {
         <Layout
             activeView={activeView}
             onViewChange={navigate}
-            connected={connected}
+            connected={connected && homeAssistantConnected}
             pendingCount={pendingPlans.length}
         >
             {globalError && (

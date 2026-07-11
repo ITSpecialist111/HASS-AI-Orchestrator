@@ -20,6 +20,11 @@ The first local-model start can take time. The E4B Ollama artifact is approximat
 ollama_host: http://localhost:11434
 llm_provider: ollama
 
+# Usually leave both blank: the add-on uses the Supervisor Core proxy.
+# For direct Core access, configure both values instead.
+ha_url: ""
+ha_access_token: ""
+
 orchestrator_model: gemma4:e4b
 smart_model: gemma4:e4b
 fast_model: gemma4:e4b
@@ -63,7 +68,12 @@ The deployment settings are hard ceilings. Profiles do not alter tool schemas, d
 
 ## Home Assistant authentication
 
-The add-on prefers the Supervisor proxy when `SUPERVISOR_TOKEN` is available. A Home Assistant Long-Lived Access Token can be supplied with `ha_access_token` when direct Core access is required. Never place tokens in prompts, agent instructions, entity names, or logs.
+The add-on uses one of two mutually exclusive modes:
+
+1. **Supervisor proxy (recommended):** leave `ha_url` and `ha_access_token` blank. Home Assistant injects `SUPERVISOR_TOKEN`; the add-on connects through `http://supervisor/core`.
+2. **Direct Core:** set `ha_access_token` to a Home Assistant Long-Lived Access Token. Optionally set `ha_url` (for example `http://192.168.68.57:8123`); when omitted in add-on mode, the internal `http://homeassistant:8123` hostname is used.
+
+Never place tokens in prompts, agent instructions, entity names, logs, screenshots, or support messages. `/api/health` and `/api/health/home-assistant` deliberately expose connection diagnostics without credentials or entity values.
 
 ## First-run verification
 

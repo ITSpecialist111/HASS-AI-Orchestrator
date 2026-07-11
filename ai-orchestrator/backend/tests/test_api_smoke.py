@@ -22,8 +22,23 @@ class TestAPISmoke:
             # Configure mocks
             mock_ha_instance = AsyncMock()
             mock_ha_instance.connected = True
+            mock_ha_instance.ha_url = "http://test-ha:8123"
+            mock_ha_instance.info = MagicMock(return_value={
+                "connected": True,
+                "mode": "direct",
+                "endpoint": "ws://test-ha:8123/api/websocket",
+                "ha_version": "2026.7.2",
+                "connection_attempts": 1,
+                "last_connected_at": "2026-07-11T00:00:00+00:00",
+                "last_error": None,
+                "last_error_at": None,
+            })
             mock_ha_instance.connect = AsyncMock()
             mock_ha_instance.disconnect = AsyncMock()
+            mock_ha_instance.get_states = AsyncMock(return_value=[
+                {"entity_id": "light.test", "state": "on", "attributes": {}},
+                {"entity_id": "sensor.test", "state": "21", "attributes": {}},
+            ])
             mock_ha.return_value = mock_ha_instance
             
             mock_mcp_instance = MagicMock()
@@ -56,6 +71,7 @@ class TestAPISmoke:
         data = response.json()
         assert "status" in data
         assert data["status"] == "online"
+        assert data["home_assistant"]["connected"] is True
     
     def test_agents_endpoint(self, client):
         """Test /api/agents endpoint returns agent list"""
@@ -64,6 +80,17 @@ class TestAPISmoke:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
+
+    def test_home_assistant_health_probe(self, client):
+        response = client.get("/api/health/home-assistant")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "connected"
+        assert data["entity_count"] == 2
+        assert data["domain_count"] == 2
+        assert "latency_ms" in data
+        assert "states" not in data
     
     def test_decisions_endpoint(self, client):
         """Test /api/decisions endpoint returns decision log"""

@@ -1,6 +1,40 @@
 # Changelog
 <br>
 
+## [0.13.2] - 2026-07-11
+### Fixed — Live Home Assistant connectivity
+- Fixed the add-on's Home Assistant WebSocket connection on `websockets` 16.1. The SDK
+  removed `extra_headers`; the client now uses `additional_headers` for Supervisor proxy
+  upgrades and explicitly disables environment proxy discovery for local HA endpoints.
+- Stopped mixing Supervisor proxy headers with a Home Assistant Long-Lived Access Token.
+  Direct LLAT and Supervisor-proxy authentication now resolve as distinct, deterministic modes.
+- Added optional `ha_url` add-on configuration for direct Core access. If an LLAT is present
+  without a URL, add-on mode uses `http://homeassistant:8123`; without an LLAT, the injected
+  Supervisor token uses `http://supervisor/core`.
+- Fixed a race where HA could return a command result before the caller registered its future.
+  Pending responses are now reserved before send and retained until consumed.
+- Send/receive failures now fail pending calls immediately instead of degrading into timeouts.
+
+### Fixed — Ollama native tool continuation
+- Converted provider-neutral tool history to Ollama 0.6's typed schema: tool-call arguments are
+  mappings rather than JSON strings, and tool results use `tool_name`. This removes the live
+  `Message.tool_calls.function.arguments` Pydantic validation error on second-turn tool use.
+
+### Added — Connection diagnostics
+- `/api/health` now reports credential-free HA endpoint mode, HA version, attempt count,
+  timestamps, and the latest connection error.
+- `/api/health/home-assistant` performs a real read-only `get_states` probe and returns only
+  entity/domain counts and latency—never entity values or credentials.
+- Portal connectivity indicators now require both backend and HA health, rather than treating
+  the dashboard WebSocket alone as proof that Home Assistant is connected.
+
+### Live verification
+- Confirmed `192.168.68.57:8123` is reachable and serving Home Assistant 2026.7.2.
+- Authenticated MCP reads successfully returned calendars, panels, and a full HA health audit.
+- The patched Python client reached the live HA authentication exchange with no legacy-header
+  or proxy error.
+- Backend suite: 281 passing tests and 4 opt-in live MCP tests skipped.
+
 ## [0.13.1] - 2026-07-11
 ### Changed — Microsoft Defender-inspired portal theme
 - Rebuilt the shared application shell around the Microsoft Defender portal's visual patterns:

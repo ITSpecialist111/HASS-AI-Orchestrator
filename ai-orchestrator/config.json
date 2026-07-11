@@ -1,6 +1,6 @@
 {
     "name": "AI Orchestrator",
-    "version": "0.13.1",
+    "version": "0.13.2",
     "slug": "ai-orchestrator",
     "description": "Microsoft Defender-inspired Home Assistant control portal with Gemma 4 E4B profiles, deterministic guarded tools, durable plans, memory, triggers, and streaming",
     "url": "https://github.com/ITSpecialist111/HASS-AI-Orchestrator",
@@ -27,6 +27,7 @@
         "ollama_host": "http://localhost:11434",
         "dry_run_mode": true,
         "log_level": "info",
+        "ha_url": "",
         "ha_access_token": "",
         "decision_interval": 120,
         "enable_rag": true,
@@ -77,6 +78,7 @@
         "ollama_host": "str",
         "dry_run_mode": "bool",
         "log_level": "list(debug|info|warning|error)",
+        "ha_url": "str?",
         "ha_access_token": "str?",
         "decision_interval": "int(30,600)",
         "enable_rag": "bool",

@@ -166,6 +166,49 @@ def resolve_reasoning_profile(profile: Optional[str]) -> ReasoningProfile:
     return resolved
 
 
+def _to_ollama_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert harness history to Ollama 0.6's typed message schema.
+
+    The harness keeps provider-neutral/OpenAI-style call records with JSON
+    string arguments and tool result names. Ollama requires argument mappings
+    and calls the result field ``tool_name``. Passing the neutral shape causes
+    a Pydantic ``Message.tool_calls.function.arguments`` validation error on
+    the first tool continuation turn.
+    """
+    converted: List[Dict[str, Any]] = []
+    for message in messages:
+        role = str(message.get("role") or "user")
+        row: Dict[str, Any] = {
+            "role": role,
+            "content": str(message.get("content") or ""),
+        }
+        if role == "assistant" and message.get("tool_calls"):
+            calls: List[Dict[str, Any]] = []
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") or {}
+                arguments = function.get("arguments") or {}
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        arguments = {"_raw": arguments}
+                if not isinstance(arguments, Mapping):
+                    arguments = {"_raw": arguments}
+                calls.append({
+                    "function": {
+                        "name": str(function.get("name") or ""),
+                        "arguments": dict(arguments),
+                    },
+                })
+            row["tool_calls"] = calls
+        elif role == "tool":
+            row["tool_name"] = str(
+                message.get("tool_name") or message.get("name") or ""
+            )
+        converted.append(row)
+    return converted
+
+
 @dataclass
 class ToolCall:
     id: str
@@ -303,7 +346,7 @@ class OllamaToolBackend:
         num_predict = selected.num_predict if profile else self.num_predict
         kwargs: Dict[str, Any] = {
             "model": self.model,
-            "messages": messages,
+            "messages": _to_ollama_messages(messages),
             "options": {
                 "temperature": temperature,
                 "top_p": top_p,

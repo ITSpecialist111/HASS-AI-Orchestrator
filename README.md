@@ -1,9 +1,9 @@
 # Graham's AI Orchestrator
 
-[![Version](https://img.shields.io/badge/version-v0.13.1-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1)
+[![Version](https://img.shields.io/badge/version-v0.13.2-blue)](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.2)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5)
 ![Agent Kernel](https://img.shields.io/badge/agent%20kernel-deterministic-8B5CF6)
-![Tests](https://img.shields.io/badge/backend%20tests-272%20passing-22C55E)
+![Tests](https://img.shields.io/badge/backend%20tests-281%20passing-22C55E)
 
 ## A reasoning and policy layer for the intelligent home
 
@@ -32,7 +32,7 @@ The long-term goal is not another voice-controlled remote and not a chatbot bolt
 - **Today:** run local `gemma4:e4b` in Rapid, Balanced, or Deep mode; investigate live HA state; create exact plans; approve and replay actions; run proactive goals; recall prior episodes; and operate everything from a human-centred dashboard.
 - **Safety posture:** dry-run by default, direct execution disabled, sensitive services gated, generated dashboards sandboxed, and mutation replay checkpointed.
 - **Next:** native Assist/voice integration, post-action state verification, filtered real-time events, and a temporal model of the home.
-- **Latest test release:** [v0.13.1 — Defender-Inspired Control Portal](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1).
+- **Latest test release:** [v0.13.2 — Live Home Assistant Connectivity](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.2).
 
 ### Contents
 
@@ -570,7 +570,7 @@ The scorer uses deterministic assertions for mutations, approvals, tool budgets,
 
 ### Verified release baseline
 
-- **272 backend tests passing**;
+- **281 backend tests passing**;
 - **4 opt-in live external-MCP tests skipped** when no live server is configured;
 - frontend clean install and production build passing;
 - frontend dependency audit reporting **0 vulnerabilities**;
@@ -682,6 +682,7 @@ See [ROADMAP.md](ROADMAP.md) for the wider product direction.
 - [Product roadmap](ROADMAP.md)
 - [Testing guide](TESTING.md)
 - [Changelog](CHANGELOG.md)
+- [v0.13.2 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.2)
 - [v0.13.1 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.1)
 - [v0.13.0 release](https://github.com/ITSpecialist111/HASS-AI-Orchestrator/releases/tag/0.13.0)
 

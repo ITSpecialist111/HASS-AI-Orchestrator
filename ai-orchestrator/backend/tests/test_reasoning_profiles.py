@@ -79,6 +79,58 @@ async def test_ollama_profile_uses_documented_think_parameter(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_ollama_tool_history_uses_native_message_schema(monkeypatch):
+    captured: Dict[str, Any] = {}
+
+    class FakeClient:
+        async def chat(self, **kwargs):
+            captured.update(kwargs)
+            return {"message": {"content": "done", "tool_calls": []}}
+
+    monkeypatch.setattr("ollama.AsyncClient", lambda host: FakeClient())
+    backend = OllamaToolBackend(model="gemma4:e4b")
+    messages = [
+        {"role": "system", "content": "system"},
+        {"role": "user", "content": "inspect living room"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "call-1",
+                "type": "function",
+                "function": {
+                    "name": "ha_summarise_area",
+                    "arguments": '{"area": "living room"}',
+                },
+            }],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-1",
+            "name": "ha_summarise_area",
+            "content": '{"ok": true}',
+        },
+    ]
+
+    await backend.chat(messages, [], profile="balanced")
+
+    assistant = captured["messages"][2]
+    tool_result = captured["messages"][3]
+    assert assistant["tool_calls"] == [{
+        "function": {
+            "name": "ha_summarise_area",
+            "arguments": {"area": "living room"},
+        },
+    }]
+    assert tool_result == {
+        "role": "tool",
+        "content": '{"ok": true}',
+        "tool_name": "ha_summarise_area",
+    }
+    assert "tool_call_id" not in tool_result
+
+
+@pytest.mark.asyncio
 async def test_rapid_profile_is_forwarded_and_caps_harness_iterations():
     seen_profiles: List[str] = []
 

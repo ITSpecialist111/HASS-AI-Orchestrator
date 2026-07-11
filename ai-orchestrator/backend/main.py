@@ -22,6 +22,7 @@ import json
 import asyncio
 import httpx
 import socket
+import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
@@ -175,6 +176,53 @@ dashboard_clients: List[WebSocket] = []
 background_tasks: set[asyncio.Task] = set()
 
 
+def resolve_ha_connection(
+    *,
+    configured_url: str,
+    long_lived_token: str,
+    supervisor_token: str,
+    is_addon: bool,
+) -> Dict[str, Optional[str]]:
+    """Resolve a safe HA URL/token pair without mixing auth modes.
+
+    A Long-Lived Access Token authenticates directly to Core. Without one,
+    add-ons use the Supervisor Core proxy and its injected token for both the
+    HTTP upgrade header and Home Assistant WebSocket auth frame.
+    """
+    direct_url = (configured_url or "").strip().rstrip("/")
+    llat = (long_lived_token or "").strip()
+    supervisor = (supervisor_token or "").strip()
+
+    if llat:
+        if not direct_url:
+            direct_url = (
+                "http://homeassistant:8123"
+                if is_addon
+                else "http://homeassistant.local:8123"
+            )
+        return {
+            "url": direct_url,
+            "token": llat,
+            "supervisor_header_token": None,
+            "mode": "direct",
+        }
+
+    if is_addon and supervisor:
+        return {
+            "url": "http://supervisor/core",
+            "token": supervisor,
+            "supervisor_header_token": supervisor,
+            "mode": "supervisor_proxy",
+        }
+
+    return {
+        "url": direct_url or "http://homeassistant.local:8123",
+        "token": "",
+        "supervisor_header_token": None,
+        "mode": "direct_uncredentialed",
+    }
+
+
 def spawn_background(coro: Any, name: str) -> asyncio.Task:
     """Start and retain a named background task for graceful shutdown."""
     task = asyncio.create_task(coro, name=name)
@@ -261,6 +309,7 @@ async def lifespan(app: FastAPI):
     disable_telemetry = True
     enable_rag_opt = True
     ha_access_token_opt = ""
+    ha_url_opt = ""
     
     # Gemini Options (Initialize to avoid NameError on failure)
     gemini_api_key_opt = ""
@@ -306,6 +355,7 @@ async def lifespan(app: FastAPI):
                 disable_telemetry = opts.get("disable_telemetry", True)
                 enable_rag_opt = bool(opts.get("enable_rag", True))
                 ha_access_token_opt = opts.get("ha_access_token", "").strip()
+                ha_url_opt = opts.get("ha_url", "").strip()
                 
                 # Gemini Options
                 gemini_api_key_opt = opts.get("gemini_api_key", "").strip()
@@ -360,6 +410,7 @@ async def lifespan(app: FastAPI):
         # Fallback to env var
         dry_run = os.getenv("DRY_RUN_MODE", "true").lower() == "true"
         enable_rag_opt = os.getenv("ENABLE_RAG", "true").lower() == "true"
+        ha_url_opt = os.getenv("HA_URL", "").strip()
         gemini_api_key_opt = os.getenv("GEMINI_API_KEY", "")
         use_gemini_dashboard_opt = os.getenv("USE_GEMINI_FOR_DASHBOARD", "false").lower() == "true"
         gemini_model_name_opt = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro")
@@ -398,38 +449,25 @@ async def lifespan(app: FastAPI):
     logger.debug("ENV - HA_URL: %s", os.getenv('HA_URL'))
     logger.debug("ENV - HA_ACCESS_TOKEN: %s", bool(os.getenv('HA_ACCESS_TOKEN')))
 
-    # If we are in an add-on, we MUST use the supervisor Proxy ONLY if the token is present.
-    # Otherwise, fallback to Direct Core Access.
     is_addon = bool(os.getenv("SUPERVISOR_TOKEN")) or options_path.exists()
     supervisor_token = os.getenv("SUPERVISOR_TOKEN", "")
-    
-    ha_url = os.getenv("HA_URL")
-    if is_addon and supervisor_token:
-        ha_url = "http://supervisor/core"
-        logger.debug("Add-on environment detected with Supervisor Token. Using Proxy: %s", ha_url)
-    elif is_addon:
-        # Fallback to internal DNS if supervisor token is missing
-        ha_url = ha_url or "http://homeassistant:8123"
-        logger.debug("Add-on environment detected but NO Supervisor Token. Falling back to Direct Access: %s", ha_url)
-    elif not ha_url:
-        ha_url = "http://homeassistant.local:8123"
-        logger.debug("No HA_URL set and not in add-on. Defaulting to %s", ha_url)
 
-    # Try to use a specific Long-Lived Access Token if provided, otherwise fallback to Supervisor Token
-    ha_token = os.getenv("HA_ACCESS_TOKEN", "").strip() or ha_access_token_opt
-    
-    # Determine which token to use for headers
-    if supervisor_token:
-        # Supervisor Proxy Mode
-        header_token = supervisor_token
-        # Ensure we have a token (either manually provided or supervisor)
-        if not ha_token:
-             ha_token = supervisor_token
-        logger.debug("Using Supervisor Proxy Mode (LLAT priority: %s)", bool(ha_access_token_opt))
-    else:
-        # Direct Core Access Mode
-        header_token = None
-        logger.debug("Using Direct Core Access Mode (Token present: %s)", bool(ha_token))
+    connection = resolve_ha_connection(
+        configured_url=os.getenv("HA_URL", "").strip() or ha_url_opt,
+        long_lived_token=(
+            os.getenv("HA_ACCESS_TOKEN", "").strip() or ha_access_token_opt
+        ),
+        supervisor_token=supervisor_token,
+        is_addon=is_addon,
+    )
+    ha_url = str(connection["url"])
+    ha_token = str(connection["token"] or "")
+    header_token = connection["supervisor_header_token"]
+    logger.info(
+        "Home Assistant connection mode=%s endpoint=%s",
+        connection["mode"],
+        ha_url,
+    )
 
     ha_client = HAWebSocketClient(
         ha_url=ha_url,
@@ -813,15 +851,53 @@ app.add_middleware(APIAuthMiddleware)
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
+    ha_info = ha_client.info() if ha_client else {"connected": False}
     return {
-        "status": "online",
+        "status": "online" if ha_info.get("connected") else "degraded",
         "version": VERSION,
+        "home_assistant": ha_info,
         "orchestrator_model": orchestrator.model_name if orchestrator else "unknown",
         "agent_count": len(orchestrator.agents) if orchestrator else 0,
         "reasoning_kernel": deep_reasoner.info() if deep_reasoner else None,
         "legacy_autonomous_loops": bool(
             any(task.get_name().startswith("legacy-agent-") for task in background_tasks)
         ),
+    }
+
+
+@app.get("/api/health/home-assistant")
+async def home_assistant_health_check():
+    """Execute a read-only HA state probe without returning entity data."""
+    if not ha_client:
+        raise HTTPException(status_code=503, detail="Home Assistant client not initialized")
+    if not ha_client.connected:
+        raise HTTPException(status_code=503, detail={
+            "message": "Home Assistant WebSocket is not connected",
+            "connection": ha_client.info(),
+        })
+
+    started = time.monotonic()
+    try:
+        states = await ha_client.get_states(timeout=20.0)
+    except Exception as exc:
+        logger.warning("Home Assistant state-read health probe failed: %s", exc)
+        raise HTTPException(status_code=503, detail={
+            "message": f"Home Assistant state read failed: {exc}",
+            "connection": ha_client.info(),
+        }) from exc
+
+    state_rows = states if isinstance(states, list) else [states]
+    domains = {
+        str(row.get("entity_id", "")).partition(".")[0]
+        for row in state_rows
+        if isinstance(row, dict) and "." in str(row.get("entity_id", ""))
+    }
+    return {
+        "status": "connected",
+        "entity_count": len(state_rows),
+        "domain_count": len(domains),
+        "latency_ms": int((time.monotonic() - started) * 1000),
+        "connection": ha_client.info(),
     }
 
 
@@ -1699,6 +1775,8 @@ async def get_config():
     """Get current configuration"""
     return {
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        "ha_url": ha_client.ha_url if ha_client else os.getenv("HA_URL", ""),
+        "ha_connected": bool(ha_client and ha_client.connected),
         "dry_run_mode": mcp_server.dry_run if mcp_server else True,
         "orchestrator_model": os.getenv("ORCHESTRATOR_MODEL", "gemma4:e4b"),
         "smart_model": os.getenv("SMART_MODEL", "gemma4:e4b"),

@@ -53,7 +53,7 @@ export GEMINI_MODEL_NAME=$(jq -r '.gemini_model_name // "gemini-1.5-pro"' $CONFI
 # Home Assistant API configuration
 export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"
 export HA_ACCESS_TOKEN=$(jq -r '.ha_access_token // ""' $CONFIG_PATH)
-export HA_URL=$(jq -r '.ha_url // "http://supervisor/core"' $CONFIG_PATH)
+export HA_URL=$(jq -r '.ha_url // ""' $CONFIG_PATH)
 
 echo "Configuration loaded:"
 echo "  Ollama Host: $OLLAMA_HOST"
@@ -70,10 +70,8 @@ echo "  RAG Enabled: $ENABLE_RAG"
 echo "  LLM Provider: $LLM_PROVIDER"
 if [ -n "$HA_ACCESS_TOKEN" ]; then
     echo "  HA Access Token: PROVIDED (Length: ${#HA_ACCESS_TOKEN})"
-    # Switch to Direct Core Access to bypass Supervisor Proxy issues ONLY if still using default proxy URL
-    if [ "$HA_URL" == "http://supervisor/core" ]; then
-        export HA_URL="http://homeassistant:8123"
-        echo "  > Switching to Direct Core Access: $HA_URL"
+    if [ -z "$HA_URL" ]; then
+        echo "  > Direct Core access will use the internal Home Assistant hostname"
     else
         echo "  > Using custom HA URL: $HA_URL"
     fi

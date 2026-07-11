@@ -53,7 +53,8 @@ async def test_connect_auth_success(ha_client, mock_ws):
         json.dumps({"type": "auth_ok", "ha_version": "2023.12.0"})
     ]
 
-    with patch('websockets.connect', new=AsyncMock(return_value=mock_ws)):
+    connect_mock = AsyncMock(return_value=mock_ws)
+    with patch('websockets.connect', new=connect_mock):
         await ha_client.connect()
 
     assert ha_client.connected
@@ -61,6 +62,38 @@ async def test_connect_auth_success(ha_client, mock_ws):
     auth_msg = next((msg for msg in mock_ws.sent_messages if msg.get("type") == "auth"), None)
     assert auth_msg is not None
     assert auth_msg["access_token"] == "test_token"
+    kwargs = connect_mock.await_args.kwargs
+    assert kwargs["proxy"] is None
+    assert "extra_headers" not in kwargs
+    assert "additional_headers" not in kwargs
+    assert ha_client.ha_version == "2023.12.0"
+    assert ha_client.info()["mode"] == "direct"
+
+
+@pytest.mark.asyncio
+async def test_connect_supervisor_proxy_uses_websockets_16_headers(mock_ws):
+    client = HAWebSocketClient(
+        "http://supervisor/core",
+        "supervisor-test-token",
+        supervisor_token="supervisor-test-token",
+    )
+    mock_ws.responses = [
+        json.dumps({"type": "auth_required", "ha_version": "2026.7.2"}),
+        json.dumps({"type": "auth_ok", "ha_version": "2026.7.2"}),
+    ]
+    connect_mock = AsyncMock(return_value=mock_ws)
+
+    with patch('websockets.connect', new=connect_mock):
+        await client.connect()
+
+    kwargs = connect_mock.await_args.kwargs
+    assert kwargs["additional_headers"] == {
+        "Authorization": "Bearer supervisor-test-token",
+    }
+    assert "extra_headers" not in kwargs
+    assert kwargs["proxy"] is None
+    assert client.ws_url == "ws://supervisor/core/api/websocket"
+    assert client.info()["mode"] == "supervisor_proxy"
 
 @pytest.mark.asyncio
 async def test_connect_auth_failure(ha_client, mock_ws):
@@ -118,6 +151,33 @@ async def test_get_states(ha_client, mock_ws):
     states = await task
     assert len(states) == 2
     assert states[0]["entity_id"] == "light.test"
+
+
+@pytest.mark.asyncio
+async def test_get_states_handles_response_arriving_during_send(ha_client, mock_ws):
+    ha_client.ws = mock_ws
+    ha_client.connected = True
+
+    async def immediate_response(message):
+        sent = json.loads(message)
+        future = ha_client.pending_responses[sent["id"]]
+        future.set_result({
+            "id": sent["id"],
+            "type": "result",
+            "success": True,
+            "result": [{
+                "entity_id": "sensor.immediate",
+                "state": "ready",
+                "attributes": {},
+            }],
+        })
+
+    mock_ws.send = immediate_response
+
+    states = await ha_client.get_states(timeout=1)
+
+    assert states[0]["entity_id"] == "sensor.immediate"
+    assert ha_client.pending_responses == {}
 
 @pytest.mark.asyncio
 async def test_call_service(ha_client):
